@@ -31,3 +31,14 @@ docs/        architecture, backend, auth, dynamodb-schema, ml-pipeline, lgpd, fr
 
 - Reference architecture: https://github.com/luidsonl/0shared (mirror its auth flow, presigned-URL upload/download, S3→SQS async patterns, CloudFormation-export → Terraform data-source integration).
 - Training dataset: Armand, Eboue (2021) "Student Learning Preferences", Mendeley Data, V1, doi: 10.17632/bwrr6zypcj.1 — VARK Likert questionnaire, ~245 records. Observed schema: `Gender` + `Age` + 15 items rated 1–5 (three 5-item subscales: reading/writing, aural, kinesthetic) + single-modality `Learner` label (A/K/…). **Caveat: subjects are university students, not children** — domain gap; use kids' VARK version and collect own data for retraining.
+
+## Public repository — MANDATORY security rules
+
+The repo is **public on GitHub**. Violations of these rules are release-blockers; see `docs/security.md` for the full spec and checklist.
+
+- **Never commit secrets**: keys, tokens, passwords, credentials (not even commented/test fixtures). Use env vars, AWS Secrets Manager, GitHub Actions secrets.
+- **Never commit an AWS Account ID** (12 digits) or an ARN containing one; use placeholders.
+- **Never commit real personal data** (LGPD): test fixtures must be fabricated (fake names/emails). Children's data is never published.
+- **Never commit** `*.tfstate`, `.env`, `env.json`, `*.pem`/`*.key`, model artifacts (`*.joblib`, `*.parquet`), or the raw training dataset (download-only, CC BY 4.0).
+- Run `gitleaks detect` before pushing; `terraform validate` on every infra change. Keep root `.gitignore`, `.gitleaks.toml`, `.pre-commit-config.yaml`, `SECURITY.md`, and `.github/workflows/secret-scan.yml` up to date.
+- `terraform/aws-bootstrap/terraform.tfvars` holds only public metadata (bucket name/owner) — safe to commit; local env overrides go in git-ignored `*.auto.tfvars`.

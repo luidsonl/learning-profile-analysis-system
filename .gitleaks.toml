@@ -1,0 +1,25 @@
+# See https://gitleaks.io for documentation
+title = "learning-profile-analysis-system gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+  id = "aws-account-id"
+  description = "AWS Account ID (12 digits)"
+  regex = '''\b[0-9]{12}\b'''
+
+[[allowlists]]
+  description = "Intentional public metadata and test fixtures"
+  paths = [
+    '''docs/security\.md''',
+    '''docs/dynamodb-schema\.md''',
+    '''docs/backend\.md''',
+    '''docs/architecture\.md''',
+    '''terraform/aws-bootstrap/terraform\.tfvars''',
+    '''SECURITY\.md''',
+    '''AGENTS\.md''',
+    '''\.gitleaks\.toml''',
+    '''\.pre-commit-config\.yaml''',
+    '''\.github/workflows/secret-scan\.yml''',
+  ]

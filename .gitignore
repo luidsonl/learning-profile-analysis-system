@@ -1,0 +1,66 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Node
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & secrets — NEVER commit real values
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.p8
+*.ppk
+id_rsa
+id_ed25519
+credentials
+*.credentials
+.aws/
+config.json
+secrets.*
+*.secret
+
+# Local API / SAM config — never commit real tokens/parameters
+sam-app/env.json
+!sam-app/env.json.example
+
+# Terraform — state & local overrides (names/owner in terraform.tfvars are public metadata, safe to commit)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*.auto.tfvars
+
+# SAM build artifacts
+.aws-sam/
+sam-build/
+
+# Test / coverage
+coverage/
+.nyc_output/
+*.log
+
+# Dataset artifacts (downloaded, not committed — see docs/security.md)
+ml/data/raw/
+ml/data/snapshots/
+*.parquet
+*.joblib
