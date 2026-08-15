@@ -133,7 +133,7 @@ Training always happens **outside** the deployed system (local machine or CI). T
 │   ├── evaluate/          # Metrics (accuracy, F1, Hamming loss) + reports
 │   └── serve/             # Package model for Lambda (layer/deps + artifact bundle)
 ├── docs/                  # architecture, backend, auth, dynamodb-schema, ml-pipeline,
-│                          #   lgpd, frontend, design-system
+│                          #   student-data, lgpd, frontend, design-system
 ├── agents.md
 └── Makefile
 ```
@@ -301,6 +301,7 @@ Cleanup happens in reverse order.
 - [Authentication](./auth.md) — sessions, RBAC, consent
 - [DynamoDB Schema](./dynamodb-schema.md) — single-table design, entities, indexes
 - [ML Pipeline](./ml-pipeline.md) — features, training, registry, inference
+- [Student Data Features](./student-data-features.md) — structured data for student categorization (future direction)
 - [LGPD](./lgpd.md) — consent, audit, retention
 - [Frontend](./frontend.md) — SPA, routes, build & deploy
 - [Design System](./design-system.md) — tokens, components, accessibility

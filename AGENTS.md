@@ -30,4 +30,4 @@ docs/        architecture, backend, auth, dynamodb-schema, ml-pipeline, lgpd, fr
 ## Key external references
 
 - Reference architecture: https://github.com/luidsonl/0shared (mirror its auth flow, presigned-URL upload/download, S3→SQS async patterns, CloudFormation-export → Terraform data-source integration).
-- Training dataset: Armand, Eboue (2021) "Student Learning Preferences", Mendeley Data, V1, doi: 10.17632/bwrr6zypcj.1 — VARK questionnaire, ~245 records, 16 questions × 4 options (V/A/R/K) + multimodal label. **Caveat: subjects are university students, not children** — domain gap; use kids' VARK version and collect own data for retraining.
+- Training dataset: Armand, Eboue (2021) "Student Learning Preferences", Mendeley Data, V1, doi: 10.17632/bwrr6zypcj.1 — VARK Likert questionnaire, ~245 records. Observed schema: `Gender` + `Age` + 15 items rated 1–5 (three 5-item subscales: reading/writing, aural, kinesthetic) + single-modality `Learner` label (A/K/…). **Caveat: subjects are university students, not children** — domain gap; use kids' VARK version and collect own data for retraining.

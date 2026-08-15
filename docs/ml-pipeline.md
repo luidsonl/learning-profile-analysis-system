@@ -43,7 +43,7 @@ This separation is intentional and is the contract that makes future models poss
 ### Public dataset (primary training source)
 
 - **Armand, Eboue (2021), "Student Learning Preferences", Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1** (License CC BY 4.0)
-- VARK questionnaire data: ~245 records, 16 questions × 4 options (V/A/R/K), with a multimodal label.
+- Observed schema (V1): 18 columns — `Gender` (Male/Female), `Age` (integer), **15 VARK Likert items rated 1–5**, and a single-modality `Learner` label (e.g., `A`, `K`). The 15 items form three 5-item subscales by wording: **reading/writing** (e.g., "I learn better by reading than by listening to someone"), **aural** (e.g., "I remember things I have heard in class better than things I have read"), and **kinesthetic** (e.g., "I enjoy learning in class by doing experiments"). There is no explicit multimodal label column in the sample; multimodal behavior must be derived from subscale scores.
 - The raw file is downloaded into `ml/data/` by a documented script (`ml/data/README.md` explains provenance and download); large/binary artifacts are kept out of git.
 - **Domain-gap caveat:** the subjects are university students, not children. The MVP therefore uses an adapted **kids** VARK form in the system and complements training with exported system submissions (see below).
 
@@ -58,7 +58,8 @@ This separation is intentional and is the contract that makes future models poss
 
 `ml/features/` transforms raw submissions into feature vectors. The feature schema is recorded in each model's `metadata.json` and in the registry item.
 
-- VARK: one-hot encoding per question/option plus per-modality totals (V, A, R, K); optional demographic fields when present.
+- VARK (primary dataset): the 15 Likert items are ordinal features; per-subscale scores (sum/mean of each 5-item group) are derived, plus `Gender` and `Age` as demographic features. Label = `Learner` (single modality).
+- Kids form in the system: same per-modality scoring applied to the adapted kids' items, so model and form remain aligned.
 - Snapshot features are kept generic so future profiles (giftedness, difficulty, socioemotional) can reuse the export without new system work.
 
 ---
@@ -127,8 +128,50 @@ Examples of future models: giftedness indicator, learning-difficulty indicator, 
 
 ---
 
+## Future directions
+
+### General student categorization (out of MVP scope)
+
+A planned direction is to categorize students from **general student data** — academic history, demographics, attendance, activity/engagement records, and other non-questionnaire signals — not just from filled forms. This is deliberately **not implemented in the MVP**: it depends on data volume the system must first collect (via observations, anamnesis, and behavior checklists). When pursued, it plugs into the same contract: export → offline training → registry → inference. The generic snapshot format and the `anamnesis`/`behavior-checklist`/`socioemotional` forms are the groundwork for it. The **feature catalog and evidence base** for this direction are documented in [Student Data Features](./student-data-features.md).
+
+### Learning styles beyond VARK
+
+The MVP targets the VARK profile (Fleming). Other well-known frameworks could yield additional profiles and use the same pipeline. Overview (see [Learning styles — Wikipedia](https://en.wikipedia.org/wiki/Learning_styles)):
+
+| Framework | Model | Typical instrument |
+|-----------|-------|--------------------|
+| Kolb experiential learning | Accommodator / Converger / Diverger / Assimilator | Kolb Learning Style Inventory (LSI) |
+| Honey & Mumford | Activist / Reflector / Theorist / Pragmatist | Learning Styles Questionnaire (LSQ) |
+| Sensory modalities (Barbe) | Visual / Auditory / Kinesthetic (VAK) | — |
+| VARK (Fleming) | Visual / Aural / Read-write / Kinesthetic + multimodal | VARK Questionnaire (the MVP profile) |
+| Gregorc & Butler | Concrete/Abstract × Sequential/Random | Gregorc Style Delineator |
+| Grasha-Riechmann | Avoidant / Participative / Competitive / Collaborative / Dependent / Independent | Grasha-Riechmann Learning Style Scale |
+| Felder & Silverman | Active-Reflective / Visual-Verbal / Sensing-Intuition / Sequential-Global | Index of Learning Styles (ILS) |
+
+> **Honesty caveat:** the scientific evidence that matching instruction to a fixed "style" improves outcomes is weak (the "meshing hypothesis" is widely criticized — see the Criticism section of the Wikipedia article). Profiles here should be treated as *preferences and suggestions*, not immutable labels, and the product copy must say so.
+
+### Candidate datasets
+
+Beyond the primary dataset (Armand, Eboue 2021), these public datasets are candidates for new models. Most target **higher education** — the MVP's kids-focused collection remains essential to close the domain gap:
+
+| Dataset | Reference / DOI | Relevance |
+|---------|-----------------|-----------|
+| Student Learning Interaction and VARK Learning Style Dataset | Alzahrani, N. & El-Sabagh, H. A. (2024). Zenodo, 10.5281/zenodo.16506654 | eLearning interaction logs (13 weeks, 135 students) + VARK labels + midterm scores — predicts style from behavior, not questionnaire |
+| DATA SET OF LEARNING STYLE PREFERENCE | Mendeley Data, 10.17632/mtvfdwm3dt.1 | **Elementary-school students** (992, grades 4–5, Indonesia), VAK preferences — closest match to the child persona |
+| Anonymized Moodle interaction dataset for learning style prediction (FSLSM) | Zenodo, 10.5281/zenodo.18624789 | Moodle resource/forum logs + aggregated features → Felder-Silverman styles (clustering + stacking ensemble) |
+| Learning Style Identification | Ayyoub, H. (2023). IEEE DataPort, 10.21227/7tc4-5841 | FSLSM via the 44-item ILS questionnaire + course event logs (2,300+ learners) |
+| Student Performance and Learning Behavior Dataset for Educational Analytics | Zenodo, 10.5281/zenodo.16459132 | 14,003 records: study behavior, engagement, demographics, LearningStyle + grades — general-student categorization |
+| Student Performance | Cortez, P. & Silva, A. (2008), UCI ML Repository | Portuguese secondary-school students: demographics + family + school features + grades — general-student categorization baseline |
+| Open University Learning Analytics Dataset (OULAD) | Kuzilek, Zdrahal & Fuglik, 2017 | Large VLE interaction + demographics + results — behavioral classification at scale |
+| Education Dialogue Dataset | Google Research, arXiv:2405.14655 | Teacher-student dialogues with stated learning preferences — NLU/LLM-based personalization research |
+
+Each candidate should be vetted (license, age range, feature alignment) in `ml/data/README.md` before being used for training.
+
+---
+
 ## See Also
 
 - [Architecture](./architecture.md) — overall design, forms engine, decoupling
 - [Backend](./backend.md) — predict/inference endpoints
 - [DynamoDB Schema](./dynamodb-schema.md) — `MODEL#`, `PRED#`, assessment entities
+- [Student Data Features](./student-data-features.md) — feature catalog & sources for general student categorization
