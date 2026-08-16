@@ -55,7 +55,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 **Profile item**
 | PK | SK | Attributes |
 |----|----|-----------|
-| `CHILD#<childId>` | `META` | `childId`, `name`, `birthDate`, `gender`, `grade`, `school`, `status` (`active|archived`), `studentUserId`, `consentVersion`, `consentAt`, `consentBy`, `createdAt`, `updatedAt` |
+| `CHILD#<childId>` | `META` | `childId`, `name`, `birthDate`, `gender`, `grade`, `school`, `status` (`active|archived`), `studentUserId`, `consentVersion`, `consentAt`, `consentBy`, `consentLegalBasis`, `consentGrantedByRole`, `autonomyLevel` (`supervised|guided|autonomous`), `autonomyUpdatedAt`, `autonomyUpdatedBy`, `accountability` (JSON: institution/authorizedBy/note), `createdAt`, `updatedAt` |
 | — | — | GSI2PK `CHILD#STATUS#<status>`, GSI2SK `CHILD#<childId>` |
 
 **Edges (child side — reverse of the user-side edges)**
@@ -68,9 +68,16 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 **Consent records (versioned)**
 | PK | SK | Attributes |
 |----|----|-----------|
-| `CHILD#<childId>` | `CONSENT#<version>#<timestamp>` | `consentVersion`, `scope`, `grantedBy`, `grantedByRole`, `status` (`granted|revoked`), `at` |
+| `CHILD#<childId>` | `CONSENT#<version>#<timestamp>` | `consentVersion`, `scope`, `grantedBy`, `grantedByRole`, `legalBasis` (`guardian|institution_authorization|self_consent`), `status` (`granted|revoked`), `at` |
 
-> Current consent is denormalized on `CHILD#<id>/META` (`consentVersion`, `consentAt`); revocation writes a new `CONSENT#` item and updates `META` (blocks new processing).
+> Current consent is denormalized on `CHILD#<id>/META` (`consentVersion`, `consentAt`, `consentBy`, `consentLegalBasis`, `consentGrantedByRole`); revocation writes a new `CONSENT#` item and updates `META` (blocks new processing).
+
+**Autonomy history (versioned — mirrors the consent pattern)**
+| PK | SK | Attributes |
+|----|----|-----------|
+| `AUTONOMY#<childId>` | `AUTONOMY#<timestamp>` | `level`, `reason`, `changedBy`, `changedByRole`, `at` |
+
+> Current autonomy level is denormalized on `CHILD#<id>/META`; `PATCH /children/:id/autonomy` writes a history item + `META` update + `AUDIT#` in one transaction.
 
 ### Edges (user side)
 
@@ -195,6 +202,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Active model version | Query `MODEL#<name>` SK `CURRENT` |
 | Models by status | GSI2 Query `MODEL#STATUS#<status>` |
 | Audit trail of a child | Query `AUDIT#CHILD#<childId>`, SK `EVENT#` prefix, desc |
+| Autonomy history of a child | Query `AUTONOMY#<childId>`, SK `AUTONOMY#` prefix, desc |
 
 ---
 
@@ -206,7 +214,8 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Grant guardianship | `USER#<g>/GUARD#<c>` + `CHILD#<c>/GUARDIAN#<g>` + `AUDIT#CHILD#<c>` |
 | Educator follow | `USER#<e>/FOLLOW#<c>` + `CHILD#<c>/EDUCATOR#<e>` + `AUDIT#CHILD#<c>` |
 | Create student account | `USER#<s>/META` + `EMAIL#` reservation + `USER#<s>/CHILD#<c>` + `CHILD#<c>/STUDENT#<s>` + `CHILD#<c>/META` (set `studentUserId`) + `AUDIT#CHILD#<c>` |
-| Consent grant / revoke | `CHILD#<c>/CONSENT#<v>#<ts>` + `CHILD#<c>/META` (consent attrs, conditional) + `AUDIT#CHILD#<c>` |
+| Consent grant / revoke | `CHILD#<c>/CONSENT#<v>#<ts>` + `CHILD#<c>/META` (consent attrs incl. legal basis, conditional) + `AUDIT#CHILD#<c>` |
+| Set autonomy level | `AUTONOMY#<c>/AUTONOMY#<ts>` + `CHILD#<c>/META` (autonomy attrs) + `AUDIT#CHILD#<c>` |
 | Submit form (idempotent) | `CHILD#<c>/SUBMISSION#…` (conditional write, no classification side-effect) |
 | Classify submission → assessment | `ASSESS#<c>/VARK#<ts>` + `CHILD#<c>/META` (profile attrs) |
 | Predict (inference) | `PRED#<c>/PRED#<id>` |

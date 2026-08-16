@@ -7,11 +7,13 @@
 | Processing | Legal basis (LGPD art. 7) | Notes |
 |-----------|----------------------------|-------|
 | Registration of guardian/educator/admin | Consent + legitimate interest of the institution | Adult users |
-| Registration of the student (minor) | **Consent of the guardian** (art. 14 — children's data) | Guardian-initiated only |
-| Filling forms, observations, assessments | Guardian consent (per child, versioned) | `vark-kids`, `anamnesis`, `socioemotional`, `behavior-checklist` |
-| ML prediction & recommendations | Same guardian consent; anonymized training outside scope | See data minimization below |
-| Reports (PDF) | Guardian consent; sharing per `sharedWith` | Presigned URLs |
+| Registration of the student (minor) | **Consent of the guardian** (art. 14 — children's data); for students without a guardian, **institution authorization** (`legalBasis=institution_authorization`) granted by the responsible educator/admin, documented on the consent record | Guardian- or institution-led |
+| Filling forms, observations, assessments | Guardian consent or institution authorization (per child, versioned) | `vark-kids`, `anamnesis`, `socioemotional`, `behavior-checklist` |
+| ML prediction & recommendations | Same consent basis; anonymized training outside scope | See data minimization below |
+| Reports (PDF) | Same consent basis; sharing per `sharedWith` | Presigned URLs |
 | Audit log | Legitimate interest + legal compliance (art. 37) | Kept separately from analytics |
+
+> Every consent record stores its **legal basis** (`legalBasis`: `guardian | institution_authorization | self_consent`) and the **role that granted it** (`grantedByRole`), satisfying LGPD accountability (art. 37). Consent is always required — the legal basis only documents *who* authorized the processing, never replaces it. Minors never consent for themselves (`self_consent` is reserved for adults in future self-service flows).
 
 > Sensitive data: the model treats family income, disability, and socioemotional signals as **sensitive** even when LGPD categories don't formally cover all — stricter handling by default.
 
@@ -31,8 +33,9 @@
 
 ## Consent Lifecycle
 
-- **Versioned**: each consent record has `consentVersion` (the terms version accepted) + timestamp; stored as `CHILD#<c>/CONSENT#<version>#<ts>` and denormalized on `CHILD#/META` (`consentVersion`, `consentAt`, `consentBy`).
-- **Grant**: guardian (or admin) calls `POST /api/children/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
+- **Versioned**: each consent record has `consentVersion` (the terms version accepted) + timestamp; stored as `CHILD#<c>/CONSENT#<version>#<ts>` and denormalized on `CHILD#/META` (`consentVersion`, `consentAt`, `consentBy`) together with `consentLegalBasis` and `consentGrantedByRole`.
+- **Grant**: guardian, educator (institution authorization, child followed), or admin calls `POST /api/children/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
+- **Erasure-adjacent control**: the autonomy level is independent of consent — raising autonomy never bypasses consent; revoking consent blocks processing regardless of level.
 - **Revocation**: writes a new `CONSENT#` item with `status=revoked` and updates `META`. After revocation:
   - new submissions, assessments, predictions, observations are rejected (403);
   - read access is limited to what's needed for the rights (access, erasure) and legal obligations;

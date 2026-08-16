@@ -234,8 +234,8 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 
 - **RBAC:** roles `guardian | educator | student | admin` enforced by `requireRole` middleware on top of Bearer-token sessions (0shared auth flow).
 - **Scope enforcement:** guardians query children via their `USER#` partition (guardianship edges); educators via `FOLLOW#` edges; students access only their own child profile through a dedicated student link. No cross-tenant enumeration.
-- **Student access is restricted:** the student (a minor) sees their own profile, recommendations, approved reports, and the forms they can fill — never educator observations or raw ML/prediction internals. A simplified student UI mode is used.
-- **Explicit consent:** guardians must consent (versioned `consent_at` / `consent_version`) before a child's data is processed. Creating a student account is initiated by the guardian and also gated by consent. Consent revocation blocks new processing.
+- **Graduated student autonomy:** each child carries an `autonomyLevel` (`supervised | guided | autonomous`) that unlocks self-service progressively — observations/submissions/scores at `guided`, reports and LGPD self-service at `autonomous`. Set by guardian/educator/admin via `PATCH /children/:id/autonomy`, versioned + audited (`AUTONOMY#`). Enforcement lives in `src/lib/scope.mjs` (`studentAccess`).
+- **Explicit consent:** consent (versioned, with **legal basis** `guardian | institution_authorization | self_consent` and `grantedByRole`) is required before a child's data is processed. Creating a student account is initiated by the guardian **or an educator following the child** (institution-led onboarding for students without a guardian) and gated by consent. Consent revocation blocks new processing.
 - **Audit log:** every access/action on a child's data writes a `AUDIT#` item (who, what, when).
 - **Data minimization & retention:** children's records are kept minimal; retention/erasure policy is documented in `lgpd.md`.
 - **Encryption:** S3 buckets use SSE; DynamoDB uses AWS KMS; in-transit TLS via CloudFront/API Gateway.

@@ -44,15 +44,17 @@
 | `DELETE /api/children/:id/guardians/:userId` | admin | Revoke guardianship | reverse txn |
 | `POST /api/children/:id/follow` | educator | Follow a child | `FOLLOW#` + `EDUCATOR#` + `AUDIT#` (txn) |
 | `DELETE /api/children/:id/follow` | educator | Unfollow | reverse txn |
-| `POST /api/children/:id/student-account` | guardian (of child), admin | Create the student (minor) account — **consent-gated** | `USER#`+`EMAIL#`+`STUDENT#`+`CHILD#` edge (txn) |
+| `POST /api/children/:id/student-account` | guardian (of child), educator (followed), admin | Create the student (minor) account — **consent-gated** (institution-led onboarding when no guardian) | `USER#`+`EMAIL#`+`STUDENT#`+`CHILD#` edge (txn) |
 | `GET /api/children/:id/guardians` | scoped | Who can see this child | `CHILD#<c>/GUARDIAN#` prefix |
 | `GET /api/children/:id/educators` | scoped | Who follows this child | `CHILD#<c>/EDUCATOR#` prefix |
+| `GET /api/children/:id/autonomy` | scoped, admin | Current level + versioned history | `AUTONOMY#` prefix |
+| `PATCH /api/children/:id/autonomy` | guardian (of child), educator (followed), admin | Set autonomy level (`supervised|guided|autonomous`) — versioned + audited | `AUTONOMY#<ts>` + `META` + `AUDIT#` (txn) |
 
 ### Consent
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `GET /api/children/:id/consent` | scoped, admin | Current consent + history | `CONSENT#` prefix |
-| `POST /api/children/:id/consent` | guardian (of child), admin | Grant/revoke versioned consent | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
+| `GET /api/children/:id/consent` | scoped, admin | Current consent + history (incl. `legalBasis`, `grantedByRole`) | `CONSENT#` prefix |
+| `POST /api/children/:id/consent` | guardian (of child), educator (followed), admin | Grant/revoke versioned consent; `legalBasis: guardian|institution_authorization|self_consent` | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
 
 ### Forms
 | Method & Path | Roles | Description | Schema items |
@@ -120,16 +122,17 @@
 | Endpoint group | guardian | educator | student | admin |
 |----------------|:--------:|:--------:|:-------:|:-----:|
 | Auth (login/logout/me) | ✓ | ✓ | ✓ | ✓ |
-| Children CRUD | own children | followed | own profile (read) | ✓ |
+| Children CRUD | own children | followed (create/edit) | own profile (read; edit name only when `autonomous`) | ✓ |
 | Guardianship | view own | ✗ | ✗ | ✓ |
 | Follow | ✗ | ✓ | ✗ | ✗ |
-| Student account | own children | ✗ | ✗ | ✓ |
-| Consent | own children | ✗ | ✗ | ✓ |
+| Student account | own children | followed (institution onboarding) | ✗ | ✓ |
+| Consent | own children | followed (grant/revoke, institution basis) | ✗ | ✓ |
+| Autonomy level | own children (set) | followed (set) | ✗ | ✓ |
 | Forms (fill) | anamnesis | socioemotional, behavior-checklist | vark-kids | define |
-| Observations | ✗ read-only not allowed | ✓ | ✗ | ✓ |
-| Assessments / Predict | own children | followed | own | ✓ |
+| Observations | ✗ | ✓ | own read-only if `guided`+ | ✓ |
+| Assessments / Predict | own children | followed | own (label always; scores+confidence if `guided`+) | ✓ |
 | Recommendations | own children (approved) | propose/approve | own (published) | ✓ |
-| Reports | own children | followed | approved reports | ✓ |
+| Reports | own children | followed | own if `autonomous` (never delete) | ✓ |
 | Models registry | ✗ | ✗ | ✗ | ✓ |
 | Audit | own children (trail) | ✗ | ✗ | ✓ |
 
