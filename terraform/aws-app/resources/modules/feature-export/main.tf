@@ -69,7 +69,7 @@ data "aws_iam_policy_document" "feature_export_lambda" {
       "logs:CreateLogStream",
       "logs:PutLogEvents",
     ]
-    resources = ["arn:aws:logs:${data.aws_region.current.name}:*:*"]
+    resources = ["arn:aws:logs:${data.aws_region.current.region}:*:*"]
   }
 }
 
