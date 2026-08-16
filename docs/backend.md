@@ -61,8 +61,9 @@
 | `GET /api/forms/:formId` | any | Active form definition | `FORM#<id>/CURRENT` → `VERSION#<v>` |
 | `GET /api/forms/:formId/versions/:version` | admin, scoped | Historical definition | `FORM#<id>/VERSION#<v>` |
 | `POST /api/forms` | admin | Publish a new form version (never destructive) | `VERSION#` + `CURRENT` (txn) |
-| `POST /api/children/:id/forms/:formId/responses` | persona allowed for the form | Submit responses (idempotent via `requestId`) | `SUBMISSION#` + (VARK) `ASSESS#` (txn) |
+| `POST /api/children/:id/forms/:formId/responses` | persona allowed for the form | Submit responses (idempotent via `requestId`) | `SUBMISSION#` only — classification is a separate step |
 | `GET /api/children/:id/forms/:formId/responses` | scoped | Submission history | Query `SUBMISSION#<formId>#` prefix |
+| `GET /api/children/:id/submissions` | scoped | Stored tests across all forms (newest first) | Query `SUBMISSION#` prefix on `CHILD#` |
 
 ### Observations
 | Method & Path | Roles | Description | Schema items |
@@ -76,9 +77,9 @@
 ### Assessment & Prediction
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `POST /api/children/:id/assessments` | student (own), guardian, educator | Trigger scoring of the child's VARK submission | creates `ASSESS#vark#<ts>` |
+| `POST /api/children/:id/assessments` | student (own), guardian, educator | Classify the child's latest stored submission | `ASSESS#vark#<ts>` + child profile fields |
 | `GET /api/children/:id/assessments?profile=vark` | scoped | Assessment history | `ASSESS#<profile>#` prefix desc |
-| `POST /api/children/:id/predict` | scoped | Run inference (packaged model) | `PRED#<profile>#<ts>` + `REC#` |
+| `POST /api/children/:id/predict` | scoped | Run inference on the stored submission (active model registry) | `PRED#<profile>#<ts>` (no `REC#`) |
 | `GET /api/children/:id/predictions?profile=vark` | scoped | Prediction history with confidence | `PRED#<profile>#` prefix desc |
 
 > Student view shows only their own latest profile/confidence — never raw model internals.
@@ -90,6 +91,8 @@
 | `POST /api/children/:id/recommendations` | educator | Propose recommendations | `REC#<type>#<ts>` |
 | `PATCH /api/children/:id/recommendations/:timestamp` | educator, admin | Approve/publish or reject | update `REC#` status |
 | `DELETE /api/children/:id/recommendations/:timestamp` | educator, admin | Remove | delete `REC#` |
+
+> Recommendations are a **manual, educator-driven** concern: prediction never auto-creates `REC#`. Educators propose and approve; students only ever see approved/published ones.
 
 ### Reports (async, 0shared pattern)
 | Method & Path | Roles | Description | Schema items |

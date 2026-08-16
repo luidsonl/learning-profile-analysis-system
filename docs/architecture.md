@@ -53,31 +53,33 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
                                                   └─────────────┘
 ```
 
-**Form filling flow (generic engine):**
+**Form filling flow (generic engine — submission and classification are decoupled):**
 
 ```
   Persona (guardian / educator / student) ──► GET /api/forms/:formId ──► form definition (FORM#)
       │
       ▼
   Persona ──► POST /api/children/:id/forms/:formId/responses ──► Submission Lambda ──► DynamoDB
-                                                                    (CHILD#/SUBMISSION# item)
-      │ (VARK form only)
-      ▼
-  Scoring (V/A/R/K totals + multimodal label) ──► stored on the VARK submission item
+                                                                     (CHILD#/SUBMISSION# item)
+  Anyone scoped ──► GET /api/children/:id/submissions ──► stored tests (all forms, newest first)
 ```
 
 **Assessment → prediction flow:**
 
 ```
-  Student (VARK form) ──► POST /api/children/:id/assessments ──► Scoring → DynamoDB
-                                                                        (ASSESS# item)
+  User ──► POST /api/children/:id/assessments ──► reads latest stored submission
+                                                      │ (classify.mjs — form processor score)
+                                                      ▼
+                                                DynamoDB (ASSESS# item + child profile fields)
   User ──► POST /api/children/:id/predict ──► Inference Lambda ──► Model artifact (S3 layer)
-                                                      │
+                                                      │  (classifies the stored submission;
+                                                      │   active MODEL# registry drives method/version)
                                                       ▼
-                                               DynamoDB (PRED# item, confidence + modelVersion)
-                                                      │
-                                                      ▼
-                                               Recommendations engine ──► DynamoDB (REC# item)
+                                                DynamoDB (PRED# item, confidence + modelVersion)
+
+  Recommendations are a separate, educator-driven concern:
+  User ──► POST /api/children/:id/recommendations ──► DynamoDB (REC# item, proposed)
+  User ──► PATCH /api/children/:id/recommendations/:recoId ──► approved/published (REC# update)
 ```
 
 **Report generation flow (async, 0shared pattern):**

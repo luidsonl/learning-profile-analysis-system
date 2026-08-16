@@ -101,7 +101,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 | PK | SK | Attributes |
 |----|----|-----------|
-| `CHILD#<childId>` | `SUBMISSION#<formId>#<timestamp>` | `childId`, `formId`, `formVersion`, `filledBy`, `filledByRole`, `status` (`complete|partial|archived`), `answers` (`{questionId: value}`), `consentVersion`, `createdAt`, `updatedAt` |
+| `CHILD#<childId>` | `SUBMISSION#<formId>#<timestamp>` | `childId`, `submissionId`, `formId`, `formVersion`, `answers` (`{questionId: value}`), `submittedBy`, `submittedByRole`, `requestId` (idempotency), `createdAt` |
 | — | — | GSI1PK `SUBMISSION#<formId>`, GSI1SK `SUBMISSION#<formId>#<timestamp>` |
 
 > Pattern: latest submissions per form → Query child partition SK begins_with `SUBMISSION#<formId>#`, descending; nightly export per form → GSI1.
@@ -113,27 +113,29 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | `CHILD#<childId>` | `OBS#<timestamp>` | `childId`, `educatorId`, `category` (`behavior|performance|academic`), `text`, `rating` (optional ordinal), `createdAt` |
 | — | — | GSI1PK `OBS#<category>`, GSI1SK `OBS#<category>#<timestamp>` |
 
-### ASSESS (profile traced from a filled form)
+### ASSESS (profile traced from a filled form — explicit classification step)
 
 | PK | SK | Attributes |
 |----|----|-----------|
-| `CHILD#<childId>` | `ASSESS#<profile>#<timestamp>` | `childId`, `profile` (`vark`; future: `giftedness`, `difficulty`, `socioemotional`), `formId`, `formVersion`, `sourceSubmission` (submission ts), `scores` (`{R, A, K}`), `label` (e.g. `K`, `multimodal`), `method` (`flemming|heuristic|model`), `methodVersion`, `createdBy`, `createdAt` |
-| — | — | GSI1PK `ASSESS#<profile>`, GSI1SK `ASSESS#<profile>#<timestamp>` |
+| `ASSESS#<childId>` | `VARK#<timestamp>` | `childId`, `kind` (`vark`), `scores` (`{R, A, K}`), `label` (e.g. `K`, `multimodal`), `multimodal`, `method` (`flemming`), `submission` (source `SUBMISSION#` SK), `createdAt` |
+| — | — | GSI1PK `ASSESS#vark`, GSI1SK `ASSESS#vark#<timestamp>` |
 
-> VARK scoring (`lib/vark-scoring`) runs on submission write and creates the `ASSESS#` item synchronously. Labeled assessments are the **training labels** for retraining (export via GSI1).
+> Classification is **decoupled from submission**: `POST /children/:id/assessments` reads the latest stored submission (`src/forms/classify.mjs`) and writes this item. Labeled assessments are the **training labels** for retraining (export via GSI1).
 
 ### PRED (ML prediction)
 
 | PK | SK | Attributes |
 |----|----|-----------|
-| `CHILD#<childId>` | `PRED#<profile>#<timestamp>` | `childId`, `profile`, `modelName`, `modelVersion`, `inputHash` (feature fingerprint), `prediction` (`{label: confidence}`), `topLabel`, `confidence`, `status` (`accepted|superseded`), `createdAt` |
-| — | — | GSI1PK `PRED#<profile>`, GSI1SK `PRED#<profile>#<timestamp>` |
+| `PRED#<childId>` | `PRED#<predictionId>` | `childId`, `model`, `modelVersion`, `method` (`ml|heuristic`), `label`, `scores`, `confidence`, `form`, `submission` (source `SUBMISSION#` SK), `createdBy`, `createdAt` |
+| — | — | GSI1PK `PRED#<model>`, GSI1SK `PRED#<model>#<timestamp>` |
+
+> Prediction runs inference on the stored submission using the **active model registry** (`MODEL#<name>/CURRENT`). It never creates recommendations — `REC#` is educator-driven only.
 
 ### REC (recommendations)
 
 | PK | SK | Attributes |
 |----|----|-----------|
-| `CHILD#<childId>` | `REC#<type>#<timestamp>` | `childId`, `type` (`vark|giftedness|difficulty`), `sourcePred` (PRED ts), `content` (`[{strategy, rationale, audience}]`), `status` (`pending|approved|published`), `approvedBy`, `approvedAt`, `visibility` (`guardian|educator|student`), `createdAt` |
+| `CHILD#<childId>` | `REC#<recoId>` | `childId`, `recoId`, `kind` (`manual`), `title`, `text`, `tags`, `status` (`proposed|approved|rejected`), `visibility` (`private|published`), `createdBy`, `createdAt`, `approvedBy`, `approvedAt` |
 
 ### REPORT
 
@@ -181,10 +183,11 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Get active form definition | Query `FORM#<formId>` SK `CURRENT` → fetch `VERSION#<v>` |
 | List form versions | Query `FORM#<formId>`, SK `VERSION#` prefix |
 | Submissions of a child (one form) | Query `CHILD#<c>`, SK begins_with `SUBMISSION#<formId>#`, desc |
+| Submissions of a child (all forms) | Query `CHILD#<c>`, SK begins_with `SUBMISSION#`, desc |
 | Submissions by form (export) | GSI1 Query `SUBMISSION#<formId>` |
-| Latest assessment for profile | Query `CHILD#<c>`, SK begins_with `ASSESS#<profile>#`, desc → first |
-| Labeled assessments by profile (retrain) | GSI1 Query `ASSESS#<profile>` |
-| Latest prediction for profile | Query `CHILD#<c>`, SK begins_with `PRED#<profile>#`, desc → first |
+| Latest assessment for profile | Query `ASSESS#<c>`, SK begins_with `VARK#`, desc → first |
+| Labeled assessments by profile (retrain) | GSI1 Query `ASSESS#vark` |
+| Latest prediction for profile | Query `PRED#<c>`, SK begins_with `PRED#`, desc → first |
 | Observations by category (analytics) | GSI1 Query `OBS#<category>` |
 | Recommendations for a child | Query `CHILD#<c>`, SK `REC#` prefix, desc |
 | Report by id | GSI1 Query `REPORT#<reportId>` |
@@ -204,7 +207,9 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Educator follow | `USER#<e>/FOLLOW#<c>` + `CHILD#<c>/EDUCATOR#<e>` + `AUDIT#CHILD#<c>` |
 | Create student account | `USER#<s>/META` + `EMAIL#` reservation + `USER#<s>/CHILD#<c>` + `CHILD#<c>/STUDENT#<s>` + `CHILD#<c>/META` (set `studentUserId`) + `AUDIT#CHILD#<c>` |
 | Consent grant / revoke | `CHILD#<c>/CONSENT#<v>#<ts>` + `CHILD#<c>/META` (consent attrs, conditional) + `AUDIT#CHILD#<c>` |
-| Submit form → VARK assess | `CHILD#<c>/SUBMISSION#…` + `CHILD#<c>/ASSESS#vark#…` (scored) |
+| Submit form (idempotent) | `CHILD#<c>/SUBMISSION#…` (conditional write, no classification side-effect) |
+| Classify submission → assessment | `ASSESS#<c>/VARK#<ts>` + `CHILD#<c>/META` (profile attrs) |
+| Predict (inference) | `PRED#<c>/PRED#<id>` |
 | Publish form version | `FORM#<id>/VERSION#<v>` + `FORM#<id>/CURRENT` (conditional on latest) |
 | Activate model | `MODEL#<name>/VERSION#<v>` (status) + `MODEL#<name>/CURRENT` (conditional) |
 
@@ -214,8 +219,8 @@ Uniqueness reservations (`EMAIL#`) and version pointers (`CURRENT`, `latest`) us
 
 ## Consistency & Partitioning Notes
 
-- Every child's data lives in one partition (`CHILD#<childId>`): submissions, assessments, predictions, recommendations, observations, reports. Single-partition queries keep the MVP reads cheap and naturally ordered by timestamp sort keys.
-- Export partitions (`SUBMISSION#<formId>`, `ASSESS#<profile>`, `OBS#<category>`, `PRED#<profile>`) live on **GSI1** so the nightly `feature-export` Lambda scans one hot GSI partition per form/profile instead of a full table scan.
+- A child's core record lives in one partition (`CHILD#<childId>`): guardians, educators, consent, submissions, recommendations, observations, reports. Assessments (`ASSESS#<childId>`) and predictions (`PRED#<childId>`) live in dedicated partitions so their `SK` can be a pure timestamp id without the child's data mixing; reads stay single-partition and ordered by timestamp.
+- Export partitions (`SUBMISSION#<formId>`, `ASSESS#vark`, `OBS#<category>`, `PRED#<model>`) live on **GSI1** so the nightly `feature-export` Lambda scans one hot GSI partition per form/profile instead of a full table scan.
 - No item approaches 400 KB: submissions store answers as a small JSON map; VARK form keeps ~15 Likert items.
 - High-frequency counters (e.g., "total submissions for retraining trigger") should be maintained as atomic `Add` on dedicated counter items (`STAT#FORM#<formId>`) if needed — not scanned.
 
