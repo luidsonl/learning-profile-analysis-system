@@ -15,6 +15,7 @@ const TEST_FIXTURES = [
   { email: "maria.responsavel@example.com", name: "Maria da Silva", password: "senha12345", role: "guardian" },
   { email: "prof.joao@example.com", name: "João Pereira", password: "senha12345", role: "educator" },
   { email: "ana.clara@example.com", name: "Ana Clara", password: "senha12345", role: "student" },
+  { email: "pedro.aluno@example.com", name: "Pedro Silva", password: "senha12345", role: "student" },
 ];
 
 let passed = 0;
@@ -61,7 +62,7 @@ const answers = {
   q11: 2, q12: 2, q13: 2, q14: 2, q15: 2,
 };
 
-let guardianToken, educatorToken, studentToken, childId, noConsentChildId, guardianId, educatorId, studentId, recoId;
+let guardianToken, educatorToken, studentToken, childId, noConsentChildId, noGuardianChildId, guardianId, educatorId, studentId, recoId;
 
 // Purge only the fixture identities this test creates (incl. leftovers of a
 // previous crashed run of THIS test). Children are only removed when their
@@ -296,6 +297,66 @@ try {
 
     const studentRecs3 = await api("GET", `/children/${childId}/recommendations`, { token: studentToken });
     expect("student sees approved recommendation", studentRecs3.status === 200 && studentRecs3.data.count === 1, JSON.stringify(studentRecs3.data));
+  }
+
+  step("autonomy: supervised student predict is label-only");
+  {
+    const p = await api("POST", `/children/${childId}/predict`, { token: studentToken });
+    expect("supervised predict is label-only", p.status === 201 && p.data.prediction.label === "R" && p.data.prediction.scores === undefined, JSON.stringify(p.data));
+
+    const lst = await api("GET", `/children/${childId}/predictions`, { token: studentToken });
+    expect("supervised prediction list label-only", lst.status === 200 && lst.data.data[0]?.scores === undefined, JSON.stringify(lst.data));
+  }
+
+  step("autonomy: student without guardian (educator-led)");
+  {
+    const c = await api("POST", "/children", { token: educatorToken, body: { name: "Pedro Silva", birthDate: "2012-09-01", accountability: { institution: "Escola Municipal Flores" } } });
+    expect("educator creates child without guardian", c.status === 201, JSON.stringify(c.data));
+    noGuardianChildId = c.data.childId;
+
+    const consent = await api("POST", `/children/${noGuardianChildId}/consent`, { token: educatorToken, body: { consentVersion: "v1", status: "active", legalBasis: "institution_authorization" } });
+    expect("educator grants institution consent", consent.status === 200 && consent.data.legalBasis === "institution_authorization", JSON.stringify(consent.data));
+
+    const cGet = await api("GET", `/children/${noGuardianChildId}/consent`, { token: educatorToken });
+    expect("consent basis persisted", cGet.data?.current?.legalBasis === "institution_authorization" && cGet.data?.current?.grantedByRole === "educator", JSON.stringify(cGet.data));
+
+    const s = await api("POST", `/children/${noGuardianChildId}/student-account`, { token: educatorToken, body: { email: TEST_FIXTURES[3].email, name: TEST_FIXTURES[3].name, password: TEST_FIXTURES[3].password } });
+    expect("educator creates student account", s.status === 201 && !!s.data.userId, JSON.stringify(s.data));
+
+    const stu = await api("POST", "/auth/login", { body: { email: TEST_FIXTURES[3].email, password: TEST_FIXTURES[3].password } });
+    expect("no-guardian student login", stu.status === 200 && !!stu.data.token, JSON.stringify(stu.data));
+    const pedroToken = stu.data.token;
+
+    const sub = await api("POST", `/children/${noGuardianChildId}/forms/vark-kids/responses`, { token: pedroToken, body: { answers } });
+    expect("student without guardian submits own form", sub.status === 201, JSON.stringify(sub.data));
+
+    const obsDenied = await api("GET", `/children/${noGuardianChildId}/observations`, { token: pedroToken });
+    expect("supervised cannot read observations", obsDenied.status === 403, JSON.stringify(obsDenied.data));
+
+    const subsDenied = await api("GET", `/children/${noGuardianChildId}/submissions`, { token: pedroToken });
+    expect("supervised cannot list submissions", subsDenied.status === 403, JSON.stringify(subsDenied.data));
+
+    await api("POST", `/children/${noGuardianChildId}/observations`, { token: educatorToken, body: { category: "academic", text: "Ótima concentração.", rating: 5 } });
+
+    const up = await api("PATCH", `/children/${noGuardianChildId}/autonomy`, { token: educatorToken, body: { level: "guided", reason: "autonomia progressiva" } });
+    expect("educator raises autonomy to guided", up.status === 200 && up.data.level === "guided", JSON.stringify(up.data));
+
+    const obsOk = await api("GET", `/children/${noGuardianChildId}/observations`, { token: pedroToken });
+    expect("guided reads own observations", obsOk.status === 200 && obsOk.data.count >= 1, JSON.stringify(obsOk.data));
+
+    const subsOk = await api("GET", `/children/${noGuardianChildId}/submissions`, { token: pedroToken });
+    expect("guided lists own submissions", subsOk.status === 200 && subsOk.data.count >= 1, JSON.stringify(subsOk.data));
+
+    const pred = await api("POST", `/children/${noGuardianChildId}/predict`, { token: pedroToken });
+    expect("guided predict includes scores", pred.status === 201 && pred.data.prediction.scores && pred.data.prediction.confidence !== undefined, JSON.stringify(pred.data));
+
+    const hist = await api("GET", `/children/${noGuardianChildId}/autonomy`, { token: educatorToken });
+    expect("autonomy history recorded", hist.status === 200 && hist.data.current.level === "guided" && hist.data.history.length >= 1, JSON.stringify(hist.data));
+
+    const repDenied = await api("POST", `/children/${noGuardianChildId}/reports/generate`, { token: pedroToken, body: { kind: "profile" } });
+    expect("guided cannot generate own reports", repDenied.status === 403, JSON.stringify(repDenied.data));
+
+    await api("POST", "/auth/logout", { token: pedroToken });
   }
 
   step("reports");

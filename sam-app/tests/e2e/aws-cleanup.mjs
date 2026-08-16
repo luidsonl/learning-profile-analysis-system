@@ -126,6 +126,7 @@ export async function cleanupChild(childId) {
   if (!childId) return;
   await deletePartition(`CHILD#${childId}`);
   await deletePartition(`CONSENT#${childId}`);
+  await deletePartition(`AUTONOMY#${childId}`);
   await deletePartition(`PRED#${childId}`);
   await deletePartition(`ASSESS#${childId}`);
   await deletePartition(`REPORT#${childId}`);
