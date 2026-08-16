@@ -45,16 +45,28 @@ resource "aws_dynamodb_table" "this" {
   # Inverted lookups: session-by-token, report-by-id, export/analytics partitions
   global_secondary_index {
     name            = "Lookup"
-    hash_key        = "GSI1PK"
-    range_key       = "GSI1SK"
     projection_type = "ALL"
+    key_schema {
+      attribute_name = "GSI1PK"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "GSI1SK"
+      key_type       = "RANGE"
+    }
   }
 
   # Listing: users by role, forms by audience, models by status, children by status
   global_secondary_index {
     name            = "RoleStatus"
-    hash_key        = "GSI2PK"
-    range_key       = "GSI2SK"
     projection_type = "ALL"
+    key_schema {
+      attribute_name = "GSI2PK"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "GSI2SK"
+      key_type       = "RANGE"
+    }
   }
 }
