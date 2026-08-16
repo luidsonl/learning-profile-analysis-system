@@ -1,0 +1,9 @@
+version = 0.1
+
+[default.build]
+cached = true
+parallel = true
+
+[default.deploy]
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "DynamoDBTableName=learning-profile FilesBucket=learning-profile-files DataBucket=learning-profile-data ReportQueueUrl="

@@ -1,0 +1,481 @@
+# ============================================================================
+# learning-profile API — AWS SAM template
+# API-triggered Lambdas (stateless). Stateful resources come from
+# terraform/aws-app (DynamoDB, S3, SQS) and are passed via parameters.
+# ============================================================================
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: learning-profile API (API Gateway + Lambda handlers)
+
+Parameters:
+  DynamoDBTableName:
+    Type: String
+    Default: learning-profile
+  FilesBucket:
+    Type: String
+    Default: learning-profile-files
+  DataBucket:
+    Type: String
+    Default: learning-profile-data
+  ReportQueueUrl:
+    Type: String
+    Default: ""
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Handler: index.lambdaHandler
+    Timeout: 10
+    MemorySize: 128
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref DynamoDBTableName
+        FILES_BUCKET: !Ref FilesBucket
+        DATA_BUCKET: !Ref DataBucket
+        REPORT_QUEUE_URL: !Ref ReportQueueUrl
+        INFERENCE_MODEL: vark-predictor
+        DYNAMODB_ENDPOINT: ""
+    LoggingConfig:
+      LogFormat: JSON
+      ApplicationLogLevel: INFO
+      SystemLogLevel: WARN
+
+Resources:
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      EndpointConfiguration: REGIONAL
+      Name: learning-profile-api
+
+  # Shared IAM role for all API handlers (DynamoDB table, S3 buckets, SQS queue).
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: learning-profile-api-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:TransactWriteItems
+                Resource:
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}/index/Lookup
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}/index/RoleStatus
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${FilesBucket}/*
+                  - !Sub arn:${AWS::Partition}:s3:::${DataBucket}/*
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !Sub arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:learning-profile_reports
+
+  # ------------------------------------------------------------------------
+  # Handlers
+  # ------------------------------------------------------------------------
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/health.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        Health:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /health
+            Method: GET
+
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/auth.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        Register:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /auth/register
+            Method: POST
+        Login:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /auth/login
+            Method: POST
+        Logout:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /auth/logout
+            Method: POST
+        Me:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /auth/me
+            Method: GET
+
+  ChildrenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/children.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        CreateChild:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children
+            Method: POST
+        ListChildren:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children
+            Method: GET
+        GetChild:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}
+            Method: GET
+        UpdateChild:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}
+            Method: PATCH
+
+  GuardianshipFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/guardianship.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        GrantGuardian:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/guardians
+            Method: POST
+        RevokeGuardian:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/guardians/{userId}
+            Method: DELETE
+        Follow:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/follow
+            Method: POST
+        Unfollow:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/follow
+            Method: DELETE
+        StudentAccount:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/student-account
+            Method: POST
+        ListGuardians:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/guardians
+            Method: GET
+        ListEducators:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/educators
+            Method: GET
+
+  ConsentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/consent.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        GetConsent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/consent
+            Method: GET
+        GrantConsent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/consent
+            Method: POST
+
+  FormsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/forms.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        ListForms:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /forms
+            Method: GET
+        GetForm:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /forms/{formId}
+            Method: GET
+        GetFormVersion:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /forms/{formId}/versions/{version}
+            Method: GET
+        PublishForm:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /forms
+            Method: POST
+        SubmitForm:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/forms/{formId}/responses
+            Method: POST
+        GetResponses:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/forms/{formId}/responses
+            Method: GET
+        ListSubmissions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/submissions
+            Method: GET
+
+  ObservationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/observations.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        AddObservation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/observations
+            Method: POST
+        ListObservations:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/observations
+            Method: GET
+        DeleteObservation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/observations/{timestamp}
+            Method: DELETE
+
+  AssessmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/assessment.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        RunAssessment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/assessments
+            Method: POST
+        ListAssessments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/assessments
+            Method: GET
+
+  PredictFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/predict.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        Predict:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/predict
+            Method: POST
+        ListPredictions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/predictions
+            Method: GET
+
+  RecommendationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/recommendations.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        ListRecommendations:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/recommendations
+            Method: GET
+        ProposeRecommendation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/recommendations
+            Method: POST
+        ApproveRecommendation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/recommendations/{recoId}
+            Method: PATCH
+        DeleteRecommendation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/recommendations/{recoId}
+            Method: DELETE
+
+  ReportsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/reports.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        GenerateReport:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/reports/generate
+            Method: POST
+        ListReports:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/reports
+            Method: GET
+        DownloadReport:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /reports/{reportId}/download
+            Method: GET
+        DeleteReport:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /reports/{reportId}
+            Method: DELETE
+
+  ModelsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/models.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        ListModels:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /models
+            Method: GET
+        GetModel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /models/{name}
+            Method: GET
+        ActivateModel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /models/{name}/activate
+            Method: POST
+        RetireModel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /models/{name}/retire
+            Method: POST
+
+  AuditFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/audit.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        ChildAudit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /audit/children/{id}
+            Method: GET
+        ActorAudit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /audit
+            Method: GET
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod"
