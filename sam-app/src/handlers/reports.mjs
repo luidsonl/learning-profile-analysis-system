@@ -2,9 +2,10 @@ import { GetObjectCommand, DeleteObjectCommand, S3Client } from "@aws-sdk/client
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { CMD, client, TABLE } from "../lib/db.mjs";
 import { ok, errorResponse, parseBody, param, HttpError, noContent } from "../lib/http.mjs";
+import { assert } from "../lib/validate.mjs";
 import { uid, nowIso } from "../lib/ids.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild } from "../lib/scope.mjs";
+import { auditChild, assertScopeChild, requireStudentAccess } from "../lib/scope.mjs";
 import { getChild } from "./children.mjs";
 
 const s3 = new S3Client({ region: process.env.AWS_REGION || process.env.REGION || "us-east-1" });
@@ -13,6 +14,7 @@ const FILES_BUCKET = process.env.FILES_BUCKET || "learning-profile-files";
 const generateReport = async (event, ctx) => {
   const childId = param(event, "id");
   await assertScopeChild(childId, ctx);
+  await requireStudentAccess(childId, ctx, "reports_self");
   const child = await getChild(childId);
   if (!child) throw new HttpError(404, "child_not_found", "Child not found");
 
@@ -58,6 +60,7 @@ const generateReport = async (event, ctx) => {
 const listReports = async (event, ctx) => {
   const childId = param(event, "id");
   await assertScopeChild(childId, ctx);
+  await requireStudentAccess(childId, ctx, "reports_self");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
@@ -91,6 +94,7 @@ const downloadReport = async (event, ctx) => {
   const item = report.Items?.[0];
   if (!item) throw new HttpError(404, "report_not_found", "Report not found");
   await assertScopeChild(item.childId.S, ctx);
+  await requireStudentAccess(item.childId.S, ctx, "reports_self");
   if (item.status.S !== "generated") throw new HttpError(409, "report_not_ready", "Report is not generated yet");
 
   const url = await getSignedUrl(
@@ -115,6 +119,7 @@ const deleteReport = async (event, ctx) => {
   const item = report.Items?.[0];
   if (!item) throw new HttpError(404, "report_not_found", "Report not found");
   await assertScopeChild(item.childId.S, ctx);
+  assert(ctx.role !== "student", "forbidden", "Students cannot delete reports", 403);
 
   await client.send(new CMD.delete({ TableName: TABLE, Key: { PK: { S: `REPORT#${item.childId.S}` }, SK: { S: `REPORT#${reportId}` } } }));
   try {

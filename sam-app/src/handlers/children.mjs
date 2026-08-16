@@ -4,7 +4,7 @@ import { ok, errorResponse, parseBody, param, HttpError } from "../lib/http.mjs"
 import { uid, nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild } from "../lib/scope.mjs";
+import { auditChild, assertScopeChild, requireStudentAccess } from "../lib/scope.mjs";
 
 export const getChild = async (childId) => {
   const res = await client.send(
@@ -32,6 +32,8 @@ const createChild = async (event, ctx) => {
     school: body.school ? { S: body.school } : { NULL: true },
     specialNeeds: body.specialNeeds ? { SS: body.specialNeeds } : { NULL: true },
     status: { S: "active" },
+    autonomyLevel: { S: "supervised" },
+    accountability: body.accountability ? { S: JSON.stringify(body.accountability) } : { NULL: true },
     createdBy: { S: ctx.userId },
     createdAt: { S: at },
     updatedAt: { S: at },
@@ -146,7 +148,11 @@ const updateChild = async (event, ctx) => {
   if (!child) throw new HttpError(404, "child_not_found", "Child not found");
 
   const body = parseBody(event);
-  const allowed = ["name", "birthDate", "gender", "grade", "school", "specialNeeds"];
+  if (ctx.role === "student") {
+    await requireStudentAccess(childId, ctx, "profile_edit");
+    assert(body.name !== undefined && body.name !== child.name, "validation_failed", "Autonomous students can only edit their own name");
+  }
+  const allowed = ctx.role === "student" ? ["name"] : ["name", "birthDate", "gender", "grade", "school", "specialNeeds"];
   const updateAttrs = allowed.filter((k) => body[k] !== undefined);
   assert(updateAttrs.length > 0, "validation_failed", "No updatable fields provided");
 

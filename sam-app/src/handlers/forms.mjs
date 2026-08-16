@@ -3,7 +3,7 @@ import { ok, errorResponse, parseBody, param, qparam, HttpError } from "../lib/h
 import { nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild, getStudentChildId } from "../lib/scope.mjs";
+import { auditChild, assertScopeChild, getStudentChildId, requireStudentAccess } from "../lib/scope.mjs";
 import { getActiveForm, getFormVersion, listFormsByAudience, listAllForms, publishFormDefinition } from "../forms/service.mjs";
 import { validateFormDefinition } from "../forms/engine.mjs";
 import { AUDIENCES } from "../forms/schema.mjs";
@@ -121,6 +121,7 @@ const submitForm = async (event, ctx) => {
 const listSubmissions = async (event, ctx) => {
   const childId = param(event, "id");
   await assertScopeChild(childId, ctx);
+  await requireStudentAccess(childId, ctx, "submissions_list");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
@@ -145,7 +146,7 @@ const getResponses = async (event, ctx) => {
   const childId = param(event, "id");
   const formId = param(event, "formId");
   await assertScopeChild(childId, ctx);
-  assert(ctx.role !== "student", "forbidden", "Students cannot list submissions", 403);
+  await requireStudentAccess(childId, ctx, "submissions_list");
 
   const res = await client.send(
     new CMD.query({

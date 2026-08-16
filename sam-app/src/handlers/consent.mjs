@@ -6,11 +6,23 @@ import { requireAuth } from "../lib/session.mjs";
 import { auditChild, assertScopeChild } from "../lib/scope.mjs";
 import { getChild } from "./children.mjs";
 
+const LEGAL_BASES = ["guardian", "institution_authorization", "self_consent"];
+
 const isPrimaryGuardian = async (childId, ctx) => {
   if (ctx.role === "admin") return true;
   if (ctx.role !== "guardian") return false;
   const child = await getChild(childId);
   return child?.createdBy === ctx.userId;
+};
+
+const canSetConsent = async (childId, ctx) => {
+  if (ctx.role === "admin") return true;
+  if (ctx.role === "educator") {
+    await assertScopeChild(childId, ctx);
+    return true;
+  }
+  if (ctx.role === "guardian") return (await getChild(childId))?.createdBy === ctx.userId;
+  return false;
 };
 
 const getConsent = async (event, ctx) => {
@@ -39,6 +51,8 @@ const getConsent = async (event, ctx) => {
       status: child.consentStatus || "not_granted",
       consentAt: child.consentAt || null,
       consentBy: child.consentBy || null,
+      legalBasis: child.consentLegalBasis || null,
+      grantedByRole: child.consentGrantedByRole || null,
     },
     history,
   });
@@ -46,16 +60,17 @@ const getConsent = async (event, ctx) => {
 
 const setConsent = async (event, ctx) => {
   const childId = param(event, "id");
-  if (!(await isPrimaryGuardian(childId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian or an admin can set consent");
+  if (!(await canSetConsent(childId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the child or an admin can set consent");
   const body = parseBody(event);
   requireKeys(body, ["consentVersion", "status"]);
   assert(["active", "revoked"].includes(body.status), "invalid_status", "status must be active or revoked");
+  const legalBasis = body.legalBasis || (ctx.role === "guardian" ? "guardian" : "institution_authorization");
+  assert(LEGAL_BASES.includes(legalBasis), "invalid_legal_basis", `legalBasis must be one of ${LEGAL_BASES.join(", ")}`);
 
   const child = await getChild(childId);
   if (!child) throw new HttpError(404, "child_not_found", "Child not found");
 
   const at = nowIso();
-  const gsi2pk = body.status === "active" ? "CHILD#STATUS#active" : "CHILD#STATUS#consent_revoked";
 
   await client.send(
     new CMD.transact({
@@ -71,6 +86,8 @@ const setConsent = async (event, ctx) => {
               version: { S: body.consentVersion },
               status: { S: body.status },
               grantedBy: { S: ctx.userId },
+              grantedByRole: { S: ctx.role },
+              legalBasis: { S: legalBasis },
               createdAt: { S: at },
             },
           },
@@ -79,12 +96,14 @@ const setConsent = async (event, ctx) => {
           Update: {
             TableName: TABLE,
             Key: { PK: { S: `CHILD#${childId}` }, SK: { S: "META" } },
-            UpdateExpression: "SET #consentStatus = :st, #consentVersion = :v, #consentAt = :at, #consentBy = :by, #updatedAt = :at",
+            UpdateExpression: "SET #consentStatus = :st, #consentVersion = :v, #consentAt = :at, #consentBy = :by, #consentLegalBasis = :lb, #consentGrantedByRole = :rb, #updatedAt = :at",
             ExpressionAttributeNames: {
               "#consentStatus": "consentStatus",
               "#consentVersion": "consentVersion",
               "#consentAt": "consentAt",
               "#consentBy": "consentBy",
+              "#consentLegalBasis": "consentLegalBasis",
+              "#consentGrantedByRole": "consentGrantedByRole",
               "#updatedAt": "updatedAt",
             },
             ExpressionAttributeValues: {
@@ -92,6 +111,8 @@ const setConsent = async (event, ctx) => {
               ":v": { S: body.consentVersion },
               ":at": { S: at },
               ":by": { S: ctx.userId },
+              ":lb": { S: legalBasis },
+              ":rb": { S: ctx.role },
             },
           },
         },
@@ -99,9 +120,9 @@ const setConsent = async (event, ctx) => {
     }),
   );
 
-  await auditChild(childId, ctx, body.status === "active" ? "consent_granted" : "consent_revoked", `child:${childId}`, { consentVersion: body.consentVersion });
+  await auditChild(childId, ctx, body.status === "active" ? "consent_granted" : "consent_revoked", `child:${childId}`, { consentVersion: body.consentVersion, legalBasis });
 
-  return ok({ childId, consentVersion: body.consentVersion, status: body.status });
+  return ok({ childId, consentVersion: body.consentVersion, status: body.status, legalBasis });
 };
 
 export const lambdaHandler = async (event) => {

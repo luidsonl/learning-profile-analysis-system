@@ -2,7 +2,7 @@ import { CMD, client, TABLE } from "../lib/db.mjs";
 import { ok, errorResponse, param, HttpError } from "../lib/http.mjs";
 import { nowIso, ts } from "../lib/ids.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild } from "../lib/scope.mjs";
+import { auditChild, assertScopeChild, studentAccess } from "../lib/scope.mjs";
 import { getAssessmentProcessor } from "../forms/engine.mjs";
 import { classifyLatestSubmission } from "../forms/classify.mjs";
 
@@ -64,24 +64,28 @@ const predict = async (event, ctx) => {
 
   await auditChild(childId, ctx, "prediction_created", `child:${childId}`, { model: modelName, label });
 
-  return ok({
-    prediction: {
-      predictionId,
-      childId,
-      model: modelName,
-      modelVersion: model?.version.S || "1",
-      method: model?.type?.S === "classifier" ? "ml" : "heuristic",
-      label,
-      scores,
-      confidence,
-      createdAt: at,
-    },
-  }, 201);
+  const full = await studentAccess(childId, ctx, "predict_full");
+  const prediction = {
+    predictionId,
+    childId,
+    model: modelName,
+    modelVersion: model?.version.S || "1",
+    method: model?.type?.S === "classifier" ? "ml" : "heuristic",
+    label,
+    createdAt: at,
+  };
+  if (full) {
+    prediction.scores = scores;
+    prediction.confidence = confidence;
+  }
+
+  return ok({ prediction }, 201);
 };
 
 const listPredictions = async (event, ctx) => {
   const childId = param(event, "id");
   await assertScopeChild(childId, ctx);
+  const full = await studentAccess(childId, ctx, "predict_full");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
@@ -90,16 +94,21 @@ const listPredictions = async (event, ctx) => {
       ExpressionAttributeValues: { ":pk": { S: `PRED#${childId}` }, ":sk": { S: "PRED#" } },
     }),
   );
-  const data = (res.Items || []).map((i) => ({
-    predictionId: i.SK.S.replace("PRED#", ""),
-    model: i.model.S,
-    modelVersion: i.modelVersion.S,
-    method: i.method.S,
-    label: i.label.S,
-    scores: JSON.parse(i.scores.S),
-    confidence: Number(i.confidence.N),
-    createdAt: i.createdAt.S,
-  }));
+  const data = (res.Items || []).map((i) => {
+    const base = {
+      predictionId: i.SK.S.replace("PRED#", ""),
+      model: i.model.S,
+      modelVersion: i.modelVersion.S,
+      method: i.method.S,
+      label: i.label.S,
+      createdAt: i.createdAt.S,
+    };
+    if (full) {
+      base.scores = JSON.parse(i.scores.S);
+      base.confidence = Number(i.confidence.N);
+    }
+    return base;
+  });
   return ok({ data, count: data.length });
 };
 

@@ -3,7 +3,7 @@ import { ok, errorResponse, parseBody, param, HttpError, noContent } from "../li
 import { nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild } from "../lib/scope.mjs";
+import { auditChild, assertScopeChild, requireStudentAccess } from "../lib/scope.mjs";
 
 const CATEGORIES = ["academic", "behavior", "social", "emotional", "attention", "other"];
 
@@ -38,7 +38,7 @@ const addObservation = async (event, ctx) => {
 const listObservations = async (event, ctx) => {
   const childId = param(event, "id");
   await assertScopeChild(childId, ctx);
-  assert(ctx.role !== "student", "forbidden", "Students cannot view observations", 403);
+  await requireStudentAccess(childId, ctx, "observations_read");
 
   const res = await client.send(
     new CMD.query({

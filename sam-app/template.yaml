@@ -243,6 +243,26 @@ Resources:
             Path: /children/{id}/consent
             Method: POST
 
+  AutonomyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/autonomy.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        GetAutonomy:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/autonomy
+            Method: GET
+        SetAutonomy:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/autonomy
+            Method: PATCH
+
   FormsFunction:
     Type: AWS::Serverless::Function
     Properties:

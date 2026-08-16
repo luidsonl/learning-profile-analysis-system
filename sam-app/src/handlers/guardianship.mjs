@@ -103,9 +103,19 @@ const unfollow = async (event, ctx) => {
   return noContent();
 };
 
+const canCreateStudentAccount = async (childId, ctx) => {
+  if (ctx.role === "admin") return true;
+  if (ctx.role === "educator") {
+    await assertScopeChild(childId, ctx);
+    return true;
+  }
+  if (ctx.role === "guardian") return (await getChild(childId))?.createdBy === ctx.userId;
+  return false;
+};
+
 const createStudentAccount = async (event, ctx) => {
   const childId = param(event, "id");
-  if (!(await isPrimaryGuardian(childId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian or an admin can create the student account");
+  if (!(await canCreateStudentAccount(childId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the child or an admin can create the student account");
 
   const child = await getChild(childId);
   if (!child) throw new HttpError(404, "child_not_found", "Child not found");
