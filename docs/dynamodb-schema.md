@@ -55,7 +55,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 **Profile item**
 | PK | SK | Attributes |
 |----|----|-----------|
-| `STUDENT#<studentId>` | `META` | `studentId`, `name`, `birthDate`, `gender`, `grade`, `school`, `status` (`active|archived`), `studentUserId`, `consentVersion`, `consentAt`, `consentBy`, `consentLegalBasis`, `consentGrantedByRole`, `autonomyLevel` (`supervised|guided|autonomous`), `autonomyUpdatedAt`, `autonomyUpdatedBy`, `accountability` (JSON: institution/authorizedBy/note), `createdAt`, `updatedAt` |
+| `STUDENT#<studentId>` | `META` | `studentId`, `name`, `birthDate`, `gender`, `grade`, `school`, `status` (`active|archived`), `studentUserId`, `consentVersion`, `consentAt`, `consentBy`, `consentLegalBasis`, `consentGrantedByRole`, `accountability` (JSON: institution/authorizedBy/note), `createdAt`, `updatedAt` |
 | — | — | GSI2PK `STUDENT#STATUS#<status>`, GSI2SK `STUDENT#<studentId>` |
 
 **Edges (student side — reverse of the user-side edges)**
@@ -71,13 +71,6 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | `STUDENT#<studentId>` | `CONSENT#<version>#<timestamp>` | `consentVersion`, `scope`, `grantedBy`, `grantedByRole`, `legalBasis` (`guardian|institution_authorization|self_consent`), `status` (`granted|revoked`), `at` |
 
 > Current consent is denormalized on `STUDENT#<id>/META` (`consentVersion`, `consentAt`, `consentBy`, `consentLegalBasis`, `consentGrantedByRole`); revocation writes a new `CONSENT#` item and updates `META` (blocks new processing).
-
-**Autonomy history (versioned — mirrors the consent pattern)**
-| PK | SK | Attributes |
-|----|----|-----------|
-| `AUTONOMY#<studentId>` | `AUTONOMY#<timestamp>` | `level`, `reason`, `changedBy`, `changedByRole`, `at` |
-
-> Current autonomy level is denormalized on `STUDENT#<id>/META`; `PATCH /students/:id/autonomy` writes a history item + `META` update + `AUDIT#` in one transaction.
 
 ### Edges (user side)
 
@@ -174,7 +167,6 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Report by id | GSI1 Query `REPORT#<reportId>` |
 | Reports of a child | Query `STUDENT#<c>`, SK `REPORT#` prefix |
 | Audit trail of a child | Query `AUDIT#STUDENT#<studentId>`, SK `EVENT#` prefix, desc |
-| Autonomy history of a child | Query `AUTONOMY#<studentId>`, SK `AUTONOMY#` prefix, desc |
 
 ---
 
@@ -187,7 +179,6 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Educator follow | `USER#<e>/FOLLOW#<c>` + `STUDENT#<c>/EDUCATOR#<e>` + `AUDIT#STUDENT#<c>` |
 | Create student account | `USER#<s>/META` + `EMAIL#` reservation + `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/STUDENT#<s>` + `STUDENT#<c>/META` (set `studentUserId`) + `AUDIT#STUDENT#<c>` |
 | Consent grant / revoke | `STUDENT#<c>/CONSENT#<v>#<ts>` + `STUDENT#<c>/META` (consent attrs incl. legal basis, conditional) + `AUDIT#STUDENT#<c>` |
-| Set autonomy level | `AUTONOMY#<c>/AUTONOMY#<ts>` + `STUDENT#<c>/META` (autonomy attrs) + `AUDIT#STUDENT#<c>` |
 | Submit form (idempotent) | `STUDENT#<c>/SUBMISSION#…` (conditional write, no classification side-effect) |
 | Classify submission → assessment | `ASSESS#<c>/VARK#<ts>` + `STUDENT#<c>/META` (profile attrs) |
 | Predict (inference) | `PRED#<c>/PRED#<id>` |

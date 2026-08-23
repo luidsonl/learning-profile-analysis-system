@@ -12,11 +12,11 @@ Backend vertical slice + offline ML pipeline are implemented and documented. Rem
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ❌ Not started | CloudFront + S3 for the SPA |
-| Backend API (`sam-app`) | ✅ Done | 12 Lambdas (~45 routes), RBAC + scoping |
+| Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~43 routes), RBAC + scoping |
 | Forms engine | ✅ Done | Code-defined forms; guardian-assisted submissions |
-| Graduated student autonomy | ✅ Done | supervised / guided / autonomous levels |
-| ML pipeline (`ml/` + `InferenceFunction`) | ✅ Implemented | Trained v2.0.0 on public dataset; async invoke on submission; no SQS — **pending `sam build && sam deploy`** |
-| Tests (`sam-app/tests/`) | ✅ Done | 29 unit passing; e2e updated to the new prediction flow (needs redeploy to run) |
+| Binary student self-service | ✅ Done | student account = full self-view (no autonomy levels) |
+| ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
+| Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; e2e 76/76 green against the real stack |
 | Frontend SPA (`frontend/`) | ❌ Not started | React + Vite, pt-BR |
 
 ---
@@ -26,9 +26,10 @@ Backend vertical slice + offline ML pipeline are implemented and documented. Rem
 Everything below is implemented, tested, and documented in its own layer doc (`docs/`):
 
 - **Infra**: Terraform stateful stack (DynamoDB single table, S3 files/data buckets, SQS report queue, async Lambdas) + SAM app with API-triggered functions.
-- **Backend API**: auth/sessions, students & guardianship, versioned consent, graduated autonomy, forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
+- **Backend API**: auth/sessions, students & guardianship, versioned consent, binary student self-service, forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
 - **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/model/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); it scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `docs/ml-pipeline.md`).
 - **Security tooling**: gitleaks + pre-commit + CI secret scan; packaged-model commit exception documented.
+- **Dev loop**: `make sync` (`sam sync --watch`) pushes handler code changes straight to the live Lambdas in seconds — no CloudFormation wait; `template.yaml` changes still take the full `make deploy` path, which remains the source of truth.
 
 ---
 

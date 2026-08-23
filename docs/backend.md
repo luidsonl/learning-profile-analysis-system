@@ -47,8 +47,6 @@
 | `POST /api/students/:id/student-account` | guardian (of child), educator (followed), admin | Create the student (minor) account — **consent-gated** (institution-led onboarding when no guardian) | `USER#`+`EMAIL#`+`STUDENT#`+`STUDENT#` edge (txn) |
 | `GET /api/students/:id/guardians` | scoped | Who can see this child | `STUDENT#<c>/GUARDIAN#` prefix |
 | `GET /api/students/:id/educators` | scoped | Who follows this child | `STUDENT#<c>/EDUCATOR#` prefix |
-| `GET /api/students/:id/autonomy` | scoped, admin | Current level + versioned history | `AUTONOMY#` prefix |
-| `PATCH /api/students/:id/autonomy` | guardian (of child), educator (followed), admin | Set autonomy level (`supervised|guided|autonomous`) — versioned + audited | `AUTONOMY#<ts>` + `META` + `AUDIT#` (txn) |
 
 ### Consent
 | Method & Path | Roles | Description | Schema items |
@@ -69,10 +67,10 @@
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
 | `POST /api/students/:id/observations` | educator | Add observation (behavior/performance/academic) | `OBS#<ts>` |
-| `GET /api/students/:id/observations` | scoped (not student) | List observations, newest first | `OBS#` prefix desc |
+| `GET /api/students/:id/observations` | scoped | List observations, newest first (students: own only) | `OBS#` prefix desc |
 | `DELETE /api/students/:id/observations/:timestamp` | educator (author) | Remove own observation | delete `OBS#` |
 
-> Students **never** see observations (restricted self-view).
+> Students see their own observations (read-only); writing/removing is educator-only.
 
 ### Assessment & Prediction
 | Method & Path | Roles | Description | Schema items |
@@ -83,7 +81,7 @@
 
 **Automatic predictions**: storing a *new* form submission triggers the Python inference Lambda asynchronously (`InvocationType: "Event"` — no SQS); it scores the bundled model and writes the `PRED#` item itself. The API never waits on inference and there is no synchronous predict endpoint. If inference fails, no prediction is created; the submission stands.
 
-> Student view shows only their own latest profile/confidence — never raw model internals. Autonomy gating applies at read time: supervised students receive label-only prediction payloads.
+> Any viewer scoped to the student receives the full prediction payload (label + scores + confidence). Raw model internals are never exposed.
 
 ### Recommendations
 | Method & Path | Roles | Description | Schema items |
@@ -117,17 +115,16 @@
 | Endpoint group | guardian | educator | student | admin |
 |----------------|:--------:|:--------:|:-------:|:-----:|
 | Auth (login/logout/me) | ✓ | ✓ | ✓ | ✓ |
-| Students CRUD | own students | followed (create/edit) | own profile (read; edit name only when `autonomous`) | ✓ |
+| Students CRUD | own students | followed (create/edit) | own profile (read; edit name) | ✓ |
 | Guardianship | view own | ✗ | ✗ | ✓ |
 | Follow | ✗ | ✓ | ✗ | ✗ |
 | Student account | own students | followed (institution onboarding) | ✗ | ✓ |
 | Consent | own students | followed (grant/revoke, institution basis) | ✗ | ✓ |
-| Autonomy level | own students (set) | followed (set) | ✗ | ✓ |
 | Forms (fill) | anamnesis | socioemotional, behavior-checklist | vark | ✓ all |
-| Observations | ✗ | ✓ | own read-only if `guided`+ | ✓ |
-| Assessments / Predict | own students | followed | own (label always; scores+confidence if `guided`+) | ✓ |
+| Observations | ✗ | ✓ | own (read-only) | ✓ |
+| Assessments / Predict | own students | followed | own (full payload) | ✓ |
 | Recommendations | own students (approved) | propose/approve | own (published) | ✓ |
-| Reports | own students | followed | own if `autonomous` (never delete) | ✓ |
+| Reports | own students | followed | own (incl. generate; never delete) | ✓ |
 | Audit | own students (trail) | ✗ | ✗ | ✓ |
 
 Every data access is additionally **scope-checked** (edges in DynamoDB), not just role-checked — see [Authentication](./auth.md).

@@ -49,7 +49,7 @@ This separation is intentional and is the contract that makes future models poss
                                                                                 ▼
                                                                         DynamoDB (PRED# item)
 
-  Scoped reads ──► GET /api/students/:id/predictions ──► PRED# history (autonomy-gated payload)
+  Scoped reads ──► GET /api/students/:id/predictions ──► PRED# history (full payload)
 ```
 
 > The nightly `feature-export` snapshot pipeline described below is a **planned future phase** (the Lambda exists as a stub). The v0 integration above does not depend on it.
@@ -102,7 +102,7 @@ This separation is intentional and is the contract that makes future models poss
 - **Trigger**: after the Forms Lambda stores a *new* (non-idempotent-duplicate) submission, it fires an asynchronous invoke — `InvocationType: "Event"`, best-effort; an invoke failure never fails the submission.
 - **Contract** (payload from Forms Lambda): `{ studentId, formId, formVersion, answers }`.
 - **Behavior**: builds the feature vector per `meta.json`'s positional mapping, scores with the bundled model, remaps labels (`{A→R, V→A, K→K}`), computes confidence = max class probability, and writes the `PRED#` item itself (`createdBy: "system:inference"`, `method: "ml"`). On any error it logs and exits — **no prediction is created and the submission stands**.
-- **Read path**: `GET /api/students/:id/predictions` (existing handler) serves history with autonomy gating at read time — supervised students see label-only payloads; guided/autonomous see scores + confidence.
+- **Read path**: `GET /api/students/:id/predictions` (existing handler) serves the full payload — label + scores + confidence — to any viewer scoped to the student.
 - **Traceability**: there is **no model registry** — each `PRED#` item records `model` + `modelVersion` from `meta.json`, so every prediction is traceable to exactly what produced it. The model itself is invisible to admins and end users.
 - Heuristic indicators (`giftedness-indicator`, `difficulty-indicator`) remain rule-based companions, not trained models. The former heuristic predict path is retired together with `POST /api/students/:id/predict`.
 

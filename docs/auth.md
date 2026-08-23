@@ -8,10 +8,10 @@
 |------|------|-----------------|
 | `guardian` | Only their own students (via `GUARD#` edges) | Other students, educator observations |
 | `educator` | Only students they follow (via `FOLLOW#` edges) | Guardianship management |
-| `student` | Own profile, recommendations, approved reports, forms they can fill — **plus what their autonomy level grants** | Observations, raw ML internals, other children |
+| `student` | Full self-view of own data — profile, forms/submissions, predictions (with scores), observations, reports | Managing others, audit trail, raw model internals |
 | `admin` | Everything (users, students, audit) | — |
 
-> **Educator = admin-like authority over the child flows:** an educator following a child can grant/revoke consent, create the student account and set the autonomy level to any value (up or down), mirroring what an admin can do. Guardians can set autonomy and consent for their own students; students can never change their own level.
+> **Educator = admin-like authority over the child flows:** an educator following a child can grant/revoke consent and create the student account (institution-led onboarding), mirroring what an admin can do. Guardians do the same for their own students; a student account holder manages only their own data.
 
 ## Session Flow
 
@@ -52,44 +52,32 @@ Scope checks are **edge lookups, not role checks** — a guardian cannot enumera
 |----------|----------|----------|---------|-------|
 | Child profile | own (`GUARD#`) | followed (`FOLLOW#`) | own link (`STUDENT#`) | all |
 | Submissions | own students (read) | followed (read) | own (read/write own forms) | all |
-| Observations | ✗ | followed (write) | own, read-only if `guided`+ | all |
-| Assessments/Predictions | own students | followed | own (payload by level) | all |
+| Observations | ✗ | followed (write) | own (read-only) | all |
+| Assessments/Predictions | own students | followed | own (full payload) | all |
 | Recommendations | own students (approved) | propose + approve | own (published only) | all |
-| Reports | own students (incl. generate) | followed | own if `autonomous` | all |
+| Reports | own students (incl. generate) | followed | own (incl. generate, never delete) | all |
 | Consent | own students (grant/revoke) | followed (admin-like) | ✗ | all |
-| Autonomy level | own students (set) | followed (set) | ✗ | all |
 | Forms definition | list/fill by audience (+ student forms assisted) | list/fill by audience | list/fill by audience | read-only |
 | Audit | own students (read) | ✗ | ✗ | all |
 
 > Details on the exact endpoints in [Backend — RBAC Matrix](./backend.md#rbac-matrix).
 
-## Graduated Student Autonomy
+## Student Self-View
 
-Students are not a single restricted profile: each child carries an **autonomy level** (`STUDENT#<id>/META.autonomyLevel`, default `supervised`) set by the guardian, an educator following the child, or an admin via `PATCH /api/students/:id/autonomy`. Every change is **versioned** (`AUTONOMY#` history items) and audited. `src/lib/scope.mjs` exposes `studentAccess(studentId, ctx, resource)` enforcing the matrix:
-
-| Resource | `supervised` | `guided` | `autonomous` |
-|----------|:---:|:---:|:---:|
-| Own observations (read-only) | ✗ | ✓ | ✓ |
-| Own submissions list | ✗ | ✓ | ✓ |
-| Prediction: label | ✓ | ✓ | ✓ |
-| Prediction: scores + confidence | ✗ | ✓ | ✓ |
-| Own reports (generate/list/download) | ✗ | ✗ | ✓ |
-| LGPD self-service / edit own profile | ✗ | ✗ | ✓ |
-
-`supervised` = the restricted self-view described below. `guided` and `autonomous` progressively unlock self-service so older or more capable students can own more of their learning data.
+Access is **binary** — there are no autonomy levels. A user either has an account or does not; a form is filled either by its intended audience or by the responsible adult acting for them. A student account holder gets the **full self-view** of their own data: profile, submissions, predictions (label + scores + confidence), observations (read-only), recommendations (published) and reports (generate/list/download). Enforcement lives in `src/lib/scope.mjs`; students can only edit their own name and never access the audit trail, other students' data, or raw model internals.
 
 ## Student (Minor) Accounts
 
 - Created via `POST /api/students/:id/student-account` by the **primary guardian**, an **educator following the child** (institution-led onboarding, e.g. no guardian), or an **admin** — gated by the child's current consent (409 if no active consent).
-- A minor **cannot** register directly, cannot change the student profile (unless `autonomous`), cannot see observations or raw model output (unless their level grants it).
+- A minor **cannot** register directly, can only edit their own name, and never sees the audit trail, other students' data, or raw model internals.
 - The student identity is linked through `STUDENT#<c>/STUDENT#<userId>` + `USER#<s>/STUDENT#<c>` edges, written in the same transaction as the user creation.
-- UI: the student persona renders the simplified self-view (see [Frontend](./frontend.md)).
+- UI: the student persona renders the self-view (see [Frontend](./frontend.md)).
 
 ## Students Without a Guardian
 
 - An educator or admin can register the child (`POST /api/students`) and record optional `accountability` (institution/authorized-by/note) on the child META.
 - **Consent is still mandatory** — no processing without a documented legal basis. The educator (or admin) grants consent via the same `POST /api/students/:id/consent` with `legalBasis: "institution_authorization"` (see [LGPD](./lgpd.md)). If a guardian exists, the guardian remains the consent authority.
-- The educator then creates the student account. From that point the child behaves like any other — the only difference is who granted consent and who set the autonomy level.
+- The educator then creates the student account. From that point the child behaves like any other — the only difference is who granted consent.
 
 ## LGPD & Consent
 

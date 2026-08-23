@@ -35,7 +35,7 @@
 
 - **Versioned**: each consent record has `consentVersion` (the terms version accepted) + timestamp; stored as `STUDENT#<c>/CONSENT#<version>#<ts>` and denormalized on `STUDENT#/META` (`consentVersion`, `consentAt`, `consentBy`) together with `consentLegalBasis` and `consentGrantedByRole`.
 - **Grant**: guardian, educator (institution authorization, child followed), or admin calls `POST /api/students/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
-- **Erasure-adjacent control**: the autonomy level is independent of consent — raising autonomy never bypasses consent; revoking consent blocks processing regardless of level.
+- **Erasure-adjacent control**: self-service is independent of consent — a student account never bypasses consent; revoking consent blocks processing regardless of who holds the account.
 - **Revocation**: writes a new `CONSENT#` item with `status=revoked` and updates `META`. After revocation:
   - new submissions, assessments, predictions, observations are rejected (403);
   - read access is limited to what's needed for the rights (access, erasure) and legal obligations;
@@ -80,7 +80,7 @@ Erasure is a **documented script/runbook** (admin-triggered Lambda or CLI) with 
 
 - Encryption at rest: DynamoDB (KMS), S3 SSE; in transit: TLS via CloudFront/API Gateway.
 - S3 buckets block public access; files served only via presigned URLs.
-- RBAC + scope enforcement via edges (see [Authentication](./auth.md)); students get a restricted self-view.
+- RBAC + scope enforcement via edges (see [Authentication](./auth.md)); students get a full self-view of their own data.
 - No third-party analytics/tracking on the SPA; no data leaves AWS boundaries except user-initiated presigned downloads.
 - Vendor/dataset note: the public training dataset (Armand, Eboue 2021, DOI: 10.17632/bwrr6zypcj.1) is CC BY 4.0, adult-subject data used only for model weights — not personal data processing of system users.
 
