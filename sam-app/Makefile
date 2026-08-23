@@ -22,9 +22,18 @@ deploy: build
 		DataBucket=$$(cd ../terraform/aws-app && terraform output -raw data_bucket_name) \
 		ReportQueueUrl=$$(cd ../terraform/aws-app && terraform output -raw report_queue_url)"
 
-# Idempotent bootstrap of FORM#/MODEL# definitions into the real table (AWS).
+# Idempotent bootstrap of FORM# definitions into the real table (AWS).
 seed:
-	node scripts/seed.mjs
+	node --input-type=module -e '\
+	const { getDefinitions } = await import("./src/forms/engine.mjs");\
+	const { getCurrentVersion, publishFormDefinition } = await import("./src/forms/service.mjs");\
+	for (const def of getDefinitions()) {\
+	  const cur = await getCurrentVersion(def.formId);\
+	  if (cur) { console.log("form " + def.formId + " already present (v" + cur + ") — skipping"); continue; }\
+	  const pub = await publishFormDefinition(def);\
+	  console.log("form " + pub.formId + " v" + pub.version + " seeded");\
+	}\
+	console.log("seed done (idempotent)");'
 
 unit-test:
 	node --test tests/unit/*.test.mjs
