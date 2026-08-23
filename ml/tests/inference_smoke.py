@@ -6,8 +6,11 @@ Node read path (assessment.mjs listPredictions) expects.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
+
+os.environ.setdefault("TABLE_NAME", "test-table")
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "sam-app" / "src" / "inference"))
@@ -34,7 +37,7 @@ answers = {f"q{i:02d}": 5 for i in range(1, 6)} | {f"q{i:02d}": 1 for i in range
 event = {
     "studentId": "student_test",
     "formId": "vark",
-    "submissionId": "SUBMISSION#vark-kids#smoke",
+    "submissionId": "SUBMISSION#vark#smoke",
     "formVersion": "1",
     "answers": answers,
 }
@@ -55,7 +58,11 @@ assert item["submission"] == event["submissionId"]
 scores = json.loads(item["scores"])
 assert set(scores) == {"R", "A", "K"}, scores
 assert abs(sum(scores.values()) - 1) < 0.01
-assert 0 <= item["confidence"] <= 1
+# boto3/DynamoDB rejects float — the stored confidence must be a Decimal.
+from decimal import Decimal  # noqa: E402
+
+assert isinstance(item["confidence"], Decimal), f"confidence must be Decimal, got {type(item['confidence'])}"
+assert 0 <= float(item["confidence"]) <= 1
 print("smoke OK:", json.dumps({k: item[k] for k in ("label", "confidence")}, default=str), scores)
 
 missing = handler.lambda_handler({"studentId": "c", "formId": "vark", "submissionId": "s", "answers": {"q01": 5}}, None)

@@ -11,6 +11,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import boto3
@@ -84,7 +85,8 @@ def lambda_handler(event, context):
             "method": "ml",
             "label": label,
             "scores": json.dumps(scores),
-            "confidence": confidence,
+            # DynamoDB (boto3) rejects float — numbers must be Decimal.
+            "confidence": Decimal(str(confidence)),
             "createdBy": "system:inference",
             "createdAt": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
         }
