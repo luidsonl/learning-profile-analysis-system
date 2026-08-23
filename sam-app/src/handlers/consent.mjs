@@ -29,7 +29,7 @@ const getConsent = async (event, ctx) => {
   const studentId = param(event, "id");
   await assertScopeStudent(studentId, ctx);
   const student = await getStudent(studentId);
-  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
+  if (!student) throw new HttpError(404, "student_not_found", "Student not found");
 
   const res = await client.send(
     new CMD.query({
@@ -60,7 +60,7 @@ const getConsent = async (event, ctx) => {
 
 const setConsent = async (event, ctx) => {
   const studentId = param(event, "id");
-  if (!(await canSetConsent(studentId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the child or an admin can set consent");
+  if (!(await canSetConsent(studentId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the student or an admin can set consent");
   const body = parseBody(event);
   requireKeys(body, ["consentVersion", "status"]);
   assert(["active", "revoked"].includes(body.status), "invalid_status", "status must be active or revoked");
@@ -68,7 +68,7 @@ const setConsent = async (event, ctx) => {
   assert(LEGAL_BASES.includes(legalBasis), "invalid_legal_basis", `legalBasis must be one of ${LEGAL_BASES.join(", ")}`);
 
   const student = await getStudent(studentId);
-  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
+  if (!student) throw new HttpError(404, "student_not_found", "Student not found");
 
   const at = nowIso();
 

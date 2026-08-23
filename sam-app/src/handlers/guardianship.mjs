@@ -11,7 +11,7 @@ import { uid } from "../lib/ids.mjs";
 const isPrimaryGuardian = async (studentId, ctx) => {
   if (ctx.role === "admin") return true;
   if (ctx.role !== "guardian") return false;
-  const child = await getStudent(studentId);
+  const student = await getStudent(studentId);
   return student?.createdBy === ctx.userId;
 };
 
@@ -70,7 +70,7 @@ const revokeGuardian = async (event, ctx) => {
 const follow = async (event, ctx) => {
   const studentId = param(event, "id");
   assert(ctx.role === "educator", "forbidden", "Only educators can follow students", 403);
-  if (!(await getStudent(studentId))) throw new HttpError(404, "student_not_found", "Child not found");
+  if (!(await getStudent(studentId))) throw new HttpError(404, "student_not_found", "Student not found");
   const at = nowIso();
   await client.send(
     new CMD.transact({
@@ -115,12 +115,12 @@ const canCreateStudentAccount = async (studentId, ctx) => {
 
 const createStudentAccount = async (event, ctx) => {
   const studentId = param(event, "id");
-  if (!(await canCreateStudentAccount(studentId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the child or an admin can create the student account");
+  if (!(await canCreateStudentAccount(studentId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the student or an admin can create the student account");
 
-  const child = await getStudent(studentId);
-  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
+  const student = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Student not found");
   assert(student.consentStatus === "active", "consent_required", "Active consent is required before creating the student account", 409);
-  assert(!student.studentUserId, "student_account_exists", "A student account already exists for this child", 409);
+  assert(!student.studentUserId, "student_account_exists", "A student account already exists for this student", 409);
 
   const body = parseBody(event);
   requireKeys(body, ["email", "name", "password"]);
