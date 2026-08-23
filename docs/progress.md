@@ -34,7 +34,7 @@ Everything below is implemented, tested, and documented in its own layer doc (`d
 
 ## Pending work
 
-1. **Deploy ML stack** — `sam build && sam deploy` (python3.12 runtime needs pip available for native builds or use docker), then run e2e against the deployed API.
+1. **Deploy ML stack** — `make deploy` at the repo root (or `cd sam-app && make deploy`; python3.12 runtime needs pip available for native builds or use docker), then run `make e2e-test` against the deployed API. Ops tooling in place: root orchestrator Makefile, `redeploy-api` race workaround, `db-clean`/`db-wipe`.
 2. **Frontend SPA** (`frontend/`) — React + Vite, pt-BR, accessible; consumes `/api/*` through the same CloudFront domain (see `docs/frontend.md`, `docs/design-system.md`). Largest remaining piece of the MVP.
 3. **`terraform/aws-frontend`** — S3 + CloudFront stack for the SPA, wiring the `/api/*` origin to the existing API Gateway stage.
 4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.

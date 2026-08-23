@@ -124,7 +124,7 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   │                      #   recommendations, reports, audit, inference)
 │   ├── samconfig.toml     # SAM config (stack name, parameter overrides)
 │   ├── resources.env      # Central resource names (source of truth)
-│   ├── Makefile           # Convenience targets (deploy, test, clean)
+│   ├── Makefile           # deploy, redeploy-api, unit/e2e tests, db-clean/db-wipe, clean
 │   └── src/handlers/      # Lambda code (Node.js ESM)
 │       ├── health.mjs, auth.mjs, students.mjs, guardianship.mjs,
 │       ├── observations.mjs, forms.mjs (submissions, assessments,
@@ -267,6 +267,18 @@ Terminal 2:  npm run dev                    # Vite on :5173, proxies /api → de
  4. terraform/aws-frontend/   (S3 static + CloudFront + frontend build & upload)
 ```
 
+The root `Makefile` orchestrates the whole chain, mirroring 0shared:
+
+```sh
+make deploy-full   # first time: bootstrap + infra + backend (+ frontend when it exists)
+make deploy        # regular: infra + backend
+make backend       # SAM only: sam build && sam deploy && forced API Gateway deployment
+make train package # offline ML: retrain and bundle a new artifact into sam-app
+make destroy-backend / make destroy
+```
+
+`sam-app/Makefile` handles the backend alone; its `redeploy-api` step works around the SAM "empty deployment" race (a no-op deploy can leave the Prod stage without the routes). Database maintenance: `make db-clean` (default: legacy `MODEL#`/`FORM#` orphans; pass `PREFIXES="..."` to target others) and `make db-wipe CONFIRM=yes` (full wipe).
+
 Cleanup happens in reverse order.
 
 ---
@@ -279,7 +291,7 @@ Cleanup happens in reverse order.
 | Split Terraform / SAM | Stateful infra is protected and centralized; stateless compute benefits from `sam local start-api` |
 | Single CloudFront domain with `/api` prefix | No CORS; one domain for app + API + future mobile consumption |
 | DynamoDB single-table | Follows 0shared; disciplined access-pattern design with entity prefixes and GSIs |
-| Student as a restricted persona | Children exercise LGPD rights; scoped self-view without exposing educator observations |
+| Student as a restricted persona | Minors exercise LGPD rights; scoped self-view without exposing educator observations |
 | Hybrid forms engine (generic engine + curated library) | One mechanism for all data collection (VARK, anamnese, socioemotional, behavior) with code-versioned definitions |
 | Profiles traced from forms | A profile is the interpretation of a filled form (VARK in the MVP); new forms → new profiles additively |
 | ML fully decoupled — offline training only | System never trains; standalone `ml-pipeline.md` spec keeps dataset + training evolvable independently |
