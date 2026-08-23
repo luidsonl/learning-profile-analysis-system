@@ -40,7 +40,7 @@ Balaji et al. [R2] found that models using only behavioral features achieve mini
 
 | Feature | Type | Source in this system | Refs |
 |---------|------|----------------------|------|
-| Age / birth date | integer/date | Child profile (`CHILD#`) | [R2][R8][R9] |
+| Age / birth date | integer/date | Child profile (`STUDENT#`) | [R2][R8][R9] |
 | Sex / gender | categorical | Child profile | [R1][R2][R8] |
 | Year/grade level | ordinal | Child profile | [R2][R4] |
 | School / institution | categorical | Child profile | [R4] |
@@ -142,12 +142,12 @@ These are validated instruments. The system should store **scores/ratings** as s
 
 Current collection points already cover most categories:
 
-- **Child profile (`CHILD#`)** → demographic, institutional.
+- **Child profile (`STUDENT#`)** → demographic, institutional.
 - **`anamnesis` form (guardian)** → family/socio-economic, academic history, development/readiness.
 - **`behavior-checklist` + observations (educator)** → engagement/behavioral, academic performance (activity, attendance, submissions, scores).
 - **`socioemotional` form (educator)** → psychological/socioemotional (motivation, self-efficacy, emotions).
 - **Reports** → aggregated grades when school data is attached.
-- **`vark-kids` form** → learning-style features (MVP).
+- **`vark` form** → learning-style features (MVP).
 
 The nightly export (`feature-export` Lambda → S3 snapshot) is the plumbing: any future model consumes the snapshot contract without system changes ([ml-pipeline.md](./ml-pipeline.md)).
 

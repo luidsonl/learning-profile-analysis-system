@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Learning Profile Analysis System is a serverless platform that personalizes education for gifted children and children with specific needs. It ingests data supplied by guardians, educators, and the children themselves through structured **forms** (academic history, learning preferences, observed behaviors, socioemotional indicators), runs machine learning analysis, and produces adapted pedagogical strategies and visual reports shared between families and educators.
+The Learning Profile Analysis System is a serverless platform that personalizes education for gifted students and students with specific needs. It ingests data supplied by guardians, educators, and the students themselves through structured **forms** (academic history, learning preferences, observed behaviors, socioemotional indicators), runs machine learning analysis, and produces adapted pedagogical strategies and visual reports shared between families and educators.
 
 Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (the child, with a restricted self-view), and **admin**. Access control is role- and scope-based: guardians see only their own children; educators see only children they follow; students see only their own profile, recommendations, and approved reports; administrators manage users and the institution's data.
 
@@ -59,19 +59,19 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
   Persona (guardian / educator / student) ──► GET /api/forms/:formId ──► form definition (FORM#)
       │
       ▼
-  Persona ──► POST /api/children/:id/forms/:formId/responses ──► Submission Lambda ──► DynamoDB
-                                                                     (CHILD#/SUBMISSION# item)
-  Anyone scoped ──► GET /api/children/:id/submissions ──► stored tests (all forms, newest first)
+  Persona ──► POST /api/students/:id/forms/:formId/responses ──► Submission Lambda ──► DynamoDB
+                                                                     (STUDENT#/SUBMISSION# item)
+  Anyone scoped ──► GET /api/students/:id/submissions ──► stored tests (all forms, newest first)
 ```
 
 **Assessment → prediction flow:**
 
 ```
-  User ──► POST /api/children/:id/assessments ──► reads latest stored submission
+  User ──► POST /api/students/:id/assessments ──► reads latest stored submission
                                                       │ (classify.mjs — form processor score)
                                                       ▼
-                                                DynamoDB (ASSESS# item + child profile fields)
-  User ──► POST /api/children/:id/forms/:formId/responses ──► Forms Lambda stores SUBMISSION#
+                                                DynamoDB (ASSESS# item + student profile fields)
+  User ──► POST /api/students/:id/forms/:formId/responses ──► Forms Lambda stores SUBMISSION#
                                                       │ fire-and-forget async invoke ("Event")
                                                       ▼
                                   Inference Lambda (Python, bundled model) ──► scores features
@@ -79,17 +79,17 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
                                                 DynamoDB (PRED# item, written by inference fn)
 
   Predictions are machine-generated data, distinct from human input (submissions/assessments).
-  There is no synchronous predict endpoint; scoped readers poll GET /api/children/:id/predictions.
+  There is no synchronous predict endpoint; scoped readers poll GET /api/students/:id/predictions.
 
   Recommendations are a separate, educator-driven concern:
-  User ──► POST /api/children/:id/recommendations ──► DynamoDB (REC# item, proposed)
-  User ──► PATCH /api/children/:id/recommendations/:recoId ──► approved/published (REC# update)
+  User ──► POST /api/students/:id/recommendations ──► DynamoDB (REC# item, proposed)
+  User ──► PATCH /api/students/:id/recommendations/:recoId ──► approved/published (REC# update)
 ```
 
 **Report generation flow (async, 0shared pattern):**
 
 ```
-  User ──► POST /api/children/:id/reports/generate ──► Generate Lambda ──► SQS queue ──► Report Lambda
+  User ──► POST /api/students/:id/reports/generate ──► Generate Lambda ──► SQS queue ──► Report Lambda
                                                                                            │
   User ◄── metadata (REPORT# item) ────────────────────────────────────────────────────────┤
   User ──► GET /api/reports/:reportId/download ──► presigned GET URL ◄──── S3 (files) ◄────┘
@@ -119,14 +119,14 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   └── aws-frontend/      # S3 static bucket + CloudFront + OAC + deploy
 ├── frontend/              # React + Vite SPA (pt-BR, accessible)
 ├── sam-app/               # API Gateway + API-triggered Lambdas (stateless compute)
-│   ├── template.yaml      # SAM template (health, auth, children, guardianship,
+│   ├── template.yaml      # SAM template (health, auth, students, guardianship,
 │   │                      #   observations, forms, assessment,
 │   │                      #   recommendations, reports, audit, inference)
 │   ├── samconfig.toml     # SAM config (stack name, parameter overrides)
 │   ├── resources.env      # Central resource names (source of truth)
 │   ├── Makefile           # Convenience targets (deploy, test, clean)
 │   └── src/handlers/      # Lambda code (Node.js ESM)
-│       ├── health.mjs, auth.mjs, children.mjs, guardianship.mjs,
+│       ├── health.mjs, auth.mjs, students.mjs, guardianship.mjs,
 │       ├── observations.mjs, forms.mjs (submissions, assessments,
 │       │                  predictions),
 │       ├── recommendations.mjs, reports.mjs, audit.mjs
@@ -202,17 +202,17 @@ The two layers share values using the same two mechanisms as 0shared:
 
 Data collection is built on a generic, hybrid forms engine:
 
-- **Generic engine underneath:** form definitions (`FORM#<formId>`, versioned) describe sections and typed questions; submissions are stored per child (`CHILD#<childId> / SUBMISSION#<formId>#<timestamp>`). Question types: single choice, multiple choice, Likert scale, text, number, date.
+- **Generic engine underneath:** form definitions (`FORM#<formId>`, versioned) describe sections and typed questions; submissions are stored per child (`STUDENT#<studentId> / SUBMISSION#<formId>#<timestamp>`). Question types: single choice, multiple choice, Likert scale, text, number, date.
 - **Curated forms library (in code):** definitions live in `src/forms/definitions/` and are served read-only — no form state in the database. The engine ships with domain forms, each targeting a persona:
 
   | Form | Filled by | Purpose |
   |------|-----------|---------|
-  | `vark-kids` | Student (with guardian/educator help if needed) | VARK questionnaire — scored into a VARK learning profile |
+  | `vark` | Student (with guardian/educator help if needed) | VARK questionnaire — scored into a VARK learning profile |
   | `anamnesis` | Guardian | Academic history, background, socio-family intake |
   | `socioemotional` | Educator | Socioemotional indicators |
   | `behavior-checklist` | Educator | Observed behaviors / performance feedback |
 
-- **A profile is traced from a filled form:** each form submission is interpreted by a profile module into dimensions and labels (e.g., the `vark-kids` form produces the VARK profile — V/A/R/K totals + multimodal label per Fleming's method, stored as an assessment `ASSESS#`). The MVP implements the VARK profile; future profiles (giftedness, difficulty, socioemotional) follow the same pattern: a form + a scoring/classification step.
+- **A profile is traced from a filled form:** each form submission is interpreted by a profile module into dimensions and labels (e.g., the `vark` form produces the VARK profile — V/A/R/K totals + multimodal label per Fleming's method, stored as an assessment `ASSESS#`). The MVP implements the VARK profile; future profiles (giftedness, difficulty, socioemotional) follow the same pattern: a form + a scoring/classification step.
 - **Admin editing:** form content is editable via the admin panel; edits create a new form **version** (never a destructive update), so past submissions stay interpretable.
 
 Forms are the system's data-collection mechanism; machine learning is an **offline, decoupled layer** that classifies profiles from form-derived features. See [Profiles & Machine Learning](#profiles--machine-learning-decoupled) and the standalone [ML Pipeline](./ml-pipeline.md) spec.
@@ -221,7 +221,7 @@ Forms are the system's data-collection mechanism; machine learning is an **offli
 
 ## Profiles & Machine Learning (decoupled)
 
-The core idea: **a profile is traced from a filled form.** Forms collect structured responses, and a profile module interprets a child's submissions into dimensions and labels. The MVP implements the **VARK learning profile** (V/A/R/K + multimodal label); future profiles (giftedness, difficulty, socioemotional) reuse the same pattern — a form plus a scoring/classification step.
+The core idea: **a profile is traced from a filled form.** Forms collect structured responses, and a profile module interprets a student's submissions into dimensions and labels. The MVP implements the **VARK learning profile** (V/A/R/K + multimodal label); future profiles (giftedness, difficulty, socioemotional) reuse the same pattern — a form plus a scoring/classification step.
 
 Machine learning is a *separate, offline* layer that classifies those profiles:
 
@@ -238,10 +238,10 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 
 - **RBAC:** roles `guardian | educator | student | admin` enforced by `requireRole` middleware on top of Bearer-token sessions (0shared auth flow).
 - **Scope enforcement:** guardians query children via their `USER#` partition (guardianship edges); educators via `FOLLOW#` edges; students access only their own child profile through a dedicated student link. No cross-tenant enumeration.
-- **Graduated student autonomy:** each child carries an `autonomyLevel` (`supervised | guided | autonomous`) that unlocks self-service progressively — observations/submissions/scores at `guided`, reports and LGPD self-service at `autonomous`. Set by guardian/educator/admin via `PATCH /children/:id/autonomy`, versioned + audited (`AUTONOMY#`). Enforcement lives in `src/lib/scope.mjs` (`studentAccess`).
+- **Graduated student autonomy:** each child carries an `autonomyLevel` (`supervised | guided | autonomous`) that unlocks self-service progressively — observations/submissions/scores at `guided`, reports and LGPD self-service at `autonomous`. Set by guardian/educator/admin via `PATCH /students/:id/autonomy`, versioned + audited (`AUTONOMY#`). Enforcement lives in `src/lib/scope.mjs` (`studentAccess`).
 - **Explicit consent:** consent (versioned, with **legal basis** `guardian | institution_authorization | self_consent` and `grantedByRole`) is required before a child's data is processed. Creating a student account is initiated by the guardian **or an educator following the child** (institution-led onboarding for students without a guardian) and gated by consent. Consent revocation blocks new processing.
-- **Audit log:** every access/action on a child's data writes a `AUDIT#` item (who, what, when).
-- **Data minimization & retention:** children's records are kept minimal; retention/erasure policy is documented in `lgpd.md`.
+- **Audit log:** every access/action on a student's data writes a `AUDIT#` item (who, what, when).
+- **Data minimization & retention:** students' records are kept minimal; retention/erasure policy is documented in `lgpd.md`.
 - **Encryption:** S3 buckets use SSE; DynamoDB uses AWS KMS; in-transit TLS via CloudFront/API Gateway.
 - **S3 buckets** block public access; files bucket objects are private and served only via presigned URLs.
 
@@ -286,8 +286,8 @@ Cleanup happens in reverse order.
 | Small packaged model in Lambda over SageMaker | Cheapest for the MVP; SageMaker remains a documented upgrade path |
 | Heuristic giftedness/difficulty indicators in MVP | No public dataset exists; heuristic rules are honest and explainable while data is collected |
 | PDF reports server-side via SQS | Async generation avoids request timeouts; output lands in S3 and is shared by presigned URL |
-| LGPD in-scope for MVP | Children's data is sensitive; consent + audit are foundational, not retrofits |
-| VARK kids questionnaire (adapted) | Closes the domain gap with the public (adult) dataset; aligns with the child persona |
+| LGPD in-scope for MVP | Students' data is sensitive (minors especially); consent + audit are foundational, not retrofits |
+| VARK questionnaire | Closes the domain gap with the public dataset (students aged 10-18+); serves every persona |
 
 ---
 

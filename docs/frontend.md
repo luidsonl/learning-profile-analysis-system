@@ -27,14 +27,14 @@
 | Path | Persona | Page |
 |------|---------|------|
 | `/login` | public | Login |
-| `/` | guardian/educator/admin | Dashboard (children in scope) |
-| `/children/:id` | scoped | Child profile + consent status |
-| `/children/:id/forms` | scoped | Available forms for the child |
-| `/children/:id/forms/vark-kids` | student (own) | VARK questionnaire (kid-friendly wizard) |
-| `/children/:id/profile` | scoped | Learning profile (V/A/R/K + multimodal) |
-| `/children/:id/recommendations` | scoped | Adapted pedagogical strategies |
-| `/children/:id/reports` | scoped | Report list + download |
-| `/children/:id/observations` | educator | Observations (educator-only; hidden from student persona) |
+| `/` | guardian/educator/admin | Dashboard (students in scope) |
+| `/students/:id` | scoped | Child profile + consent status |
+| `/students/:id/forms` | scoped | Available forms for the child |
+| `/students/:id/forms/vark` | student (own) | VARK questionnaire (kid-friendly wizard) |
+| `/students/:id/profile` | scoped | Learning profile (V/A/R/K + multimodal) |
+| `/students/:id/recommendations` | scoped | Adapted pedagogical strategies |
+| `/students/:id/reports` | scoped | Report list + download |
+| `/students/:id/observations` | educator | Observations (educator-only; hidden from student persona) |
 | `/admin/*` | admin | Users, forms definitions, audit |
 | `/me` | any | Own account (guardian/educator) |
 
@@ -48,9 +48,9 @@ Student persona sees a **simplified self-view**: own profile, recommendations, a
 
 ## Feature Areas
 
-1. **Form engine renderer** — generic renderer over `FORM#` definitions: renders question types (single, multiple, likert, text, number, date), sections, progress, required validation; submit via `POST /api/children/:id/forms/:formId/responses` (idempotent `requestId`).
+1. **Form engine renderer** — generic renderer over `FORM#` definitions: renders question types (single, multiple, likert, text, number, date), sections, progress, required validation; submit via `POST /api/students/:id/forms/:formId/responses` (idempotent `requestId`).
 2. **VARK wizard** — kid-friendly adaptation of the questionnaire with per-modality progress; on submit shows the resulting profile.
-3. **Profile view** — V/A/R/K totals + multimodal label + confidence (from `GET /api/children/:id/predictions`), with plain-language explanation (no raw ML).
+3. **Profile view** — V/A/R/K totals + multimodal label + confidence (from `GET /api/students/:id/predictions`), with plain-language explanation (no raw ML).
 4. **Recommendations** — list, filter by `visibility`; educator can propose/approve; guardian/student see approved.
 5. **Reports** — generate (async), poll status, download via presigned URL.
 6. **Admin** — user management, form version editing, audit browser.

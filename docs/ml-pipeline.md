@@ -10,13 +10,13 @@ Machine learning is **fully decoupled** from the running system. The deployed AW
 2. **The inference Lambda only classifies and persists.** It loads a joblib model bundled in its deployment package, scores features, and writes the resulting `PRED#` item to DynamoDB. Nothing else.
 3. **Trigger = asynchronous invoke on form submission.** After the Forms Lambda stores a *new* submission, it fires `lambda.invoke(InvocationType: "Event")` at the inference function — fire-and-forget. **No SQS**, no streams, no EventBridge in the ML path. The user never waits for inference.
 4. **Form data and inference data are distinct entities**: submissions (`SUBMISSION#`) are human input; predictions (`PRED#`) are machine-generated output written solely by the inference function (`createdBy: system:inference`). Assessments (`ASSESS#`, rule-based classification from the forms engine) are also human-flow data and are separate from predictions.
-5. **Failure is silent and safe**: if the inference function fails or is unreachable, the submission stands and no prediction is created. Predictions are eventually available via `GET /api/children/:id/predictions`.
+5. **Failure is silent and safe**: if the inference function fails or is unreachable, the submission stands and no prediction is created. Predictions are eventually available via `GET /api/students/:id/predictions`.
 6. **Extensible by addition**: a future form/model pairs a curated form definition with a new offline pipeline and (if needed) another inference function — no changes to the running API.
 
 This separation is intentional and is the contract that makes future models possible:
 
 - The system collects data through **forms** (see [Architecture — Forms Engine](./architecture.md#forms-engine)).
-- A **profile** is a characterization of a child derived from their form responses (e.g., the VARK learning profile from the `vark-kids` form).
+- A **profile** is a characterization of a student derived from their form responses (e.g., the VARK learning profile from the `vark` form).
 - Models are trained offline to predict profile labels from features. Adding a new form → profile → model later requires no changes to the running system, only to the offline pipeline and an inference redeploy.
 
 ---
@@ -40,7 +40,7 @@ This separation is intentional and is the contract that makes future models poss
 
   ──────────────── runtime ────────────────
 
-  Persona ──► POST /api/children/:id/forms/:formId/responses ──► Forms Lambda
+  Persona ──► POST /api/students/:id/forms/:formId/responses ──► Forms Lambda
                                                                     │ stores SUBMISSION#
                                                                     │ fire-and-forget:
                                                                     ▼
@@ -49,7 +49,7 @@ This separation is intentional and is the contract that makes future models poss
                                                                                 ▼
                                                                         DynamoDB (PRED# item)
 
-  Scoped reads ──► GET /api/children/:id/predictions ──► PRED# history (autonomy-gated payload)
+  Scoped reads ──► GET /api/students/:id/predictions ──► PRED# history (autonomy-gated payload)
 ```
 
 > The nightly `feature-export` snapshot pipeline described below is a **planned future phase** (the Lambda exists as a stub). The v0 integration above does not depend on it.
@@ -64,7 +64,7 @@ This separation is intentional and is the contract that makes future models poss
 - **Committed in this repository at `datasets/vark/data.csv` by owner decision** (public dataset, CC BY 4.0 permits redistribution with attribution — provenance kept in `datasets/vark/citation.txt`). Model artifacts (`*.joblib`, `*.parquet`) remain git-ignored.
 - Observed schema: 18 columns — `Gender` (`Male/Female`), `Age` (10–18+; **school-age students**, not university as previously assumed), **15 VARK Likert items rated 1–5** in three 5-item subscales (**reading/writing**, **aural**, **kinesthetic**), and a single-modality `Learner` label.
 - **Label distribution is imbalanced**: `K` 679 (~56%), `A` 286, `V` 245 of 1210 records. Metrics must therefore report macro-F1 and per-class results alongside accuracy.
-- **Label space caveat (important)**: the dataset's `Learner` letters do **not** follow naive VARK semantics against the item blocks. Empirically (per-class group means, ~93% CV separability): the *reading/writing* block discriminates class `A`, the *aural* block discriminates `V`, and only the *kinesthetic* block matches `K`. Serving therefore maps dataset letters to the system profile vocabulary via `LABEL_MAP = {A→R, V→A, K→K}` — a child who answers mostly reading items gets profile `R`, not "auditivo". This map ships inside `meta.json` and is applied by the inference handler; extreme-vector smoke tests (`ml/tests/inference_smoke.py`) pin the behavior.
+- **Label space caveat (important)**: the dataset's `Learner` letters do **not** follow naive VARK semantics against the item blocks. Empirically (per-class group means, ~93% CV separability): the *reading/writing* block discriminates class `A`, the *aural* block discriminates `V`, and only the *kinesthetic* block matches `K`. Serving therefore maps dataset letters to the system profile vocabulary via `LABEL_MAP = {A→R, V→A, K→K}` — a student who answers mostly reading items gets profile `R`, not "auditivo". This map ships inside `meta.json` and is applied by the inference handler; extreme-vector smoke tests (`ml/tests/inference_smoke.py`) pin the behavior.
 - **Parsing quirk**: two columns share the same header text ("role-playing"). The loader must reference columns **by position**, never by name.
 
 ### System-exported snapshots (planned future phase)
@@ -79,7 +79,7 @@ This separation is intentional and is the contract that makes future models poss
 `ml/features/` transforms the raw dataset into feature vectors. The feature schema is recorded in each model's `meta.json`.
 
 - **v0 uses only the 15 Likert items** (ordinal 1–5) — no `Gender`/`Age`. Rationale: the kids form does not collect demographics at submission time, so training and serving must share the exact same feature space; dropping demographics also avoids amplifying domain gap.
-- The dataset's item order is mapped **positionally** to the `vark-kids` question ids (`q01…q15`) in a table stored in `meta.json`, so serving can build vectors from submission answers without name-based guessing.
+- The dataset's item order is mapped **positionally** to the `vark` question ids (`q01…q15`) in a table stored in `meta.json`, so serving can build vectors from submission answers without name-based guessing.
 - Snapshot features are kept generic so future profiles (giftedness, difficulty, socioemotional) can reuse the export without new system work.
 
 ---
@@ -100,11 +100,11 @@ This separation is intentional and is the contract that makes future models poss
 
 - The inference function (`InferenceFunction` in `sam-app/template.yaml`) is a **Python 3.12 Lambda** deployed with the SAM app; its deployment package bundles `model.joblib` + `meta.json`. It is **never invoked synchronously by the API**.
 - **Trigger**: after the Forms Lambda stores a *new* (non-idempotent-duplicate) submission, it fires an asynchronous invoke — `InvocationType: "Event"`, best-effort; an invoke failure never fails the submission.
-- **Contract** (payload from Forms Lambda): `{ childId, formId, formVersion, answers }`.
+- **Contract** (payload from Forms Lambda): `{ studentId, formId, formVersion, answers }`.
 - **Behavior**: builds the feature vector per `meta.json`'s positional mapping, scores with the bundled model, remaps labels (`{A→R, V→A, K→K}`), computes confidence = max class probability, and writes the `PRED#` item itself (`createdBy: "system:inference"`, `method: "ml"`). On any error it logs and exits — **no prediction is created and the submission stands**.
-- **Read path**: `GET /api/children/:id/predictions` (existing handler) serves history with autonomy gating at read time — supervised students see label-only payloads; guided/autonomous see scores + confidence.
+- **Read path**: `GET /api/students/:id/predictions` (existing handler) serves history with autonomy gating at read time — supervised students see label-only payloads; guided/autonomous see scores + confidence.
 - **Traceability**: there is **no model registry** — each `PRED#` item records `model` + `modelVersion` from `meta.json`, so every prediction is traceable to exactly what produced it. The model itself is invisible to admins and end users.
-- Heuristic indicators (`giftedness-indicator`, `difficulty-indicator`) remain rule-based companions, not trained models. The former heuristic predict path is retired together with `POST /api/children/:id/predict`.
+- Heuristic indicators (`giftedness-indicator`, `difficulty-indicator`) remain rule-based companions, not trained models. The former heuristic predict path is retired together with `POST /api/students/:id/predict`.
 
 ---
 

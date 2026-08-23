@@ -6,12 +6,12 @@
 
 | Role | Sees | Restricted from |
 |------|------|-----------------|
-| `guardian` | Only their own children (via `GUARD#` edges) | Other children, educator observations |
-| `educator` | Only children they follow (via `FOLLOW#` edges) | Guardianship management |
+| `guardian` | Only their own students (via `GUARD#` edges) | Other students, educator observations |
+| `educator` | Only students they follow (via `FOLLOW#` edges) | Guardianship management |
 | `student` | Own profile, recommendations, approved reports, forms they can fill — **plus what their autonomy level grants** | Observations, raw ML internals, other children |
-| `admin` | Everything (users, children, models, audit) | — |
+| `admin` | Everything (users, students, audit) | — |
 
-> **Educator = admin-like authority over the child flows:** an educator following a child can grant/revoke consent, create the student account and set the autonomy level to any value (up or down), mirroring what an admin can do. Guardians can set autonomy and consent for their own children; students can never change their own level.
+> **Educator = admin-like authority over the child flows:** an educator following a child can grant/revoke consent, create the student account and set the autonomy level to any value (up or down), mirroring what an admin can do. Guardians can set autonomy and consent for their own students; students can never change their own level.
 
 ## Session Flow
 
@@ -33,7 +33,7 @@
                                            requireRole(roles...) → handler
                                                   │
                                                   ▼
-                                           scopeCheck(childId, role)  → edges
+                                           scopeCheck(studentId, role)  → edges
 ```
 
 ## Middleware (`sam-app/src/handlers/middleware/`)
@@ -42,30 +42,30 @@
 |------------|----------------|
 | `requireAuth` | Validates token → context `{userId, role}`; 401 otherwise |
 | `requireRole(...roles)` | Rejects if `role` not allowed; 403 |
-| `requireScopeChild(childId)` | For children routes: guardian → `USER#<u>/GUARD#<c>` exists; educator → `FOLLOW#`; student → `USER#<s>/CHILD#<c>`; admin → always; else 403. Uses the reverse edge (`CHILD#<c>/GUARDIAN#`/`EDUCATOR#`) where the query is cheaper. |
+| `requireScopeChild(studentId)` | For children routes: guardian → `USER#<u>/GUARD#<c>` exists; educator → `FOLLOW#`; student → `USER#<s>/STUDENT#<c>`; admin → always; else 403. Uses the reverse edge (`STUDENT#<c>/GUARDIAN#`/`EDUCATOR#`) where the query is cheaper. |
 
-Scope checks are **edge lookups, not role checks** — a guardian cannot enumerate other people's children even with a valid token.
+Scope checks are **edge lookups, not role checks** — a guardian cannot enumerate other people's students even with a valid token.
 
 ## Access Rules per Resource
 
 | Resource | guardian | educator | student | admin |
 |----------|----------|----------|---------|-------|
-| Child profile | own (`GUARD#`) | followed (`FOLLOW#`) | own link (`CHILD#`) | all |
-| Submissions | own children (read) | followed (read) | own (read/write own forms) | all |
+| Child profile | own (`GUARD#`) | followed (`FOLLOW#`) | own link (`STUDENT#`) | all |
+| Submissions | own students (read) | followed (read) | own (read/write own forms) | all |
 | Observations | ✗ | followed (write) | own, read-only if `guided`+ | all |
-| Assessments/Predictions | own children | followed | own (payload by level) | all |
-| Recommendations | own children (approved) | propose + approve | own (published only) | all |
-| Reports | own children (incl. generate) | followed | own if `autonomous` | all |
-| Consent | own children (grant/revoke) | followed (admin-like) | ✗ | all |
-| Autonomy level | own children (set) | followed (set) | ✗ | all |
+| Assessments/Predictions | own students | followed | own (payload by level) | all |
+| Recommendations | own students (approved) | propose + approve | own (published only) | all |
+| Reports | own students (incl. generate) | followed | own if `autonomous` | all |
+| Consent | own students (grant/revoke) | followed (admin-like) | ✗ | all |
+| Autonomy level | own students (set) | followed (set) | ✗ | all |
 | Forms definition | list/fill by audience (+ student forms assisted) | list/fill by audience | list/fill by audience | read-only |
-| Audit | own children (read) | ✗ | ✗ | all |
+| Audit | own students (read) | ✗ | ✗ | all |
 
 > Details on the exact endpoints in [Backend — RBAC Matrix](./backend.md#rbac-matrix).
 
 ## Graduated Student Autonomy
 
-Students are not a single restricted profile: each child carries an **autonomy level** (`CHILD#<id>/META.autonomyLevel`, default `supervised`) set by the guardian, an educator following the child, or an admin via `PATCH /api/children/:id/autonomy`. Every change is **versioned** (`AUTONOMY#` history items) and audited. `src/lib/scope.mjs` exposes `studentAccess(childId, ctx, resource)` enforcing the matrix:
+Students are not a single restricted profile: each child carries an **autonomy level** (`STUDENT#<id>/META.autonomyLevel`, default `supervised`) set by the guardian, an educator following the child, or an admin via `PATCH /api/students/:id/autonomy`. Every change is **versioned** (`AUTONOMY#` history items) and audited. `src/lib/scope.mjs` exposes `studentAccess(studentId, ctx, resource)` enforcing the matrix:
 
 | Resource | `supervised` | `guided` | `autonomous` |
 |----------|:---:|:---:|:---:|
@@ -80,22 +80,22 @@ Students are not a single restricted profile: each child carries an **autonomy l
 
 ## Student (Minor) Accounts
 
-- Created via `POST /api/children/:id/student-account` by the **primary guardian**, an **educator following the child** (institution-led onboarding, e.g. no guardian), or an **admin** — gated by the child's current consent (409 if no active consent).
-- A minor **cannot** register directly, cannot change the child profile (unless `autonomous`), cannot see observations or raw model output (unless their level grants it).
-- The student identity is linked through `CHILD#<c>/STUDENT#<userId>` + `USER#<s>/CHILD#<c>` edges, written in the same transaction as the user creation.
+- Created via `POST /api/students/:id/student-account` by the **primary guardian**, an **educator following the child** (institution-led onboarding, e.g. no guardian), or an **admin** — gated by the child's current consent (409 if no active consent).
+- A minor **cannot** register directly, cannot change the student profile (unless `autonomous`), cannot see observations or raw model output (unless their level grants it).
+- The student identity is linked through `STUDENT#<c>/STUDENT#<userId>` + `USER#<s>/STUDENT#<c>` edges, written in the same transaction as the user creation.
 - UI: the student persona renders the simplified self-view (see [Frontend](./frontend.md)).
 
 ## Students Without a Guardian
 
-- An educator or admin can register the child (`POST /api/children`) and record optional `accountability` (institution/authorized-by/note) on the child META.
-- **Consent is still mandatory** — no processing without a documented legal basis. The educator (or admin) grants consent via the same `POST /api/children/:id/consent` with `legalBasis: "institution_authorization"` (see [LGPD](./lgpd.md)). If a guardian exists, the guardian remains the consent authority.
+- An educator or admin can register the child (`POST /api/students`) and record optional `accountability` (institution/authorized-by/note) on the child META.
+- **Consent is still mandatory** — no processing without a documented legal basis. The educator (or admin) grants consent via the same `POST /api/students/:id/consent` with `legalBasis: "institution_authorization"` (see [LGPD](./lgpd.md)). If a guardian exists, the guardian remains the consent authority.
 - The educator then creates the student account. From that point the child behaves like any other — the only difference is who granted consent and who set the autonomy level.
 
 ## LGPD & Consent
 
-- **Explicit consent** (versioned: `consentVersion`, `consentAt`) is required before any child data is processed; recorded via `POST /api/children/:id/consent` (see [LGPD](./lgpd.md)). Consent records carry a **legal basis** (`legalBasis`: `guardian | institution_authorization | self_consent`) and the role that granted it (`grantedByRole`) — LGPD accountability is not an afterthought.
-- Consent **revocation** flips `CHILD#<id>/META` state and blocks new processing (new submissions/predictions are rejected with 403).
-- Every authenticated access to a child's data writes an `AUDIT#CHILD#<id>` item (who, what, when, ip) — the audit trail is queryable by admin and by the guardian for their own children.
+- **Explicit consent** (versioned: `consentVersion`, `consentAt`) is required before any child data is processed; recorded via `POST /api/students/:id/consent` (see [LGPD](./lgpd.md)). Consent records carry a **legal basis** (`legalBasis`: `guardian | institution_authorization | self_consent`) and the role that granted it (`grantedByRole`) — LGPD accountability is not an afterthought.
+- Consent **revocation** flips `STUDENT#<id>/META` state and blocks new processing (new submissions/predictions are rejected with 403).
+- Every authenticated access to a child's data writes an `AUDIT#STUDENT#<id>` item (who, what, when, ip) — the audit trail is queryable by admin and by the guardian for their own students.
 - Tokens and sessions are short-lived; no third-party analytics/telemetry touches the SPA.
 
 ## Security Notes

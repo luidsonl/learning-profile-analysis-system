@@ -1,6 +1,6 @@
 # LGPD Compliance — Learning Profile Analysis System
 
-> The system processes personal data of **minors** (children) in an educational context. LGPD compliance is in scope for the MVP — consent, minimization, audit, and erasure are foundational, not retrofits. This spec documents the data inventory, lawful bases, consent lifecycle, and the operational flows implementing LGPD rights.
+> The system processes personal data of **students** — including minors (children) — in an educational context. LGPD compliance is in scope for the MVP — consent, minimization, audit, and erasure are foundational, not retrofits. This spec documents the data inventory, lawful bases, consent lifecycle, and the operational flows implementing LGPD rights.
 
 ## Scope & Legal Basis
 
@@ -8,7 +8,7 @@
 |-----------|----------------------------|-------|
 | Registration of guardian/educator/admin | Consent + legitimate interest of the institution | Adult users |
 | Registration of the student (minor) | **Consent of the guardian** (art. 14 — children's data); for students without a guardian, **institution authorization** (`legalBasis=institution_authorization`) granted by the responsible educator/admin, documented on the consent record | Guardian- or institution-led |
-| Filling forms, observations, assessments | Guardian consent or institution authorization (per child, versioned) | `vark-kids`, `anamnesis`, `socioemotional`, `behavior-checklist` |
+| Filling forms, observations, assessments | Guardian consent or institution authorization (per student, versioned) | `vark`, `anamnesis`, `socioemotional`, `behavior-checklist` |
 | ML prediction & recommendations | Same consent basis; anonymized training outside scope | See data minimization below |
 | Reports (PDF) | Same consent basis; sharing per `sharedWith` | Presigned URLs |
 | Audit log | Legitimate interest + legal compliance (art. 37) | Kept separately from analytics |
@@ -22,7 +22,7 @@
 | Item | Entities (`dynamodb-schema.md`) | Purpose |
 |------|--------------------------------|---------|
 | Identity & contacts | `USER#` | Accounts, login, roles |
-| Child profile | `CHILD#/META` | Guardianship, consent, personalization |
+| Child profile | `STUDENT#/META` | Guardianship, consent, personalization |
 | Form responses | `SUBMISSION#` | Profile tracing (VARK scoring) |
 | Observations | `OBS#` | Educator feedback, features for future models |
 | Scores & labels | `ASSESS#` | Profile interpretation (V/A/R/K + multimodal) |
@@ -33,19 +33,19 @@
 
 ## Consent Lifecycle
 
-- **Versioned**: each consent record has `consentVersion` (the terms version accepted) + timestamp; stored as `CHILD#<c>/CONSENT#<version>#<ts>` and denormalized on `CHILD#/META` (`consentVersion`, `consentAt`, `consentBy`) together with `consentLegalBasis` and `consentGrantedByRole`.
-- **Grant**: guardian, educator (institution authorization, child followed), or admin calls `POST /api/children/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
+- **Versioned**: each consent record has `consentVersion` (the terms version accepted) + timestamp; stored as `STUDENT#<c>/CONSENT#<version>#<ts>` and denormalized on `STUDENT#/META` (`consentVersion`, `consentAt`, `consentBy`) together with `consentLegalBasis` and `consentGrantedByRole`.
+- **Grant**: guardian, educator (institution authorization, child followed), or admin calls `POST /api/students/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
 - **Erasure-adjacent control**: the autonomy level is independent of consent — raising autonomy never bypasses consent; revoking consent blocks processing regardless of level.
 - **Revocation**: writes a new `CONSENT#` item with `status=revoked` and updates `META`. After revocation:
   - new submissions, assessments, predictions, observations are rejected (403);
   - read access is limited to what's needed for the rights (access, erasure) and legal obligations;
-  - nightly export excludes the child.
+  - nightly export excludes the student.
 - **Re-consent**: a new consent version is accepted explicitly; old version history retained for proof.
 - **Student account gating**: creating a student account requires an active consent for the child; a minor can never consent themselves.
 
 ## Audit Log
 
-- Every access/action on a child's data writes `AUDIT#CHILD#<id>` (actorId, actorRole, action, resource, detail, ip, timestamp).
+- Every access/action on a child's data writes `AUDIT#STUDENT#<id>` (actorId, actorRole, action, resource, detail, ip, timestamp).
 - User- and form-scoped trails: `AUDIT#USER#<id>`, `AUDIT#FORM#<id>`.
 - Retained according to the retention policy (below); not used for analytics/training.
 
@@ -60,18 +60,18 @@
   | Submissions / assessments / predictions | Kept while consent active; erasure on revocation request or at the end of the institution's term (configurable) |
   | Audit log | 2 years (configurable), never TTL'd by default |
   | Export snapshots (`-data`) | Anonymized → retained for ML retraining per policy |
-- **TTL is never used for children's data** as a substitute for explicit erasure flows.
-- **Anonymization at export**: the nightly `feature-export` strips direct identifiers (names, emails, birth dates, user/child IDs) and emits only scores/labels/aggregate attributes — the decoupling contract in [ML Pipeline](./ml-pipeline.md). Anonymized data falls outside LGPD personal-data scope.
+- **TTL is never used for students' data** as a substitute for explicit erasure flows.
+- **Anonymization at export**: the nightly `feature-export` strips direct identifiers (names, emails, birth dates, user/student IDs) and emits only scores/labels/aggregate attributes — the decoupling contract in [ML Pipeline](./ml-pipeline.md). Anonymized data falls outside LGPD personal-data scope.
 
 ## Data Subject Rights (operational flows)
 
 | Right (LGPD art. 18) | Endpoint / flow |
 |----------------------|-----------------|
-| Access | `GET /api/children/:id` (guardian) / `GET /api/children/:id/...` data download; admin export |
-| Correction | `PATCH /api/children/:id` (non-destructive, versioned) |
-| Erasure (apagamento) | **Erasure flow** (admin/DPO): delete `CHILD#` partition items (submissions, assess, pred, rec, obs, reports + S3 PDFs, consent history), `GUARD#`/`FOLLOW#`/`STUDENT#` edges, student `USER#` + `EMAIL#` reservation; keep only anonymized snapshots + audit record of the deletion |
-| Consent revocation | `POST /api/children/:id/consent` with `status=revoked` |
-| Portability | Structured export (JSON) of the child's `SUBMISSION#`, `ASSESS#`, `PRED#`, `REC#` for the guardian |
+| Access | `GET /api/students/:id` (guardian) / `GET /api/students/:id/...` data download; admin export |
+| Correction | `PATCH /api/students/:id` (non-destructive, versioned) |
+| Erasure (apagamento) | **Erasure flow** (admin/DPO): delete `STUDENT#` partition items (submissions, assess, pred, rec, obs, reports + S3 PDFs, consent history), `GUARD#`/`FOLLOW#`/`STUDENT#` edges, student `USER#` + `EMAIL#` reservation; keep only anonymized snapshots + audit record of the deletion |
+| Consent revocation | `POST /api/students/:id/consent` with `status=revoked` |
+| Portability | Structured export (JSON) of the student's `SUBMISSION#`, `ASSESS#`, `PRED#`, `REC#` for the guardian |
 | Anonymous review / complaints | Institution DPO contact surfaced in the UI (footer) |
 
 Erasure is a **documented script/runbook** (admin-triggered Lambda or CLI) with a preflight dry-run and an `AUDIT#` record of execution.

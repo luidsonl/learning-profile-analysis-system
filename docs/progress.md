@@ -26,7 +26,7 @@ Backend vertical slice + offline ML pipeline are implemented and documented. Rem
 Everything below is implemented, tested, and documented in its own layer doc (`docs/`):
 
 - **Infra**: Terraform stateful stack (DynamoDB single table, S3 files/data buckets, SQS report queue, async Lambdas) + SAM app with API-triggered functions.
-- **Backend API**: auth/sessions, children & guardianship, versioned consent, graduated autonomy, forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
+- **Backend API**: auth/sessions, students & guardianship, versioned consent, graduated autonomy, forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
 - **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/model/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); it scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `docs/ml-pipeline.md`).
 - **Security tooling**: gitleaks + pre-commit + CI secret scan; packaged-model commit exception documented.
 
