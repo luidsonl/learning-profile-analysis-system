@@ -59,10 +59,8 @@
 ### Forms
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `GET /api/forms?audience=` | any | List active forms for a persona | GSI2 `FORM#AUD#<audience>` |
-| `GET /api/forms/:formId` | any | Active form definition | `FORM#<id>/CURRENT` → `VERSION#<v>` |
-| `GET /api/forms/:formId/versions/:version` | admin, scoped | Historical definition | `FORM#<id>/VERSION#<v>` |
-| `POST /api/forms` | admin | Publish a new form version (never destructive) | `VERSION#` + `CURRENT` (txn) |
+| `GET /api/forms?audience=` | any | List forms available to the persona (served from code) | in-memory registry |
+| `GET /api/forms/:formId` | scoped | Form definition (read-only) | in-memory registry |
 | `POST /api/children/:id/forms/:formId/responses` | persona of the form; **guardian may also submit student-audience forms** (child fills together with the guardian on the guardian's account) | Submit responses (idempotent via `requestId`) | `SUBMISSION#` only — classification is a separate step |
 | `GET /api/children/:id/forms/:formId/responses` | scoped | Submission history | Query `SUBMISSION#<formId>#` prefix |
 | `GET /api/children/:id/submissions` | scoped | Stored tests across all forms (newest first) | Query `SUBMISSION#` prefix on `CHILD#` |
@@ -125,7 +123,7 @@
 | Student account | own children | followed (institution onboarding) | ✗ | ✓ |
 | Consent | own children | followed (grant/revoke, institution basis) | ✗ | ✓ |
 | Autonomy level | own children (set) | followed (set) | ✗ | ✓ |
-| Forms (fill) | anamnesis | socioemotional, behavior-checklist | vark-kids | define |
+| Forms (fill) | anamnesis | socioemotional, behavior-checklist | vark-kids | ✓ all |
 | Observations | ✗ | ✓ | own read-only if `guided`+ | ✓ |
 | Assessments / Predict | own children | followed | own (label always; scores+confidence if `guided`+) | ✓ |
 | Recommendations | own children (approved) | propose/approve | own (published) | ✓ |

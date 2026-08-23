@@ -6,7 +6,7 @@
 
 - **One table**: `learning-profile` (name from `terraform/aws-app/terraform.tfvars`, passed to SAM via `resources.env`).
 - **Key schema**: composite `PK` (entity-prefixed partition) + `SK` (entity-prefixed sort). Items are addressed by natural access patterns first; indexes only where a partition cannot serve the query.
-- **Prefixes**: `USER#`, `EMAIL#`, `CHILD#`, `GUARD#`, `FOLLOW#`, `STUDENT#`, `CONSENT#`, `SESSION#`, `FORM#`, `SUBMISSION#`, `OBS#`, `ASSESS#`, `PRED#`, `REC#`, `REPORT#`, `MODEL#`, `AUDIT#`.
+- **Prefixes**: `USER#`, `EMAIL#`, `CHILD#`, `GUARD#`, `FOLLOW#`, `STUDENT#`, `CONSENT#`, `SESSION#`, `SUBMISSION#`, `OBS#`, `ASSESS#`, `PRED#`, `REC#`, `REPORT#`, `AUDIT#`.
 - **Fat items**: attributes are denormalized onto the item where they are read (e.g., role snapshot on sessions, form version on submissions).
 - **Strong vs eventual**: edge and consent invariants are written in transactions (strongly consistent by default); high-frequency reads (report listing, submissions) may use eventually consistent reads.
 - **TTL** for ephemeral data only (sessions); children's data is never TTL-expired — retention is handled by LGPD flows (see [LGPD](./lgpd.md)).
@@ -89,22 +89,9 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 > Pattern: "list children a guardian/educator can see" → Query the user partition SK begins_with `GUARD#` / `FOLLOW#`. Reverse edges (child partition) serve consent display and scope checks ("who has access to this child"). Edges are written **bidirectionally in one transaction** + an `AUDIT#` item.
 
-### FORM
-
-**Version item** (form definitions are immutable once versioned)
-| PK | SK | Attributes |
-|----|----|-----------|
-| `FORM#<formId>` | `VERSION#<versionNumber>` | `formId`, `version`, `title`, `audience` (`guardian|educator|student|admin`), `sections[]` (id, title, `questions[]` — id, `type` (`single|multiple|likert|text|number|date`), label, `options[]`, required, `group` (modality for VARK)), `status` (`draft|active|archived`), `createdBy`, `createdAt`, `updatedAt` |
-| — | — | GSI2PK `FORM#AUD#<audience>`, GSI2SK `FORM#<formId>#<version>` |
-
-**Current-version pointer**
-| PK | SK | Attributes |
-|----|----|-----------|
-| `FORM#<formId>` | `CURRENT` | `activeVersion`, `latestVersion`, `updatedAt` |
-
-> Admin editing creates a new `VERSION#` item and updates the `CURRENT` pointer (conditional update); past submissions keep their `formVersion` and remain interpretable.
-
 ### SUBMISSION (per-child form responses)
+
+> Form definitions are **not stored in the database** — they live in code (`sam-app/src/forms/definitions/*.mjs`) and are served read-only by the API. Only the answers are persisted; each submission records the static `formVersion` exported by the definition module, so future question changes keep old submissions interpretable.
 
 | PK | SK | Attributes |
 |----|----|-----------|
@@ -159,7 +146,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 |----|----|-----------|
 | `AUDIT#<subjectType>#<subjectId>` | `EVENT#<timestamp>#<seq>` | `actorId`, `actorRole`, `action`, `resource`, `detail`, `ip`, `createdAt` |
 
-> Subjects: `AUDIT#CHILD#<childId>`, `AUDIT#USER#<userId>`, `AUDIT#FORM#<formId>`. Every access/action on a child's data writes an audit item (see [LGPD](./lgpd.md)).
+> Subjects: `AUDIT#CHILD#<childId>`, `AUDIT#USER#<userId>`. Every access/action on a child's data writes an audit item (see [LGPD](./lgpd.md)).
 
 ---
 
@@ -176,9 +163,6 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Get child profile | Query `CHILD#<c>` SK `META` |
 | List children by status (admin) | GSI2 Query `CHILD#STATUS#<status>` |
 | List users by role (admin) | GSI2 Query `ROLE#<role>` |
-| List forms by audience | GSI2 Query `FORM#AUD#<audience>` |
-| Get active form definition | Query `FORM#<formId>` SK `CURRENT` → fetch `VERSION#<v>` |
-| List form versions | Query `FORM#<formId>`, SK `VERSION#` prefix |
 | Submissions of a child (one form) | Query `CHILD#<c>`, SK begins_with `SUBMISSION#<formId>#`, desc |
 | Submissions of a child (all forms) | Query `CHILD#<c>`, SK begins_with `SUBMISSION#`, desc |
 | Submissions by form (export) | GSI1 Query `SUBMISSION#<formId>` |
@@ -207,9 +191,8 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Submit form (idempotent) | `CHILD#<c>/SUBMISSION#…` (conditional write, no classification side-effect) |
 | Classify submission → assessment | `ASSESS#<c>/VARK#<ts>` + `CHILD#<c>/META` (profile attrs) |
 | Predict (inference) | `PRED#<c>/PRED#<id>` |
-| Publish form version | `FORM#<id>/VERSION#<v>` + `FORM#<id>/CURRENT` (conditional on latest) |
 
-Uniqueness reservations (`EMAIL#`) and version pointers (`CURRENT`, `latest`) use **conditional writes** inside the transaction so concurrent attempts fail instead of overwriting.
+Uniqueness reservations (`EMAIL#`) use **conditional writes** inside the transaction so concurrent attempts fail instead of overwriting.
 
 ---
 
@@ -218,13 +201,13 @@ Uniqueness reservations (`EMAIL#`) and version pointers (`CURRENT`, `latest`) us
 - A child's core record lives in one partition (`CHILD#<childId>`): guardians, educators, consent, submissions, recommendations, observations, reports. Assessments (`ASSESS#<childId>`) and predictions (`PRED#<childId>`) live in dedicated partitions so their `SK` can be a pure timestamp id without the child's data mixing; reads stay single-partition and ordered by timestamp.
 - Export partitions (`SUBMISSION#<formId>`, `ASSESS#vark`, `OBS#<category>`, `PRED#<model>`) live on **GSI1** so the nightly `feature-export` Lambda scans one hot GSI partition per form/profile instead of a full table scan.
 - No item approaches 400 KB: submissions store answers as a small JSON map; VARK form keeps ~15 Likert items.
-- High-frequency counters (e.g., "total submissions for retraining trigger") should be maintained as atomic `Add` on dedicated counter items (`STAT#FORM#<formId>`) if needed — not scanned.
+- High-frequency counters (e.g., "total submissions for retraining trigger") should be maintained as atomic `Add` on dedicated counter items dedicated counter items if needed — not scanned.
 
 ---
 
 ## Seed Data
 
-- Curated forms (`FORM#`): `vark-kids` (student), `anamnesis` (guardian), `socioemotional` (educator), `behavior-checklist` (educator) — v1 definitions + `CURRENT` pointers, seeded via `make seed` in `sam-app/` (idempotent conditional writes). No other seed data — everything else is produced at runtime.
+- **None.** Form definitions live in code (served read-only by the API); every table item is produced at runtime by user actions or the inference Lambda.
 
 ---
 

@@ -287,18 +287,6 @@ Resources:
             RestApiId: !Ref Api
             Path: /forms/{formId}
             Method: GET
-        GetFormVersion:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /forms/{formId}/versions/{version}
-            Method: GET
-        PublishForm:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /forms
-            Method: POST
         SubmitForm:
           Type: Api
           Properties:
@@ -316,6 +304,24 @@ Resources:
           Properties:
             RestApiId: !Ref Api
             Path: /children/{id}/submissions
+            Method: GET
+        RunAssessment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/assessments
+            Method: POST
+        ListAssessments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/assessments
+            Method: GET
+        ListPredictions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /children/{id}/predictions
             Method: GET
 
   ObservationsFunction:
@@ -343,32 +349,6 @@ Resources:
             RestApiId: !Ref Api
             Path: /children/{id}/observations/{timestamp}
             Method: DELETE
-
-  AssessmentFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/
-      Handler: handlers/assessment.lambdaHandler
-      Role: !GetAtt ApiRole.Arn
-      Events:
-        RunAssessment:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /children/{id}/assessments
-            Method: POST
-        ListAssessments:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /children/{id}/assessments
-            Method: GET
-        ListPredictions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /children/{id}/predictions
-            Method: GET
 
   RecommendationsFunction:
     Type: AWS::Serverless::Function

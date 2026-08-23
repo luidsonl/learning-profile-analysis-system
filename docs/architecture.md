@@ -124,10 +124,11 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   │                      #   recommendations, reports, audit, inference)
 │   ├── samconfig.toml     # SAM config (stack name, parameter overrides)
 │   ├── resources.env      # Central resource names (source of truth)
-│   ├── Makefile           # Convenience targets (deploy, seed, test, clean)
+│   ├── Makefile           # Convenience targets (deploy, test, clean)
 │   └── src/handlers/      # Lambda code (Node.js ESM)
 │       ├── health.mjs, auth.mjs, children.mjs, guardianship.mjs,
-│       ├── observations.mjs, forms.mjs, assessment.mjs,
+│       ├── observations.mjs, forms.mjs (submissions, assessments,
+│       │                  predictions),
 │       ├── recommendations.mjs, reports.mjs, audit.mjs
 │       ├── middleware/    # requireAuth + requireRole (guardian | educator | student | admin)
 │       └── lib/           # Shared utilities (DynamoDB client, VARK scoring, form engine, etc.)
@@ -202,7 +203,7 @@ The two layers share values using the same two mechanisms as 0shared:
 Data collection is built on a generic, hybrid forms engine:
 
 - **Generic engine underneath:** form definitions (`FORM#<formId>`, versioned) describe sections and typed questions; submissions are stored per child (`CHILD#<childId> / SUBMISSION#<formId>#<timestamp>`). Question types: single choice, multiple choice, Likert scale, text, number, date.
-- **Curated forms library (seeded):** the engine ships with domain forms, each targeting a persona:
+- **Curated forms library (in code):** definitions live in `src/forms/definitions/` and are served read-only — no form state in the database. The engine ships with domain forms, each targeting a persona:
 
   | Form | Filled by | Purpose |
   |------|-----------|---------|
@@ -279,7 +280,7 @@ Cleanup happens in reverse order.
 | Single CloudFront domain with `/api` prefix | No CORS; one domain for app + API + future mobile consumption |
 | DynamoDB single-table | Follows 0shared; disciplined access-pattern design with entity prefixes and GSIs |
 | Student as a restricted persona | Children exercise LGPD rights; scoped self-view without exposing educator observations |
-| Hybrid forms engine (generic engine + curated library) | One mechanism for all data collection (VARK, anamnese, socioemotional, behavior) with versioned definitions |
+| Hybrid forms engine (generic engine + curated library) | One mechanism for all data collection (VARK, anamnese, socioemotional, behavior) with code-versioned definitions |
 | Profiles traced from forms | A profile is the interpretation of a filled form (VARK in the MVP); new forms → new profiles additively |
 | ML fully decoupled — offline training only | System never trains; standalone `ml-pipeline.md` spec keeps dataset + training evolvable independently |
 | Small packaged model in Lambda over SageMaker | Cheapest for the MVP; SageMaker remains a documented upgrade path |

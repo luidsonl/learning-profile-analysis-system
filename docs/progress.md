@@ -12,8 +12,8 @@ Backend vertical slice + offline ML pipeline are implemented and documented. Rem
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ❌ Not started | CloudFront + S3 for the SPA |
-| Backend API (`sam-app`) | ✅ Done | 14 Lambdas (~47 routes), RBAC + scoping |
-| Forms engine | ✅ Done | Versioned definitions; guardian-assisted submissions |
+| Backend API (`sam-app`) | ✅ Done | 12 Lambdas (~45 routes), RBAC + scoping |
+| Forms engine | ✅ Done | Code-defined forms; guardian-assisted submissions |
 | Graduated student autonomy | ✅ Done | supervised / guided / autonomous levels |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Implemented | Trained v2.0.0 on public dataset; async invoke on submission; no SQS — **pending `sam build && sam deploy`** |
 | Tests (`sam-app/tests/`) | ✅ Done | 29 unit passing; e2e updated to the new prediction flow (needs redeploy to run) |
