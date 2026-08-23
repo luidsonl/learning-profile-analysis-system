@@ -4,13 +4,13 @@ import { ok, errorResponse, parseBody, param, HttpError } from "../lib/http.mjs"
 import { uid, nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild, requireStudentAccess } from "../lib/scope.mjs";
+import { auditStudent, assertScopeStudent, requireStudentAccess } from "../lib/scope.mjs";
 
-export const getChild = async (childId) => {
+export const getStudent = async (studentId) => {
   const res = await client.send(
-    new CMD.get({ TableName: TABLE, Key: { PK: { S: `CHILD#${childId}` }, SK: { S: "META" } } }),
+    new CMD.get({ TableName: TABLE, Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: "META" } } }),
   );
-  return res.Item ? { childId, ...unmarshall(res.Item) } : null;
+  return res.Item ? { studentId, ...unmarshall(res.Item) } : null;
 };
 
 const createChild = async (event, ctx) => {
@@ -18,13 +18,13 @@ const createChild = async (event, ctx) => {
   requireKeys(body, ["name", "birthDate"]);
   assert(["guardian", "educator", "admin"].includes(ctx.role), "forbidden", "Role cannot register children", 403);
 
-  const childId = uid();
+  const studentId = uid();
   const at = nowIso();
   const item = {
-    PK: { S: `CHILD#${childId}` },
+    PK: { S: `STUDENT#${studentId}` },
     SK: { S: "META" },
     type: { S: "child" },
-    childId: { S: childId },
+    studentId: { S: studentId },
     name: { S: body.name },
     birthDate: { S: body.birthDate },
     gender: body.gender ? { S: body.gender } : { NULL: true },
@@ -37,8 +37,8 @@ const createChild = async (event, ctx) => {
     createdBy: { S: ctx.userId },
     createdAt: { S: at },
     updatedAt: { S: at },
-    GSI2PK: { S: "CHILD#STATUS#active" },
-    GSI2SK: { S: `CHILD#${childId}` },
+    GSI2PK: { S: "STUDENT#STATUS#active" },
+    GSI2SK: { S: `STUDENT#${studentId}` },
   };
 
   const transact = {
@@ -53,7 +53,7 @@ const createChild = async (event, ctx) => {
           TableName: TABLE,
           Item: {
             PK: { S: `USER#${ctx.userId}` },
-            SK: { S: `GUARD#${childId}` },
+            SK: { S: `GUARD#${studentId}` },
             type: { S: "edge" },
             relation: { S: body.relation || "guardian" },
             createdAt: { S: at },
@@ -64,7 +64,7 @@ const createChild = async (event, ctx) => {
       {
         Put: {
           TableName: TABLE,
-          Item: { PK: { S: `CHILD#${childId}` }, SK: { S: `GUARDIAN#${ctx.userId}` }, type: { S: "edge" }, createdAt: { S: at } },
+          Item: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `GUARDIAN#${ctx.userId}` }, type: { S: "edge" }, createdAt: { S: at } },
           ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
         },
       },
@@ -76,7 +76,7 @@ const createChild = async (event, ctx) => {
           TableName: TABLE,
           Item: {
             PK: { S: `USER#${ctx.userId}` },
-            SK: { S: `FOLLOW#${childId}` },
+            SK: { S: `FOLLOW#${studentId}` },
             type: { S: "edge" },
             createdAt: { S: at },
           },
@@ -86,7 +86,7 @@ const createChild = async (event, ctx) => {
       {
         Put: {
           TableName: TABLE,
-          Item: { PK: { S: `CHILD#${childId}` }, SK: { S: `EDUCATOR#${ctx.userId}` }, type: { S: "edge" }, createdAt: { S: at } },
+          Item: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `EDUCATOR#${ctx.userId}` }, type: { S: "edge" }, createdAt: { S: at } },
           ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
         },
       },
@@ -94,9 +94,9 @@ const createChild = async (event, ctx) => {
   }
 
   await client.send(new CMD.transact(transact));
-  await auditChild(childId, ctx, "create", `child:${childId}`, { name: body.name });
+  await auditStudent(studentId, ctx, "create", `student:${studentId}`, { name: body.name });
 
-  return ok({ childId }, 201);
+  return ok({ studentId }, 201);
 };
 
 const listChildren = async (event, ctx) => {
@@ -106,8 +106,8 @@ const listChildren = async (event, ctx) => {
       new CMD.query({ TableName: TABLE, KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)", ExpressionAttributeValues: { ":pk": { S: `USER#${ctx.userId}` }, ":sk": { S: "GUARD#" } } }),
     );
     for (const edge of res.Items || []) {
-      const childId = edge.SK.S.replace("GUARD#", "");
-      const child = await getChild(childId);
+      const studentId = edge.SK.S.replace("GUARD#", "");
+      const child = await getStudent(studentId);
       if (child) items.push(child);
     }
   } else if (ctx.role === "educator") {
@@ -115,13 +115,13 @@ const listChildren = async (event, ctx) => {
       new CMD.query({ TableName: TABLE, KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)", ExpressionAttributeValues: { ":pk": { S: `USER#${ctx.userId}` }, ":sk": { S: "FOLLOW#" } } }),
     );
     for (const edge of res.Items || []) {
-      const childId = edge.SK.S.replace("FOLLOW#", "");
-      const child = await getChild(childId);
+      const studentId = edge.SK.S.replace("FOLLOW#", "");
+      const child = await getStudent(studentId);
       if (child) items.push(child);
     }
   } else if (ctx.role === "admin") {
     const res = await client.send(
-      new CMD.query({ TableName: TABLE, IndexName: "RoleStatus", KeyConditionExpression: "GSI2PK = :pk", ExpressionAttributeValues: { ":pk": { S: "CHILD#STATUS#active" } } }),
+      new CMD.query({ TableName: TABLE, IndexName: "RoleStatus", KeyConditionExpression: "GSI2PK = :pk", ExpressionAttributeValues: { ":pk": { S: "STUDENT#STATUS#active" } } }),
     );
     for (const item of res.Items || []) {
       const plain = unmarshall(item);
@@ -133,23 +133,23 @@ const listChildren = async (event, ctx) => {
   return ok({ data: items, count: items.length });
 };
 
-const getChildHandler = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
-  const child = await getChild(childId);
-  if (!child) throw new HttpError(404, "child_not_found", "Child not found");
+const getStudentHandler = async (event, ctx) => {
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
+  const child = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
   return ok({ child });
 };
 
 const updateChild = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
-  const child = await getChild(childId);
-  if (!child) throw new HttpError(404, "child_not_found", "Child not found");
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
+  const child = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
 
   const body = parseBody(event);
   if (ctx.role === "student") {
-    await requireStudentAccess(childId, ctx, "profile_edit");
+    await requireStudentAccess(studentId, ctx, "profile_edit");
     assert(body.name !== undefined && body.name !== child.name, "validation_failed", "Autonomous students can only edit their own name");
   }
   const allowed = ctx.role === "student" ? ["name"] : ["name", "birthDate", "gender", "grade", "school", "specialNeeds"];
@@ -166,16 +166,16 @@ const updateChild = async (event, ctx) => {
   await client.send(
     new CMD.update({
       TableName: TABLE,
-      Key: { PK: { S: `CHILD#${childId}` }, SK: { S: "META" } },
+      Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: "META" } },
       UpdateExpression: `SET ${updateExpression}, #updatedAt = :updatedAt`,
       ExpressionAttributeNames: { ...exprAttrNames, "#updatedAt": "updatedAt" },
       ExpressionAttributeValues: exprAttrValues,
       ReturnValues: "ALL_NEW",
     }),
   );
-  await auditChild(childId, ctx, "update", `child:${childId}`, { updated: updateAttrs });
+  await auditStudent(studentId, ctx, "update", `student:${studentId}`, { updated: updateAttrs });
 
-  return ok({ childId, updated: updateAttrs });
+  return ok({ studentId, updated: updateAttrs });
 };
 
 export const lambdaHandler = async (event) => {
@@ -183,13 +183,13 @@ export const lambdaHandler = async (event) => {
     const route = `${event.httpMethod} ${event.resource}`;
     const ctx = await requireAuth(event);
     switch (route) {
-      case "POST /children":
+      case "POST /students":
         return await createChild(event, ctx);
-      case "GET /children":
+      case "GET /students":
         return await listChildren(event, ctx);
-      case "GET /children/{id}":
-        return await getChildHandler(event, ctx);
-      case "PATCH /children/{id}":
+      case "GET /students/{id}":
+        return await getStudentHandler(event, ctx);
+      case "PATCH /students/{id}":
         return await updateChild(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");

@@ -42,7 +42,7 @@ export async function findUserByEmail(email) {
   return res.Item?.userId?.S || null;
 }
 
-export async function findChildrenByCreator(userId) {
+export async function findStudentsByCreator(userId) {
   const found = [];
   let last = undefined;
   do {
@@ -51,12 +51,12 @@ export async function findChildrenByCreator(userId) {
         TableName: TABLE,
         IndexName: "RoleStatus",
         KeyConditionExpression: "GSI2PK = :pk",
-        ExpressionAttributeValues: { ":pk": { S: "CHILD#STATUS#active" } },
+        ExpressionAttributeValues: { ":pk": { S: "STUDENT#STATUS#active" } },
         ExclusiveStartKey: last,
       }),
     );
     for (const item of res.Items || []) {
-      if (item.createdBy?.S === userId && item.childId?.S) found.push(item.childId.S);
+      if (item.createdBy?.S === userId && item.studentId?.S) found.push(item.studentId.S);
     }
     last = res.LastEvaluatedKey;
   } while (last);
@@ -122,15 +122,15 @@ export async function purgeOrphanSessions() {
   return removed;
 }
 
-export async function cleanupChild(childId) {
-  if (!childId) return;
-  await deletePartition(`CHILD#${childId}`);
-  await deletePartition(`CONSENT#${childId}`);
-  await deletePartition(`AUTONOMY#${childId}`);
-  await deletePartition(`PRED#${childId}`);
-  await deletePartition(`ASSESS#${childId}`);
-  await deletePartition(`REPORT#${childId}`);
-  await deletePartition(`AUDIT#CHILD#${childId}`);
+export async function cleanupStudent(studentId) {
+  if (!studentId) return;
+  await deletePartition(`STUDENT#${studentId}`);
+  await deletePartition(`CONSENT#${studentId}`);
+  await deletePartition(`AUTONOMY#${studentId}`);
+  await deletePartition(`PRED#${studentId}`);
+  await deletePartition(`ASSESS#${studentId}`);
+  await deletePartition(`REPORT#${studentId}`);
+  await deletePartition(`AUDIT#STUDENT#${studentId}`);
 }
 
 export const CLEANUP_TABLE = TABLE;

@@ -3,11 +3,11 @@ import { ok, errorResponse, parseBody, param, qparam, HttpError } from "../lib/h
 import { nowIso } from "../lib/ids.mjs";
 import { assert, requireKeys } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild, getStudentChildId, requireStudentAccess, studentAccess } from "../lib/scope.mjs";
+import { auditStudent, assertScopeStudent, getOwnStudentId, requireStudentAccess, studentAccess } from "../lib/scope.mjs";
 import { getDefinitions, getFormDefinition, getAssessmentProcessor } from "../forms/engine.mjs";
 import { classifyLatestSubmission } from "../forms/classify.mjs";
 import { AUDIENCES } from "../forms/schema.mjs";
-import { getChild } from "./children.mjs";
+import { getStudent } from "./students.mjs";
 
 const listForms = async (event, ctx) => {
   const audience = qparam(event, "audience");
@@ -40,7 +40,7 @@ const audienceOkForRole = (ctx, formAudience) => {
 };
 
 const submitForm = async (event, ctx) => {
-  const childId = param(event, "id");
+  const studentId = param(event, "id");
   const formId = param(event, "formId");
   const form = getFormDefinition(formId);
   if (!form) throw new HttpError(404, "form_not_found", "Form not found");
@@ -48,15 +48,15 @@ const submitForm = async (event, ctx) => {
   assert(audienceOkForRole(ctx, form.audience), "forbidden", `Form ${formId} is not available to role ${ctx.role}`, 403);
 
   if (ctx.role === "student") {
-    const ownChild = await getStudentChildId(ctx.userId);
-    assert(ownChild === childId, "forbidden", "Students can only submit forms for their own profile", 403);
+    const ownChild = await getOwnStudentId(ctx.userId);
+    assert(ownChild === studentId, "forbidden", "Students can only submit forms for their own profile", 403);
   } else {
-    await assertScopeChild(childId, ctx);
+    await assertScopeStudent(studentId, ctx);
   }
 
-  const child = await getChild(childId);
-  if (!child) throw new HttpError(404, "child_not_found", "Child not found");
-  assert(child.consentStatus === "active", "consent_required", "Active consent is required to submit forms", 409);
+  const child = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
+  assert(student.consentStatus === "active", "consent_required", "Active consent is required to submit forms", 409);
 
   const body = parseBody(event);
   requireKeys(body, ["answers"]);
@@ -66,14 +66,14 @@ const submitForm = async (event, ctx) => {
   const key = body.requestId ? `SUBMISSION#${formId}#${body.requestId}` : `SUBMISSION#${formId}#${at}`;
   if (body.requestId) {
     const existing = await client.send(
-      new CMD.get({ TableName: TABLE, Key: { PK: { S: `CHILD#${childId}` }, SK: { S: key } } }),
+      new CMD.get({ TableName: TABLE, Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: key } } }),
     );
     if (existing.Item) return ok({ submissionId: existing.Item.submissionId?.S || key, submittedBy: "already_exists" });
   }
 
   const submissionId = key.replace(/^SUBMISSION#/, "");
   const submissionItem = {
-    PK: { S: `CHILD#${childId}` },
+    PK: { S: `STUDENT#${studentId}` },
     SK: { S: key },
     type: { S: "submission" },
     formId: { S: formId },
@@ -86,9 +86,9 @@ const submitForm = async (event, ctx) => {
   };
 
   await client.send(new CMD.put({ TableName: TABLE, Item: submissionItem, ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)" }));
-  await auditChild(childId, ctx, "form_submitted", `form:${formId}`, { formVersion: form.version });
+  await auditStudent(studentId, ctx, "form_submitted", `form:${formId}`, { formVersion: form.version });
 
-  await triggerInference({ childId, formId, formVersion: String(form.version), submissionId, answers: body.answers });
+  await triggerInference({ studentId, formId, formVersion: String(form.version), submissionId, answers: body.answers });
 
   return ok({ submissionId, formId }, 201);
 };
@@ -113,15 +113,15 @@ const triggerInference = async (payload) => {
 };
 
 const listSubmissions = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
-  await requireStudentAccess(childId, ctx, "submissions_list");
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
+  await requireStudentAccess(studentId, ctx, "submissions_list");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ScanIndexForward: false,
-      ExpressionAttributeValues: { ":pk": { S: `CHILD#${childId}` }, ":sk": { S: "SUBMISSION#" } },
+      ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: "SUBMISSION#" } },
     }),
   );
   const data = (res.Items || []).map((i) => ({
@@ -152,12 +152,12 @@ const shapePrediction = (i, full) => {
   return p;
 };
 
-const latestPredictionsBySubmission = async (childId, full) => {
+const latestPredictionsBySubmission = async (studentId, full) => {
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
-      ExpressionAttributeValues: { ":pk": { S: `PRED#${childId}` }, ":sk": { S: "PRED#" } },
+      ExpressionAttributeValues: { ":pk": { S: `PRED#${studentId}` }, ":sk": { S: "PRED#" } },
     }),
   );
   const bySubmission = new Map();
@@ -170,20 +170,20 @@ const latestPredictionsBySubmission = async (childId, full) => {
 };
 
 const getResponses = async (event, ctx) => {
-  const childId = param(event, "id");
+  const studentId = param(event, "id");
   const formId = param(event, "formId");
-  await assertScopeChild(childId, ctx);
-  await requireStudentAccess(childId, ctx, "submissions_list");
+  await assertScopeStudent(studentId, ctx);
+  await requireStudentAccess(studentId, ctx, "submissions_list");
 
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
-      ExpressionAttributeValues: { ":pk": { S: `CHILD#${childId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
+      ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
     }),
   );
-  const full = await studentAccess(childId, ctx, "predict_full");
-  const predictions = await latestPredictionsBySubmission(childId, full);
+  const full = await studentAccess(studentId, ctx, "predict_full");
+  const predictions = await latestPredictionsBySubmission(studentId, full);
   const data = (res.Items || []).map((i) => ({
     submissionId: i.submissionId.S,
     formId: i.formId.S,
@@ -198,13 +198,13 @@ const getResponses = async (event, ctx) => {
 };
 
 const runAssessment = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
 
   const processor = getAssessmentProcessor();
   if (!processor) throw new HttpError(404, "no_assessment_processor", "No assessment processor registered");
 
-  const result = await classifyLatestSubmission(childId, processor.formId);
+  const result = await classifyLatestSubmission(studentId, processor.formId);
   if (!result) throw new HttpError(404, "no_submission", "No assessment submission available yet");
 
   const at = nowIso();
@@ -212,7 +212,7 @@ const runAssessment = async (event, ctx) => {
     new CMD.put({
       TableName: TABLE,
       Item: {
-        PK: { S: `ASSESS#${childId}` },
+        PK: { S: `ASSESS#${studentId}` },
         SK: { S: `VARK#${at}` },
         type: { S: "assessment" },
         kind: { S: "vark" },
@@ -229,7 +229,7 @@ const runAssessment = async (event, ctx) => {
   await client.send(
     new CMD.update({
       TableName: TABLE,
-      Key: { PK: { S: `CHILD#${childId}` }, SK: { S: "META" } },
+      Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: "META" } },
       UpdateExpression: "SET #varkLabel = :l, #varkScores = :s, #varkMultimodal = :m, #updatedAt = :at",
       ExpressionAttributeNames: {
         "#varkLabel": "varkLabel",
@@ -246,20 +246,20 @@ const runAssessment = async (event, ctx) => {
     }),
   );
 
-  await auditChild(childId, ctx, "assessment_ran", `child:${childId}`, { kind: processor.kind, submission: result.submission });
+  await auditStudent(studentId, ctx, "assessment_ran", `student:${studentId}`, { kind: processor.kind, submission: result.submission });
 
-  return ok({ childId, kind: processor.kind, ...result, createdAt: at }, 201);
+  return ok({ studentId, kind: processor.kind, ...result, createdAt: at }, 201);
 };
 
 const listAssessments = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ScanIndexForward: false,
-      ExpressionAttributeValues: { ":pk": { S: `ASSESS#${childId}` }, ":sk": { S: "VARK#" } },
+      ExpressionAttributeValues: { ":pk": { S: `ASSESS#${studentId}` }, ":sk": { S: "VARK#" } },
     }),
   );
   const data = (res.Items || []).map((i) => ({
@@ -275,15 +275,15 @@ const listAssessments = async (event, ctx) => {
 };
 
 const listPredictions = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
-  const full = await studentAccess(childId, ctx, "predict_full");
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
+  const full = await studentAccess(studentId, ctx, "predict_full");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ScanIndexForward: false,
-      ExpressionAttributeValues: { ":pk": { S: `PRED#${childId}` }, ":sk": { S: "PRED#" } },
+      ExpressionAttributeValues: { ":pk": { S: `PRED#${studentId}` }, ":sk": { S: "PRED#" } },
     }),
   );
   const data = (res.Items || []).map((i) => shapePrediction(i, full));
@@ -299,17 +299,17 @@ export const lambdaHandler = async (event) => {
         return await listForms(event, ctx);
       case "GET /forms/{formId}":
         return await getForm(event, ctx);
-      case "POST /children/{id}/forms/{formId}/responses":
+      case "POST /students/{id}/forms/{formId}/responses":
         return await submitForm(event, ctx);
-      case "GET /children/{id}/forms/{formId}/responses":
+      case "GET /students/{id}/forms/{formId}/responses":
         return await getResponses(event, ctx);
-      case "GET /children/{id}/submissions":
+      case "GET /students/{id}/submissions":
         return await listSubmissions(event, ctx);
-      case "POST /children/{id}/assessments":
+      case "POST /students/{id}/assessments":
         return await runAssessment(event, ctx);
-      case "GET /children/{id}/assessments":
+      case "GET /students/{id}/assessments":
         return await listAssessments(event, ctx);
-      case "GET /children/{id}/predictions":
+      case "GET /students/{id}/predictions":
         return await listPredictions(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");

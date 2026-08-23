@@ -18,33 +18,33 @@ export default async (ctx) => {
 
   step("forms: submit tests (decoupled from classification)");
   {
-    const r = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
+    const r = await api("POST", `/students/${ctx.studentId}/forms/vark/responses`, {
       token: ctx.studentToken,
       body: { answers, requestId: "test-run-1" },
     });
     expect("vark submission accepted", r.status === 201 && !!r.data.submissionId, JSON.stringify(r.data));
     ctx.varkSubmissionId = r.data.submissionId;
 
-    const dup = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
+    const dup = await api("POST", `/students/${ctx.studentId}/forms/vark/responses`, {
       token: ctx.studentToken,
       body: { answers, requestId: "test-run-1" },
     });
     expect("duplicate submission idempotent", dup.status === 200 && dup.data.submittedBy === "already_exists", JSON.stringify(dup.data));
 
-    const byGuardian = await api("POST", `/children/${ctx.childId}/forms/anamnesis/responses`, {
+    const byGuardian = await api("POST", `/students/${ctx.studentId}/forms/anamnesis/responses`, {
       token: ctx.guardianToken,
       body: { answers: { a01: "2016-03-12", a02: "dentro do esperado", a03: "não", a07: "Boa adaptação", a10: "Nenhuma" } },
     });
     expect("guardian anamnesis accepted", byGuardian.status === 201, JSON.stringify(byGuardian.data));
     ctx.anamnesisSubmissionId = byGuardian.data.submissionId;
 
-    const assisted = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
+    const assisted = await api("POST", `/students/${ctx.studentId}/forms/vark/responses`, {
       token: ctx.guardianToken,
       body: { answers, requestId: "test-run-guardian" },
     });
     expect("guardian-assisted vark submission accepted", assisted.status === 201 && !!assisted.data.submissionId, JSON.stringify(assisted.data));
 
-    const assistedDup = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
+    const assistedDup = await api("POST", `/students/${ctx.studentId}/forms/vark/responses`, {
       token: ctx.guardianToken,
       body: { answers, requestId: "test-run-guardian" },
     });
@@ -53,22 +53,22 @@ export default async (ctx) => {
 
   step("submissions: fetch stored tests (no classification side-effect)");
   {
-    const before = await api("GET", `/children/${ctx.childId}/submissions`, { token: ctx.guardianToken });
+    const before = await api("GET", `/students/${ctx.studentId}/submissions`, { token: ctx.guardianToken });
     expect("submissions listed without assessment yet", before.status === 200 && before.data.count === 3, JSON.stringify(before.data));
 
-    const noAssessYet = await api("GET", `/children/${ctx.childId}/assessments`, { token: ctx.guardianToken });
+    const noAssessYet = await api("GET", `/students/${ctx.studentId}/assessments`, { token: ctx.guardianToken });
     expect("no assessment persisted yet (decoupled)", noAssessYet.status === 200 && noAssessYet.data.count === 0, JSON.stringify(noAssessYet.data));
 
-    const perForm = await api("GET", `/children/${ctx.childId}/forms/vark/responses`, { token: ctx.guardianToken });
+    const perForm = await api("GET", `/students/${ctx.studentId}/forms/vark/responses`, { token: ctx.guardianToken });
     expect("per-form responses listed", perForm.status === 200 && perForm.data.count === 2, JSON.stringify(perForm.data));
   }
 
   step("assessment: classify stored submissions");
   {
-    const a = await api("POST", `/children/${ctx.childId}/assessments`, { token: ctx.guardianToken });
+    const a = await api("POST", `/students/${ctx.studentId}/assessments`, { token: ctx.guardianToken });
     expect("assessment labels reading/writing", a.status === 201 && a.data.kind === "assessment" && a.data.label === "R", JSON.stringify(a.data));
 
-    const list = await api("GET", `/children/${ctx.childId}/assessments`, { token: ctx.guardianToken });
+    const list = await api("GET", `/students/${ctx.studentId}/assessments`, { token: ctx.guardianToken });
     expect("assessment listed", list.status === 200 && list.data.count >= 1, JSON.stringify(list.data));
   }
 };

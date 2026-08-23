@@ -18,7 +18,7 @@ if (!BASE) {
 const TABLE = process.env.TABLE_NAME || "learning-profile";
 
 // Scenarios run in order and share fixture state through ctx
-// (tokens, child ids, submission ids created along the way).
+// (tokens, student ids, submission ids created along the way).
 const scenarios = [s01, s02, s03, s04, s05, s06, s07];
 const ctx = {};
 
@@ -26,7 +26,7 @@ const cleanupErrors = [];
 
 try {
   // Purge only the fixture identities these tests create (incl. leftovers of a
-  // previous crashed run). Children are removed only when their creator is a
+  // previous crashed run). Students are removed only when their creator is a
   // fixture user — anything else in the table is left untouched.
   await purgeFixtures();
   for (const scenario of scenarios) {

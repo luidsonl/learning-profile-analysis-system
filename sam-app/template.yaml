@@ -35,7 +35,7 @@ Globals:
         REPORT_QUEUE_URL: !Ref ReportQueueUrl
         DYNAMODB_ENDPOINT: ""
         INFERENCE_FUNCTION_NAME: !Ref InferenceFunction
-        INFERENCE_FORMS: vark-kids
+        INFERENCE_FORMS: vark
     LoggingConfig:
       LogFormat: JSON
       ApplicationLogLevel: INFO
@@ -146,36 +146,36 @@ Resources:
             Path: /auth/me
             Method: GET
 
-  ChildrenFunction:
+  StudentsFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
-      Handler: handlers/children.lambdaHandler
+      Handler: handlers/students.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
         CreateChild:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children
+            Path: /students
             Method: POST
         ListChildren:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children
+            Path: /students
             Method: GET
         GetChild:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}
+            Path: /students/{id}
             Method: GET
         UpdateChild:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}
+            Path: /students/{id}
             Method: PATCH
 
   GuardianshipFunction:
@@ -189,43 +189,43 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/guardians
+            Path: /students/{id}/guardians
             Method: POST
         RevokeGuardian:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/guardians/{userId}
+            Path: /students/{id}/guardians/{userId}
             Method: DELETE
         Follow:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/follow
+            Path: /students/{id}/follow
             Method: POST
         Unfollow:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/follow
+            Path: /students/{id}/follow
             Method: DELETE
         StudentAccount:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/student-account
+            Path: /students/{id}/student-account
             Method: POST
         ListGuardians:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/guardians
+            Path: /students/{id}/guardians
             Method: GET
         ListEducators:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/educators
+            Path: /students/{id}/educators
             Method: GET
 
   ConsentFunction:
@@ -239,13 +239,13 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/consent
+            Path: /students/{id}/consent
             Method: GET
         GrantConsent:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/consent
+            Path: /students/{id}/consent
             Method: POST
 
   AutonomyFunction:
@@ -259,13 +259,13 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/autonomy
+            Path: /students/{id}/autonomy
             Method: GET
         SetAutonomy:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/autonomy
+            Path: /students/{id}/autonomy
             Method: PATCH
 
   FormsFunction:
@@ -291,37 +291,37 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/forms/{formId}/responses
+            Path: /students/{id}/forms/{formId}/responses
             Method: POST
         GetResponses:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/forms/{formId}/responses
+            Path: /students/{id}/forms/{formId}/responses
             Method: GET
         ListSubmissions:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/submissions
+            Path: /students/{id}/submissions
             Method: GET
         RunAssessment:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/assessments
+            Path: /students/{id}/assessments
             Method: POST
         ListAssessments:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/assessments
+            Path: /students/{id}/assessments
             Method: GET
         ListPredictions:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/predictions
+            Path: /students/{id}/predictions
             Method: GET
 
   ObservationsFunction:
@@ -335,19 +335,19 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/observations
+            Path: /students/{id}/observations
             Method: POST
         ListObservations:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/observations
+            Path: /students/{id}/observations
             Method: GET
         DeleteObservation:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/observations/{timestamp}
+            Path: /students/{id}/observations/{timestamp}
             Method: DELETE
 
   RecommendationsFunction:
@@ -361,25 +361,25 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/recommendations
+            Path: /students/{id}/recommendations
             Method: GET
         ProposeRecommendation:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/recommendations
+            Path: /students/{id}/recommendations
             Method: POST
         ApproveRecommendation:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/recommendations/{recoId}
+            Path: /students/{id}/recommendations/{recoId}
             Method: PATCH
         DeleteRecommendation:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/recommendations/{recoId}
+            Path: /students/{id}/recommendations/{recoId}
             Method: DELETE
 
   ReportsFunction:
@@ -393,13 +393,13 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/reports/generate
+            Path: /students/{id}/reports/generate
             Method: POST
         ListReports:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /children/{id}/reports
+            Path: /students/{id}/reports
             Method: GET
         DownloadReport:
           Type: Api
@@ -425,7 +425,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /audit/children/{id}
+            Path: /audit/students/{id}
             Method: GET
         ActorAudit:
           Type: Api

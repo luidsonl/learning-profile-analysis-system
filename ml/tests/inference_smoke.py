@@ -32,8 +32,8 @@ handler.boto3.resource = lambda *a, **k: FakeDynamo()
 
 answers = {f"q{i:02d}": 5 for i in range(1, 6)} | {f"q{i:02d}": 1 for i in range(6, 16)}
 event = {
-    "childId": "child_test",
-    "formId": "vark-kids",
+    "studentId": "student_test",
+    "formId": "vark",
     "submissionId": "SUBMISSION#vark-kids#smoke",
     "formVersion": "1",
     "answers": answers,
@@ -45,7 +45,7 @@ item = captured["item"]
 meta = json.loads((ROOT / "sam-app/src/inference/model/meta.json").read_text())
 
 assert captured["table"] == "test-table"
-assert item["PK"] == "PRED#child_test"
+assert item["PK"] == "PRED#student_test"
 assert item["SK"].startswith("PRED#")
 assert item["model"] == meta["name"] and item["modelVersion"] == meta["version"]
 assert item["method"] == "ml"
@@ -58,6 +58,6 @@ assert abs(sum(scores.values()) - 1) < 0.01
 assert 0 <= item["confidence"] <= 1
 print("smoke OK:", json.dumps({k: item[k] for k in ("label", "confidence")}, default=str), scores)
 
-missing = handler.lambda_handler({"childId": "c", "formId": "vark-kids", "submissionId": "s", "answers": {"q01": 5}}, None)
+missing = handler.lambda_handler({"studentId": "c", "formId": "vark", "submissionId": "s", "answers": {"q01": 5}}, None)
 assert missing["statusCode"] == 422, missing
 print("invalid-answers path OK (422)")

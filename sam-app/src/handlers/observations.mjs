@@ -3,14 +3,14 @@ import { ok, errorResponse, parseBody, param, HttpError, noContent } from "../li
 import { nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild, requireStudentAccess } from "../lib/scope.mjs";
+import { auditStudent, assertScopeStudent, requireStudentAccess } from "../lib/scope.mjs";
 
 const CATEGORIES = ["academic", "behavior", "social", "emotional", "attention", "other"];
 
 const addObservation = async (event, ctx) => {
-  const childId = param(event, "id");
+  const studentId = param(event, "id");
   assert(ctx.role === "educator", "forbidden", "Only educators can add observations", 403);
-  await assertScopeChild(childId, ctx);
+  await assertScopeStudent(studentId, ctx);
 
   const body = parseBody(event);
   requireKeys(body, ["category", "text"]);
@@ -19,7 +19,7 @@ const addObservation = async (event, ctx) => {
 
   const at = nowIso();
   const item = {
-    PK: { S: `CHILD#${childId}` },
+    PK: { S: `STUDENT#${studentId}` },
     SK: { S: `OBS#${at}` },
     type: { S: "observation" },
     category: { S: body.category },
@@ -30,22 +30,22 @@ const addObservation = async (event, ctx) => {
   };
 
   await client.send(new CMD.put({ TableName: TABLE, Item: item }));
-  await auditChild(childId, ctx, "observation_added", `child:${childId}`, { category: body.category });
+  await auditStudent(studentId, ctx, "observation_added", `student:${studentId}`, { category: body.category });
 
-  return ok({ childId, observationTimestamp: at }, 201);
+  return ok({ studentId, observationTimestamp: at }, 201);
 };
 
 const listObservations = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
-  await requireStudentAccess(childId, ctx, "observations_read");
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
+  await requireStudentAccess(studentId, ctx, "observations_read");
 
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ScanIndexForward: false,
-      ExpressionAttributeValues: { ":pk": { S: `CHILD#${childId}` }, ":sk": { S: "OBS#" } },
+      ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: "OBS#" } },
     }),
   );
   const data = (res.Items || []).map((i) => ({
@@ -60,19 +60,19 @@ const listObservations = async (event, ctx) => {
 };
 
 const deleteObservation = async (event, ctx) => {
-  const childId = param(event, "id");
+  const studentId = param(event, "id");
   const timestamp = param(event, "timestamp");
   assert(ctx.role === "educator" || ctx.role === "admin", "forbidden", "Only educators or admins can delete observations", 403);
-  await assertScopeChild(childId, ctx);
+  await assertScopeStudent(studentId, ctx);
 
   const res = await client.send(
-    new CMD.get({ TableName: TABLE, Key: { PK: { S: `CHILD#${childId}` }, SK: { S: `OBS#${timestamp}` } } }),
+    new CMD.get({ TableName: TABLE, Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `OBS#${timestamp}` } } }),
   );
   if (!res.Item) throw new HttpError(404, "observation_not_found", "Observation not found");
   assert(ctx.role === "admin" || res.Item.submittedBy.S === ctx.userId, "forbidden", "Only the author can delete this observation", 403);
 
-  await client.send(new CMD.delete({ TableName: TABLE, Key: { PK: { S: `CHILD#${childId}` }, SK: { S: `OBS#${timestamp}` } } }));
-  await auditChild(childId, ctx, "observation_deleted", `child:${childId}`, { timestamp });
+  await client.send(new CMD.delete({ TableName: TABLE, Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `OBS#${timestamp}` } } }));
+  await auditStudent(studentId, ctx, "observation_deleted", `student:${studentId}`, { timestamp });
 
   return noContent();
 };
@@ -82,11 +82,11 @@ export const lambdaHandler = async (event) => {
     const route = `${event.httpMethod} ${event.resource}`;
     const ctx = await requireAuth(event);
     switch (route) {
-      case "POST /children/{id}/observations":
+      case "POST /students/{id}/observations":
         return await addObservation(event, ctx);
-      case "GET /children/{id}/observations":
+      case "GET /students/{id}/observations":
         return await listObservations(event, ctx);
-      case "DELETE /children/{id}/observations/{timestamp}":
+      case "DELETE /students/{id}/observations/{timestamp}":
         return await deleteObservation(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");

@@ -1,21 +1,21 @@
 import { CMD, client, TABLE } from "../lib/db.mjs";
 import { getFormProcessor, getFormDefinition } from "./engine.mjs";
 
-export const latestSubmission = async (childId, formId) => {
+export const latestSubmission = async (studentId, formId) => {
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ScanIndexForward: false,
       Limit: 1,
-      ExpressionAttributeValues: { ":pk": { S: `CHILD#${childId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
+      ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
     }),
   );
   return res.Items?.[0] ?? null;
 };
 
-export const classifyLatestSubmission = async (childId, formId) => {
-  const submission = await latestSubmission(childId, formId);
+export const classifyLatestSubmission = async (studentId, formId) => {
+  const submission = await latestSubmission(studentId, formId);
   if (!submission) return null;
 
   const form = getFormDefinition(formId);

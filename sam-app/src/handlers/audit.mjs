@@ -1,7 +1,7 @@
 import { CMD, client, TABLE } from "../lib/db.mjs";
 import { ok, errorResponse, param, qparam, HttpError } from "../lib/http.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { assertScopeChild } from "../lib/scope.mjs";
+import { assertScopeStudent } from "../lib/scope.mjs";
 
 const asEvent = (i) => ({
   subject: i.PK.S.replace("AUDIT#", ""),
@@ -14,10 +14,10 @@ const asEvent = (i) => ({
   createdAt: i.createdAt?.S || i.SK.S.replace("EVENT#", ""),
 });
 
-const childAudit = async (event, ctx) => {
-  const childId = param(event, "id");
+const studentAudit = async (event, ctx) => {
+  const studentId = param(event, "id");
   if (ctx.role !== "admin") {
-    await assertScopeChild(childId, ctx);
+    await assertScopeStudent(studentId, ctx);
     if (ctx.role !== "guardian") throw new HttpError(403, "forbidden", "Only guardians or admins can read the audit trail");
   }
   const res = await client.send(
@@ -25,7 +25,7 @@ const childAudit = async (event, ctx) => {
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ScanIndexForward: false,
-      ExpressionAttributeValues: { ":pk": { S: `AUDIT#CHILD#${childId}` }, ":sk": { S: "EVENT#" } },
+      ExpressionAttributeValues: { ":pk": { S: `AUDIT#STUDENT#${studentId}` }, ":sk": { S: "EVENT#" } },
     }),
   );
   return ok({ data: (res.Items || []).map(asEvent), count: res.Items?.length || 0 });
@@ -51,8 +51,8 @@ export const lambdaHandler = async (event) => {
     const route = `${event.httpMethod} ${event.resource}`;
     const ctx = await requireAuth(event);
     switch (route) {
-      case "GET /audit/children/{id}":
-        return await childAudit(event, ctx);
+      case "GET /audit/students/{id}":
+        return await studentAudit(event, ctx);
       case "GET /audit":
         return await actorAudit(event, ctx);
       default:

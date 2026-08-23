@@ -38,12 +38,12 @@ def _now_ms() -> str:
 
 
 def lambda_handler(event, context):
-    child_id = event.get("childId")
+    student_id = event.get("studentId")
     form_id = event.get("formId")
     submission_id = event.get("submissionId")
     answers = event.get("answers") or {}
 
-    if not child_id or not form_id or not submission_id:
+    if not student_id or not form_id or not submission_id:
         LOGGER.warning("inference_rejected invalid payload keys=%s", list(event.keys()))
         return {"statusCode": 422}
 
@@ -72,10 +72,10 @@ def lambda_handler(event, context):
     table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
     table.put_item(
         Item={
-            "PK": f"PRED#{child_id}",
+            "PK": f"PRED#{student_id}",
             "SK": f"PRED#{at}",
             "type": "prediction",
-            "childId": child_id,
+            "studentId": student_id,
             "form": form_id,
             "submission": submission_id,
             "formVersion": str(event.get("formVersion", "")),
@@ -90,7 +90,7 @@ def lambda_handler(event, context):
         }
     )
     LOGGER.info(
-        "inference_stored child=%s submission=%s model=%s/%s label=%s confidence=%.3f",
-        child_id, submission_id, meta["name"], meta["version"], label, confidence,
+        "inference_stored student=%s submission=%s model=%s/%s label=%s confidence=%.3f",
+        student_id, submission_id, meta["name"], meta["version"], label, confidence,
     )
     return {"statusCode": 200}

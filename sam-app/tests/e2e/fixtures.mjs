@@ -1,7 +1,7 @@
-import { cleanupChild, cleanupUser, findChildrenByCreator, findUserByEmail } from "./aws-cleanup.mjs";
+import { cleanupStudent, cleanupUser, findStudentsByCreator, findUserByEmail } from "./aws-cleanup.mjs";
 
 // Solely the fixture identities the e2e suite itself creates. Cleanup deletes
-// ONLY data added by the tests (users/children keyed to these test-only emails)
+// ONLY data added by the tests (users/students keyed to these test-only emails)
 // and never touches anything else in the table.
 export const TEST_FIXTURES = [
   { email: "maria.responsavel@example.com", name: "Maria da Silva", password: "senha12345", role: "guardian" },
@@ -22,8 +22,8 @@ export const purgeFixtures = async () => {
   for (const { email } of TEST_FIXTURES) {
     const userId = await findUserByEmail(email);
     if (!userId) continue;
-    for (const childId of await findChildrenByCreator(userId)) {
-      await cleanupChild(childId);
+    for (const studentId of await findStudentsByCreator(userId)) {
+      await cleanupStudent(studentId);
     }
     await cleanupUser(userId, email);
   }

@@ -3,19 +3,19 @@ import { ok, errorResponse, parseBody, param, HttpError, noContent } from "../li
 import { nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild } from "../lib/scope.mjs";
+import { auditStudent, assertScopeStudent } from "../lib/scope.mjs";
 
 const STATUSES = ["proposed", "approved", "rejected", "published"];
 
 const listRecommendations = async (event, ctx) => {
-  const childId = param(event, "id");
-  await assertScopeChild(childId, ctx);
+  const studentId = param(event, "id");
+  await assertScopeStudent(studentId, ctx);
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ScanIndexForward: false,
-      ExpressionAttributeValues: { ":pk": { S: `CHILD#${childId}` }, ":sk": { S: "REC#" } },
+      ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: "REC#" } },
     }),
   );
   let data = (res.Items || []).map((i) => ({
@@ -38,9 +38,9 @@ const listRecommendations = async (event, ctx) => {
 };
 
 const proposeRecommendation = async (event, ctx) => {
-  const childId = param(event, "id");
+  const studentId = param(event, "id");
   assert(ctx.role === "educator" || ctx.role === "admin", "forbidden", "Only educators or admins can propose recommendations", 403);
-  await assertScopeChild(childId, ctx);
+  await assertScopeStudent(studentId, ctx);
 
   const body = parseBody(event);
   requireKeys(body, ["title", "text"]);
@@ -51,7 +51,7 @@ const proposeRecommendation = async (event, ctx) => {
     new CMD.put({
       TableName: TABLE,
       Item: {
-        PK: { S: `CHILD#${childId}` },
+        PK: { S: `STUDENT#${studentId}` },
         SK: { S: `REC#${recoId}` },
         type: { S: "recommendation" },
         recoId: { S: recoId },
@@ -66,19 +66,19 @@ const proposeRecommendation = async (event, ctx) => {
       },
     }),
   );
-  await auditChild(childId, ctx, "recommendation_proposed", `child:${childId}`, { recoId });
+  await auditStudent(studentId, ctx, "recommendation_proposed", `student:${studentId}`, { recoId });
 
-  return ok({ childId, recoId }, 201);
+  return ok({ studentId, recoId }, 201);
 };
 
 const updateRecommendation = async (event, ctx) => {
-  const childId = param(event, "id");
+  const studentId = param(event, "id");
   const recoId = param(event, "recoId");
   assert(ctx.role === "educator" || ctx.role === "admin", "forbidden", "Only educators or admins can update recommendations", 403);
-  await assertScopeChild(childId, ctx);
+  await assertScopeStudent(studentId, ctx);
 
   const res = await client.send(
-    new CMD.get({ TableName: TABLE, Key: { PK: { S: `CHILD#${childId}` }, SK: { S: `REC#${recoId}` } } }),
+    new CMD.get({ TableName: TABLE, Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `REC#${recoId}` } } }),
   );
   if (!res.Item) throw new HttpError(404, "recommendation_not_found", "Recommendation not found");
 
@@ -104,27 +104,27 @@ const updateRecommendation = async (event, ctx) => {
   await client.send(
     new CMD.update({
       TableName: TABLE,
-      Key: { PK: { S: `CHILD#${childId}` }, SK: { S: `REC#${recoId}` } },
+      Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `REC#${recoId}` } },
       UpdateExpression: `SET ${updates.join(", ")}, #updatedAt = :updatedAt`,
       ExpressionAttributeNames: { ...names, "#updatedAt": "updatedAt" },
       ExpressionAttributeValues: { ...values, ":updatedAt": { S: at } },
     }),
   );
-  await auditChild(childId, ctx, "recommendation_updated", `child:${childId}`, { recoId, updates });
+  await auditStudent(studentId, ctx, "recommendation_updated", `student:${studentId}`, { recoId, updates });
 
-  return ok({ childId, recoId });
+  return ok({ studentId, recoId });
 };
 
 const deleteRecommendation = async (event, ctx) => {
-  const childId = param(event, "id");
+  const studentId = param(event, "id");
   const recoId = param(event, "recoId");
   assert(ctx.role === "educator" || ctx.role === "admin", "forbidden", "Only educators or admins can delete recommendations", 403);
-  await assertScopeChild(childId, ctx);
+  await assertScopeStudent(studentId, ctx);
 
   await client.send(
-    new CMD.delete({ TableName: TABLE, Key: { PK: { S: `CHILD#${childId}` }, SK: { S: `REC#${recoId}` } } }),
+    new CMD.delete({ TableName: TABLE, Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `REC#${recoId}` } } }),
   );
-  await auditChild(childId, ctx, "recommendation_deleted", `child:${childId}`, { recoId });
+  await auditStudent(studentId, ctx, "recommendation_deleted", `student:${studentId}`, { recoId });
 
   return noContent();
 };
@@ -134,13 +134,13 @@ export const lambdaHandler = async (event) => {
     const route = `${event.httpMethod} ${event.resource}`;
     const ctx = await requireAuth(event);
     switch (route) {
-      case "GET /children/{id}/recommendations":
+      case "GET /students/{id}/recommendations":
         return await listRecommendations(event, ctx);
-      case "POST /children/{id}/recommendations":
+      case "POST /students/{id}/recommendations":
         return await proposeRecommendation(event, ctx);
-      case "PATCH /children/{id}/recommendations/{recoId}":
+      case "PATCH /students/{id}/recommendations/{recoId}":
         return await updateRecommendation(event, ctx);
-      case "DELETE /children/{id}/recommendations/{recoId}":
+      case "DELETE /students/{id}/recommendations/{recoId}":
         return await deleteRecommendation(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");

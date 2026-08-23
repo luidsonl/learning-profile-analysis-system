@@ -7,7 +7,7 @@ export default async (ctx) => {
   step("ml: automatic inference arrives after vark submission");
   {
     const preds = await pollUntil(
-      () => api("GET", `/children/${ctx.childId}/predictions`, { token: ctx.guardianToken }),
+      () => api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.guardianToken }),
       { tries: 15 },
     ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
     expect("auto prediction arrived", !!preds, JSON.stringify(preds || { count: 0 }));
@@ -27,7 +27,7 @@ export default async (ctx) => {
   step("ml: prediction is attached to the originating submission");
   {
     const resp = await pollUntil(async () => {
-      const r = await api("GET", `/children/${ctx.childId}/forms/vark/responses`, { token: ctx.guardianToken });
+      const r = await api("GET", `/students/${ctx.studentId}/forms/vark/responses`, { token: ctx.guardianToken });
       const subs = r.status === 200 ? r.data?.data || [] : [];
       return subs.length > 0 && subs.every((s) => s.prediction) ? r : null;
     }, { tries: 15 });
@@ -47,7 +47,7 @@ export default async (ctx) => {
 
   step("ml: non-inference forms are not scored");
   {
-    const ana = await api("GET", `/children/${ctx.childId}/forms/anamnesis/responses`, { token: ctx.guardianToken });
+    const ana = await api("GET", `/students/${ctx.studentId}/forms/anamnesis/responses`, { token: ctx.guardianToken });
     const item = ana.data?.data?.[0];
     expect(
       "anamnesis response has no prediction",
@@ -59,20 +59,20 @@ export default async (ctx) => {
   step("ml: supervised student sees label-only predictions");
   {
     const lst = await pollUntil(
-      () => api("GET", `/children/${ctx.childId}/predictions`, { token: ctx.studentToken }),
+      () => api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.studentToken }),
       { tries: 15 },
     ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
     expect("supervised prediction list arrives", !!lst, JSON.stringify(lst || { count: 0 }));
     expect("supervised prediction is label-only", lst?.data?.[0]?.scores === undefined && lst?.data?.[0]?.confidence === undefined, JSON.stringify(lst?.data?.[0]));
 
-    const own = await api("GET", `/children/${ctx.childId}/forms/vark/responses`, { token: ctx.studentToken });
+    const own = await api("GET", `/students/${ctx.studentId}/forms/vark/responses`, { token: ctx.studentToken });
     const ownPred = own.data?.data?.find((s) => s.submissionId === ctx.varkSubmissionId)?.prediction;
     expect("supervised responses hide scores too", ownPred && ownPred.scores === undefined && ownPred.confidence === undefined && !!ownPred.label, JSON.stringify(ownPred));
   }
 
   step("ml: predictions do not bundle recommendations");
   {
-    const recs = await api("GET", `/children/${ctx.childId}/recommendations`, { token: ctx.guardianToken });
+    const recs = await api("GET", `/students/${ctx.studentId}/recommendations`, { token: ctx.guardianToken });
     expect("no recommendations bundled with prediction", recs.status === 200 && recs.data.count === 0, JSON.stringify(recs.data));
   }
 };

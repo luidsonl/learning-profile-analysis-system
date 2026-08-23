@@ -22,10 +22,10 @@ export const writeAudit = async ({ subjectType, subjectId, actorId, actorRole, a
   );
 };
 
-export const auditChild = (childId, ctx, action, resource, detail, ip) =>
+export const auditStudent = (studentId, ctx, action, resource, detail, ip) =>
   writeAudit({
-    subjectType: "CHILD",
-    subjectId: childId,
+    subjectType: "STUDENT",
+    subjectId: studentId,
     actorId: ctx.userId,
     actorRole: ctx.role,
     action,
@@ -34,30 +34,30 @@ export const auditChild = (childId, ctx, action, resource, detail, ip) =>
     ip,
   });
 
-export const assertScopeChild = async (childId, ctx) => {
+export const assertScopeStudent = async (studentId, ctx) => {
   if (ctx.role === "admin") return;
   const key = { PK: { S: `USER#${ctx.userId}` }, SK: { S: "META" } };
   let sk;
-  if (ctx.role === "guardian") sk = `GUARD#${childId}`;
-  else if (ctx.role === "educator") sk = `FOLLOW#${childId}`;
-  else if (ctx.role === "student") sk = `CHILD#${childId}`;
-  else throw new HttpError(403, "forbidden", "Role cannot access children");
+  if (ctx.role === "guardian") sk = `GUARD#${studentId}`;
+  else if (ctx.role === "educator") sk = `FOLLOW#${studentId}`;
+  else if (ctx.role === "student") sk = `STUDENT#${studentId}`;
+  else throw new HttpError(403, "forbidden", "Role cannot access students");
 
   const res = await client.send(new CMD.get({ TableName: TABLE, Key: { ...key, SK: { S: sk } } }));
-  if (!res.Item) throw new HttpError(403, "forbidden", "No access to this child");
+  if (!res.Item) throw new HttpError(403, "forbidden", "No access to this student");
 };
 
-export const getStudentChildId = async (studentUserId) => {
+export const getOwnStudentId = async (studentUserId) => {
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       Limit: 1,
-      ExpressionAttributeValues: { ":pk": { S: `USER#${studentUserId}` }, ":sk": { S: "CHILD#" } },
+      ExpressionAttributeValues: { ":pk": { S: `USER#${studentUserId}` }, ":sk": { S: "STUDENT#" } },
     }),
   );
   const edge = res.Items?.[0];
-  return edge ? edge.SK.S.replace("CHILD#", "") : null;
+  return edge ? edge.SK.S.replace("STUDENT#", "") : null;
 };
 
 export const AUTONOMY_LEVELS = ["supervised", "guided", "autonomous"];
@@ -76,27 +76,27 @@ const AUTONOMY_GRANTS = {
 
 export const autonomyAllows = (resource, level) => (AUTONOMY_GRANTS[resource] || []).includes(level);
 
-const readAutonomyLevel = async (childId) => {
+const readAutonomyLevel = async (studentId) => {
   const res = await client.send(
     new CMD.get({
       TableName: TABLE,
-      Key: { PK: { S: `CHILD#${childId}` }, SK: { S: "META" } },
+      Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: "META" } },
       ProjectionExpression: "autonomyLevel",
     }),
   );
   return res.Item?.autonomyLevel?.S || "supervised";
 };
 
-export const getAutonomyLevel = async (childId) => readAutonomyLevel(childId);
+export const getAutonomyLevel = async (studentId) => readAutonomyLevel(studentId);
 
-export const studentAccess = async (childId, ctx, resource) => {
+export const studentAccess = async (studentId, ctx, resource) => {
   if (ctx.role !== "student") return true;
-  return autonomyAllows(resource, await readAutonomyLevel(childId));
+  return autonomyAllows(resource, await readAutonomyLevel(studentId));
 };
 
-export const requireStudentAccess = async (childId, ctx, resource) => {
+export const requireStudentAccess = async (studentId, ctx, resource) => {
   if (ctx.role !== "student") return;
-  if (!(await studentAccess(childId, ctx, resource))) {
+  if (!(await studentAccess(studentId, ctx, resource))) {
     throw new HttpError(403, "forbidden", `Student autonomy level does not allow ${resource}`);
   }
 };
