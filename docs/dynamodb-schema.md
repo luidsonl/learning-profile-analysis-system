@@ -138,7 +138,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 > Predictions are produced automatically after form submissions via asynchronous invoke (no SQS). Submissions (`SUBMISSION#`) and assessments (`ASSESS#`) are human-flow data; `PRED#` is generated data in its own partition.
 
-> Prediction runs inference on the stored submission using the **active model registry** (`MODEL#<name>/CURRENT`). It never creates recommendations — `REC#` is educator-driven only.
+> Predictions are produced automatically after form submissions via asynchronous invoke (no SQS). Submissions (`SUBMISSION#`) and assessments (`ASSESS#`) are human-flow data; `PRED#` is generated data in its own partition. There is no model registry — each prediction carries the `model` + `modelVersion` that produced it.
 
 ### REC (recommendations)
 
@@ -152,18 +152,6 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 |----|----|-----------|
 | `CHILD#<childId>` | `REPORT#<reportId>` | `childId`, `reportId`, `type`, `status` (`queued|processing|ready|failed`), `s3Key`, `sizeBytes`, `requestedBy`, `requestedAt`, `approvedBy`, `approvedAt`, `sharedWith[]`, `ttl` (retention) |
 | — | — | GSI1PK `REPORT#<reportId>`, GSI1SK `REPORT#<reportId>` |
-
-### MODEL (registry)
-
-| PK | SK | Attributes |
-|----|----|-----------|
-| `MODEL#<name>` | `VERSION#<versionNumber>` | `name`, `version`, `status` (`training|active|retired|failed`), `s3Key` (`models/<name>/<version>/`), `artifactName`, `featureSchema`, `metrics` (`{accuracy, f1, hammingLoss, perLabel}`), `trainedAt`, `datasetHash`, `changelog` |
-| — | — | GSI2PK `MODEL#STATUS#<status>`, GSI2SK `MODEL#<name>#<version>` |
-
-**Active-version pointer**
-| PK | SK | Attributes |
-|----|----|-----------|
-| `MODEL#<name>` | `CURRENT` | `activeVersion`, `updatedAt` |
 
 ### AUDIT
 
@@ -201,8 +189,6 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Recommendations for a child | Query `CHILD#<c>`, SK `REC#` prefix, desc |
 | Report by id | GSI1 Query `REPORT#<reportId>` |
 | Reports of a child | Query `CHILD#<c>`, SK `REPORT#` prefix |
-| Active model version | Query `MODEL#<name>` SK `CURRENT` |
-| Models by status | GSI2 Query `MODEL#STATUS#<status>` |
 | Audit trail of a child | Query `AUDIT#CHILD#<childId>`, SK `EVENT#` prefix, desc |
 | Autonomy history of a child | Query `AUTONOMY#<childId>`, SK `AUTONOMY#` prefix, desc |
 
@@ -222,7 +208,6 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Classify submission → assessment | `ASSESS#<c>/VARK#<ts>` + `CHILD#<c>/META` (profile attrs) |
 | Predict (inference) | `PRED#<c>/PRED#<id>` |
 | Publish form version | `FORM#<id>/VERSION#<v>` + `FORM#<id>/CURRENT` (conditional on latest) |
-| Activate model | `MODEL#<name>/VERSION#<v>` (status) + `MODEL#<name>/CURRENT` (conditional) |
 
 Uniqueness reservations (`EMAIL#`) and version pointers (`CURRENT`, `latest`) use **conditional writes** inside the transaction so concurrent attempts fail instead of overwriting.
 
@@ -239,8 +224,7 @@ Uniqueness reservations (`EMAIL#`) and version pointers (`CURRENT`, `latest`) us
 
 ## Seed Data
 
-- Curated forms (`FORM#`): `vark-kids` (student), `anamnesis` (guardian), `socioemotional` (educator), `behavior-checklist` (educator) — v1 definitions + `CURRENT` pointers, seeded by the deployment/bootstrap script (idempotent conditional writes).
-- Model registry: initial `MODEL#vark-predictor/VERSION#1` (status `active`) plus `MODEL#giftedness-indicator` / `MODEL#difficulty-indicator` registered as heuristic `method=heuristic` entries.
+- Curated forms (`FORM#`): `vark-kids` (student), `anamnesis` (guardian), `socioemotional` (educator), `behavior-checklist` (educator) — v1 definitions + `CURRENT` pointers, seeded via `make seed` in `sam-app/` (idempotent conditional writes). No other seed data — everything else is produced at runtime.
 
 ---
 
@@ -249,6 +233,6 @@ Uniqueness reservations (`EMAIL#`) and version pointers (`CURRENT`, `latest`) us
 - [Architecture](./architecture.md) — forms engine, flows, RBAC
 - [Backend](./backend.md) — handlers mapping to these access patterns
 - [Authentication](./auth.md) — sessions, roles, scope enforcement over the edges above
-- [ML Pipeline](./ml-pipeline.md) — snapshot export contract, model registry, retraining trigger
+- [ML Pipeline](./ml-pipeline.md) — snapshot export contract, retraining loop
 - [Student Data Features](./student-data-features.md) — attributes collected via the forms/observations above
 - [LGPD](./lgpd.md) — retention, consent, erasure flows on these items

@@ -35,7 +35,7 @@
 | `/children/:id/recommendations` | scoped | Adapted pedagogical strategies |
 | `/children/:id/reports` | scoped | Report list + download |
 | `/children/:id/observations` | educator | Observations (educator-only; hidden from student persona) |
-| `/admin/*` | admin | Users, forms definitions, models registry, audit |
+| `/admin/*` | admin | Users, forms definitions, audit |
 | `/me` | any | Own account (guardian/educator) |
 
 Student persona sees a **simplified self-view**: own profile, recommendations, approved reports, and the forms they can fill — never observations or raw ML output.
@@ -53,7 +53,7 @@ Student persona sees a **simplified self-view**: own profile, recommendations, a
 3. **Profile view** — V/A/R/K totals + multimodal label + confidence (from `GET /api/children/:id/predictions`), with plain-language explanation (no raw ML).
 4. **Recommendations** — list, filter by `visibility`; educator can propose/approve; guardian/student see approved.
 5. **Reports** — generate (async), poll status, download via presigned URL.
-6. **Admin** — user management, form version editing, model registry (status/metrics), audit browser.
+6. **Admin** — user management, form version editing, audit browser.
 
 ## Local Development
 

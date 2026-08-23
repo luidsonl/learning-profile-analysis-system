@@ -4,7 +4,7 @@
 
 The Learning Profile Analysis System is a serverless platform that personalizes education for gifted children and children with specific needs. It ingests data supplied by guardians, educators, and the children themselves through structured **forms** (academic history, learning preferences, observed behaviors, socioemotional indicators), runs machine learning analysis, and produces adapted pedagogical strategies and visual reports shared between families and educators.
 
-Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (the child, with a restricted self-view), and **admin**. Access control is role- and scope-based: guardians see only their own children; educators see only children they follow; students see only their own profile, recommendations, and approved reports; administrators manage users, the institution's data, and the model registry.
+Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (the child, with a restricted self-view), and **admin**. Access control is role- and scope-based: guardians see only their own children; educators see only children they follow; students see only their own profile, recommendations, and approved reports; administrators manage users and the institution's data.
 
 The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for a React+Vite SPA, and **DynamoDB single-table** design. It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
 
@@ -102,7 +102,6 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
                                                                     │ (S3 snapshot + manifest)
   v0: ml/ pipeline trains locally on datasets/vark/data.csv
       → make package bundles model.joblib into sam-app/src/inference/model/
-      → register MODEL#<name>#<version> (scripts/register-model.mjs)
       → sam build && sam deploy → predictions now carry the new version
 ```
 
@@ -121,24 +120,23 @@ Training always happens **outside** the deployed system (local machine). The dep
 ├── frontend/              # React + Vite SPA (pt-BR, accessible)
 ├── sam-app/               # API Gateway + API-triggered Lambdas (stateless compute)
 │   ├── template.yaml      # SAM template (health, auth, children, guardianship,
-│   │                      #   observations, forms, assessment, predict,
-│   │                      #   recommendations, reports, models, audit)
+│   │                      #   observations, forms, assessment,
+│   │                      #   recommendations, reports, audit, inference)
 │   ├── samconfig.toml     # SAM config (stack name, parameter overrides)
 │   ├── resources.env      # Central resource names (source of truth)
-│   ├── Makefile           # Convenience targets (deploy, test, clean)
-│   ├── env.json           # Local environment variables
+│   ├── Makefile           # Convenience targets (deploy, seed, test, clean)
 │   └── src/handlers/      # Lambda code (Node.js ESM)
 │       ├── health.mjs, auth.mjs, children.mjs, guardianship.mjs,
-│       ├── observations.mjs, forms.mjs, assessment.mjs, predict.mjs,
-│       ├── recommendations.mjs, reports.mjs, models.mjs, audit.mjs
+│       ├── observations.mjs, forms.mjs, assessment.mjs,
+│       ├── recommendations.mjs, reports.mjs, audit.mjs
 │       ├── middleware/    # requireAuth + requireRole (guardian | educator | student | admin)
 │       └── lib/           # Shared utilities (DynamoDB client, VARK scoring, form engine, etc.)
 ├── ml/                    # Offline Python ML pipeline (decoupled)
 │   ├── data/              # Public dataset (Mendeley 10.17632/bwrr6zypcj.1) + feature snapshots
 │   ├── features/          # Feature engineering (assessment/observation → feature vectors)
-│   ├── train/             # scikit-learn training, k-fold CV, model registry write
+│   ├── train/             # scikit-learn training + k-fold CV
 │   ├── evaluate/          # Metrics (accuracy, F1, Hamming loss) + reports
-│   └── serve/             # Package model for Lambda (layer/deps + artifact bundle)
+│   └── serve/             # Package model for Lambda (artifact bundle + sanity checks)
 ├── docs/                  # architecture, backend, auth, dynamodb-schema, ml-pipeline,
 │                          #   student-data, lgpd, frontend, design-system
 ├── agents.md
@@ -167,15 +165,15 @@ SAM manages **stateless, ephemeral compute** (API-triggered Lambdas) plus API Ga
 | Resource | Responsibility |
 |----------|----------------|
 | `template.yaml` | All API handlers (Node.js 22 ESM), inference Lambda (Python 3.12, bundled model, invoked asynchronously by the Forms handler), REST API Gateway |
-| `src/handlers/` | Business logic |
+`sam-app/src/handlers/` | Business logic
 
-`sam local start-api` enables local testing of API-triggered Lambdas against local DynamoDB.
+The API is exercised via the deployed stack (`make e2e-test` in `sam-app/`); no local Lambda/DynamoDB emulation is wired up.
 
 ---
 
 ## Resource Name Centralization
 
-Naming follows the 0shared derivation chain: `terraform/aws-app/terraform.tfvars` → `sam-app/resources.env` → `samconfig.toml` / `env.json`.
+Naming follows the 0shared derivation chain: `terraform/aws-app/terraform.tfvars` → `sam-app/resources.env` → `samconfig.toml`.
 
 **Naming formula** (`namespace=learning-profile`, `project=learning-profile`):
 
@@ -227,11 +225,11 @@ The core idea: **a profile is traced from a filled form.** Forms collect structu
 Machine learning is a *separate, offline* layer that classifies those profiles:
 
 - The running system **never trains**. It stores submissions and serves machine-generated predictions from the artifact bundled into the inference function (details in [ML Pipeline](./ml-pipeline.md)).
-- Training runs offline (local machine) on the committed public dataset (`datasets/vark/data.csv`); the packaged `model.joblib` + `meta.json` are **copied into** `sam-app/src/inference/model/` and deployed with SAM — no S3 fetch at runtime, and the `MODEL#<name>#<version>` registry item stays informational/auditable.
+- Training runs offline (local machine) on the committed public dataset (`datasets/vark/data.csv`); the packaged `model.joblib` + `meta.json` are **copied into** `sam-app/src/inference/model/` and deployed with SAM — no S3 fetch at runtime; each `PRED#` item records the `model` + `modelVersion` that produced it (traceability without a registry).
 - Inference runs asynchronously: storing a new submission fires a fire-and-forget invoke (`InvocationType: "Event"`, **no SQS**) at the Python inference Lambda, which scores and persists the `PRED#` item itself. There is no synchronous predict endpoint.
-- MVP model: `vark-predictor` (offline-trained Logistic Regression; dataset label `V` is mapped to `R` at the serving boundary). Heuristic `giftedness-indicator` and `difficulty-indicator` remain rule-based registry companions.
+- MVP model: `vark-predictor` (offline-trained Logistic Regression; dataset labels are remapped at serving via `{A→R, V→A, K→K}` — see [ML Pipeline](./ml-pipeline.md)). Heuristic `giftedness-indicator` and `difficulty-indicator` remain rule-based companions.
 
-The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1), the snapshot/export contract, training, registry, and retraining are documented in the standalone **[ML Pipeline](./ml-pipeline.md)** spec — kept separate so future trainings and ideas can evolve it without touching the system.
+The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1), the snapshot/export contract, training, and retraining are documented in the standalone **[ML Pipeline](./ml-pipeline.md)** spec — kept separate so future trainings and ideas can evolve it without touching the system.
 
 ---
 
@@ -251,12 +249,11 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 ## Local Development Workflow
 
 ```
-Terminal 1:  sam local start-api --env-vars env.json --host 0.0.0.0   (API on :3000)
-Terminal 2:  npm run dev                                               (Vite on :5173, proxies /api → :3000)
-Terminal 3:  (optional) aws dynamodb / DynamoDB Local                 (interact directly)
+Terminal 1:  (sam-app/)  make e2e-test      # e2e suite against the deployed API
+Terminal 2:  npm run dev                    # Vite on :5173, proxies /api → deployed API
 ```
 
-`frontend/vite.config.ts` proxies `/api` to `http://localhost:3000` in dev; production uses relative paths routed by CloudFront — no environment-specific config in app code.
+`frontend/vite.config.ts` proxies `/api` in dev; production uses relative paths routed by CloudFront — no environment-specific config in app code.
 
 ---
 
@@ -297,7 +294,7 @@ Cleanup happens in reverse order.
 
 - **New API handler:** add `sam-app/src/handlers/<name>.mjs`, wire in `template.yaml` under `/api/*`.
 - **New async processing:** add a Terraform-managed Lambda + SQS/EventBridge wiring in `terraform/aws-app`.
-- **New model:** extend the offline `ml/` pipeline (see [ML Pipeline](./ml-pipeline.md)), register under `MODEL#<name>#<version>`, expose via the inference handler.
+- **New model:** extend the offline `ml/` pipeline (see [ML Pipeline](./ml-pipeline.md)) and bundle it into the inference handler.
 - **New DynamoDB access pattern:** document it in `dynamodb-schema.md` first, then add the GSI/attribute — schema changes are treated as design changes, not hacks.
 
 ---
@@ -307,7 +304,7 @@ Cleanup happens in reverse order.
 - [Backend](./backend.md) — API endpoints, error handling
 - [Authentication](./auth.md) — sessions, RBAC, consent
 - [DynamoDB Schema](./dynamodb-schema.md) — single-table design, entities, indexes
-- [ML Pipeline](./ml-pipeline.md) — features, training, registry, inference
+- [ML Pipeline](./ml-pipeline.md) — features, training, inference
 - [Student Data Features](./student-data-features.md) — structured data for student categorization (future direction)
 - [LGPD](./lgpd.md) — consent, audit, retention
 - [Frontend](./frontend.md) — SPA, routes, build & deploy

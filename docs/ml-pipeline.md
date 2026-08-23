@@ -64,7 +64,7 @@ This separation is intentional and is the contract that makes future models poss
 - **Committed in this repository at `datasets/vark/data.csv` by owner decision** (public dataset, CC BY 4.0 permits redistribution with attribution — provenance kept in `datasets/vark/citation.txt`). Model artifacts (`*.joblib`, `*.parquet`) remain git-ignored.
 - Observed schema: 18 columns — `Gender` (`Male/Female`), `Age` (10–18+; **school-age students**, not university as previously assumed), **15 VARK Likert items rated 1–5** in three 5-item subscales (**reading/writing**, **aural**, **kinesthetic**), and a single-modality `Learner` label.
 - **Label distribution is imbalanced**: `K` 679 (~56%), `A` 286, `V` 245 of 1210 records. Metrics must therefore report macro-F1 and per-class results alongside accuracy.
-- **Label space caveat**: the dataset has **no `R` class** despite containing reading/writing items — reading-dominant subjects are labeled `V`. At the serving boundary the model's `V` output is **mapped to `R`** so predictions match the system's profile vocabulary (`R/A/K`).
+- **Label space caveat (important)**: the dataset's `Learner` letters do **not** follow naive VARK semantics against the item blocks. Empirically (per-class group means, ~93% CV separability): the *reading/writing* block discriminates class `A`, the *aural* block discriminates `V`, and only the *kinesthetic* block matches `K`. Serving therefore maps dataset letters to the system profile vocabulary via `LABEL_MAP = {A→R, V→A, K→K}` — a child who answers mostly reading items gets profile `R`, not "auditivo". This map ships inside `meta.json` and is applied by the inference handler; extreme-vector smoke tests (`ml/tests/inference_smoke.py`) pin the behavior.
 - **Parsing quirk**: two columns share the same header text ("role-playing"). The loader must reference columns **by position**, never by name.
 
 ### System-exported snapshots (planned future phase)
@@ -76,7 +76,7 @@ This separation is intentional and is the contract that makes future models poss
 
 ## Feature engineering
 
-`ml/features/` transforms the raw dataset into feature vectors. The feature schema is recorded in each model's `meta.json` and in the registry item.
+`ml/features/` transforms the raw dataset into feature vectors. The feature schema is recorded in each model's `meta.json`.
 
 - **v0 uses only the 15 Likert items** (ordinal 1–5) — no `Gender`/`Age`. Rationale: the kids form does not collect demographics at submission time, so training and serving must share the exact same feature space; dropping demographics also avoids amplifying domain gap.
 - The dataset's item order is mapped **positionally** to the `vark-kids` question ids (`q01…q15`) in a table stored in `meta.json`, so serving can build vectors from submission answers without name-based guessing.
@@ -91,26 +91,8 @@ This separation is intentional and is the contract that makes future models poss
 - Frameworks: scikit-learn. v0 baseline = **Logistic Regression** (multinomial, `class_weight="balanced"` to counter the K-heavy imbalance, standardized features).
 - Validation: stratified k-fold cross-validation.
 - Metrics: accuracy, **macro-F1**, per-class precision/recall/F1 and confusion matrix; a written evaluation report (`metrics.json`) is stored next to the artifact and registered with the model.
-- Output: `model.joblib` + `meta.json` (model name, version, feature order + question-id mapping, label map `{V→R}`, metrics, trained_at, sklearn/joblib versions, dataset sha256). `make package` copies both into `sam-app/src/inference/model/`.
+- Output: `model.joblib` + `meta.json` (model name, version, feature order + question-id mapping, label map `{A→R, V→A, K→K}`, metrics, trained_at, sklearn/joblib versions, dataset sha256). `make package` copies both into `sam-app/src/inference/model/`, which is **committed to git as a static serving artifact** (owner decision; see [Security](./security.md#4-datasets--ml-artifacts)).
 - Multi-label approaches (Binary Relevance / MLkNN) remain a documented future upgrade, not v0.
-
----
-
-## Model registry
-
-A `MODEL#<name>#<version>` item in DynamoDB records:
-
-| Attribute | Description |
-|-----------|-------------|
-| `name` | Model identifier (e.g. `vark-predictor`) |
-| `version` | Semantic version |
-| `status` | `active` \| `retired` |
-| `metrics` | Offline evaluation results |
-| `feature_schema` | Input feature names/encoding |
-| `trained_at` | Training timestamp |
-| `dataset_ref` | Dataset reference + hash |
-
-The registry is **informational and auditable** (admin visibility via `/api/models`). At runtime the inference function uses the artifact bundled in its own package; each `PRED#` item records `model` + `modelVersion` from `meta.json`, so every prediction is traceable to exactly what produced it regardless of registry state. Registration after training happens via `sam-app/scripts/register-model.mjs`; activation/retirement via the existing admin endpoints.
 
 ---
 
@@ -119,9 +101,10 @@ The registry is **informational and auditable** (admin visibility via `/api/mode
 - The inference function (`InferenceFunction` in `sam-app/template.yaml`) is a **Python 3.12 Lambda** deployed with the SAM app; its deployment package bundles `model.joblib` + `meta.json`. It is **never invoked synchronously by the API**.
 - **Trigger**: after the Forms Lambda stores a *new* (non-idempotent-duplicate) submission, it fires an asynchronous invoke — `InvocationType: "Event"`, best-effort; an invoke failure never fails the submission.
 - **Contract** (payload from Forms Lambda): `{ childId, formId, formVersion, answers }`.
-- **Behavior**: builds the feature vector per `meta.json`'s positional mapping, scores with the bundled model, maps `V→R`, computes confidence = max class probability, and writes the `PRED#` item itself (`createdBy: "system:inference"`, `method: "ml"`). On any error it logs and exits — **no prediction is created and the submission stands**.
+- **Behavior**: builds the feature vector per `meta.json`'s positional mapping, scores with the bundled model, remaps labels (`{A→R, V→A, K→K}`), computes confidence = max class probability, and writes the `PRED#` item itself (`createdBy: "system:inference"`, `method: "ml"`). On any error it logs and exits — **no prediction is created and the submission stands**.
 - **Read path**: `GET /api/children/:id/predictions` (existing handler) serves history with autonomy gating at read time — supervised students see label-only payloads; guided/autonomous see scores + confidence.
-- Heuristic indicators (`giftedness-indicator`, `difficulty-indicator`) remain rule-based registry companions, not trained models. The former heuristic predict path is retired together with `POST /api/children/:id/predict`.
+- **Traceability**: there is **no model registry** — each `PRED#` item records `model` + `modelVersion` from `meta.json`, so every prediction is traceable to exactly what produced it. The model itself is invisible to admins and end users.
+- Heuristic indicators (`giftedness-indicator`, `difficulty-indicator`) remain rule-based companions, not trained models. The former heuristic predict path is retired together with `POST /api/children/:id/predict`.
 
 ---
 
@@ -130,8 +113,7 @@ The registry is **informational and auditable** (admin visibility via `/api/mode
 ```
   1. Offline (engineer): run ml/ pipeline locally → make train (prepare → train → evaluate)
   2. make package → new model.joblib + meta.json copied into sam-app/src/inference/model/
-  3. sam-app/scripts/register-model.mjs → registers MODEL#<name>#<version> with metrics
-  4. sam build && sam deploy → inference function now produces predictions with the new version
+  3. sam build && sam deploy → inference function now produces predictions with the new version
 ```
 
 Retraining is **never scheduled inside AWS** — it is a deliberate human step on a local machine. There are no queues, schedulers, or event-driven triggers anywhere in this loop beyond the submission-triggered inference itself.
@@ -143,7 +125,7 @@ Retraining is **never scheduled inside AWS** — it is a deliberate human step o
 The pipeline is designed so new classifications are additive:
 
 1. **New form → new profile:** add a curated form (see Architecture — Forms Engine); submissions are stored by the generic engine.
-2. **New model:** add a model under `ml/` (features + train + evaluate), train offline (on exported snapshots once the export phase exists), register it in the registry.
+2. **New model:** add a model under `ml/` (features + train + evaluate), train offline (on exported snapshots once the export phase exists).
 3. **Deploy:** package and redeploy the inference Lambda with the new artifact — predictions for that form's submissions start flowing automatically through the same async invoke; no new endpoint is required.
 4. No changes to the running system's data model are required — the submission contract already carries the data.
 
@@ -155,7 +137,7 @@ Examples of future models: giftedness indicator, learning-difficulty indicator, 
 
 ### General student categorization (out of MVP scope)
 
-A planned direction is to categorize students from **general student data** — academic history, demographics, attendance, activity/engagement records, and other non-questionnaire signals — not just from filled forms. This is deliberately **not implemented in the MVP**: it depends on data volume the system must first collect (via observations, anamnesis, and behavior checklists). When pursued, it plugs into the same contract: export → offline training → registry → inference. The generic snapshot format and the `anamnesis`/`behavior-checklist`/`socioemotional` forms are the groundwork for it. The **feature catalog and evidence base** for this direction are documented in [Student Data Features](./student-data-features.md).
+A planned direction is to categorize students from **general student data** — academic history, demographics, attendance, activity/engagement records, and other non-questionnaire signals — not just from filled forms. This is deliberately **not implemented in the MVP**: it depends on data volume the system must first collect (via observations, anamnesis, and behavior checklists). When pursued, it plugs into the same contract: export → offline training → inference. The generic snapshot format and the `anamnesis`/`behavior-checklist`/`socioemotional` forms are the groundwork for it. The **feature catalog and evidence base** for this direction are documented in [Student Data Features](./student-data-features.md).
 
 ### Learning styles beyond VARK
 
@@ -196,5 +178,5 @@ Each candidate should be vetted (license, age range, feature alignment) in `ml/d
 
 - [Architecture](./architecture.md) — overall design, forms engine, decoupling
 - [Backend](./backend.md) — predict/inference endpoints
-- [DynamoDB Schema](./dynamodb-schema.md) — `MODEL#`, `PRED#`, assessment entities
+- [DynamoDB Schema](./dynamodb-schema.md) — `PRED#`, assessment entities
 - [Student Data Features](./student-data-features.md) — feature catalog & sources for general student categorization

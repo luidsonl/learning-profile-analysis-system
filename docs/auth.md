@@ -59,7 +59,6 @@ Scope checks are **edge lookups, not role checks** — a guardian cannot enumera
 | Consent | own children (grant/revoke) | followed (admin-like) | ✗ | all |
 | Autonomy level | own children (set) | followed (set) | ✗ | all |
 | Forms definition | list/fill by audience (+ student forms assisted) | list/fill by audience | list/fill by audience | define/edit |
-| Models registry | ✗ | ✗ | ✗ | ✓ |
 | Audit | own children (read) | ✗ | ✗ | all |
 
 > Details on the exact endpoints in [Backend — RBAC Matrix](./backend.md#rbac-matrix).

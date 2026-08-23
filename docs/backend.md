@@ -105,13 +105,9 @@
 | `GET /api/reports/:reportId/download` | scoped, sharedWith | Presigned GET URL to the PDF | GSI1 `REPORT#<id>` → S3 presign |
 | `DELETE /api/reports/:reportId` | admin, scoped | Remove report (and object) | delete `REPORT#` + S3 object |
 
-### Admin — Models & Audit
+### Admin — Audit
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `GET /api/models` | admin | List models by status | GSI2 `MODEL#STATUS#<status>` |
-| `GET /api/models/:name` | admin | Model + versions + metrics | `MODEL#<name>` partition |
-| `POST /api/models/:name/activate` | admin | Promote a trained version to active | `MODEL#<name>/CURRENT` (conditional) |
-| `POST /api/models/:name/retire` | admin | Retire a version | `VERSION#` status update |
 | `GET /api/audit/children/:id` | admin, scoped | Audit trail of a child | `AUDIT#CHILD#<c>` prefix desc |
 | `GET /api/audit?actor=` | admin | Audit trail by actor | `AUDIT#USER#<id>` prefix desc |
 | `GET /api/health` | public | Lambda health/liveness | — |
@@ -134,7 +130,6 @@
 | Assessments / Predict | own children | followed | own (label always; scores+confidence if `guided`+) | ✓ |
 | Recommendations | own children (approved) | propose/approve | own (published) | ✓ |
 | Reports | own children | followed | own if `autonomous` (never delete) | ✓ |
-| Models registry | ✗ | ✗ | ✗ | ✓ |
 | Audit | own children (trail) | ✗ | ✗ | ✓ |
 
 Every data access is additionally **scope-checked** (edges in DynamoDB), not just role-checked — see [Authentication](./auth.md).
@@ -154,12 +149,7 @@ Both are stateful-adjacent and therefore live in `terraform/aws-app`, not SAM.
 
 ## Local Development
 
-```
-Terminal 1:  sam local start-api --env-vars env.json --host 0.0.0.0   (API on :3000)
-Terminal 2:  npm run dev                                               (Vite on :5173, proxies /api → :3000)
-```
-
-`sam-app/env.json` points to local DynamoDB (or DynamoDB Local) and local bucket names from `resources.env`.
+The API is exercised via the deployed stack (`make e2e-test` runs the e2e suite against it). There is no local Lambda/DynamoDB emulation wired up — keep the feedback loop on the real stack.
 
 ---
 

@@ -2,120 +2,47 @@
 
 ## Status snapshot
 
-**As of:** 2026-08-23 · **Commits:** 19 · **Branch:** `main`
+**As of:** 2026-08-23 · **Branch:** `main`
 
-The backend vertical slice (auth → children/guardianship → forms/VARK assessment → prediction → recommendations → reports → audit) is implemented, tested, and documented. The two remaining layers are the **frontend SPA** and the **ML pipeline**, plus its CloudFront/S3 Terraform stack.
+Backend vertical slice + offline ML pipeline are implemented and documented. Remaining: deploy the new inference stack, then the **frontend SPA** and its CloudFront/S3 Terraform stack.
 
 | Layer | Status | Notes |
 |---|---|---|
 | Docs (`docs/`) | ✅ Done | 10 documents covering every layer |
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
-| Terraform stateful infra (`terraform/aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
+| Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ❌ Not started | CloudFront + S3 for the SPA |
-| Backend API (`sam-app`) | ✅ Done | 14 Lambda functions, ~47 routes, RBAC + scoping |
-| Forms engine | ✅ Done | Versioned definitions, processors, decoupled classification |
+| Backend API (`sam-app`) | ✅ Done | 14 Lambdas (~47 routes), RBAC + scoping |
+| Forms engine | ✅ Done | Versioned definitions; guardian-assisted submissions |
 | Graduated student autonomy | ✅ Done | supervised / guided / autonomous levels |
-| Test suites (`sam-app/tests/`) | ✅ Done | Unit + e2e against a deployed API, self-cleaning fixtures |
+| ML pipeline (`ml/` + `InferenceFunction`) | ✅ Implemented | Trained v2.0.0 on public dataset; async invoke on submission; no SQS — **pending `sam build && sam deploy`** |
+| Tests (`sam-app/tests/`) | ✅ Done | 29 unit passing; e2e updated to the new prediction flow (needs redeploy to run) |
 | Frontend SPA (`frontend/`) | ❌ Not started | React + Vite, pt-BR |
-| ML integration (`ml/` + `InferenceFunction`) | 📝 Spec finalized | Offline training; async invoke on submission; no SQS |
 
 ---
 
 ## Completed work
 
-### Documentation
+Everything below is implemented, tested, and documented in its own layer doc (`docs/`):
 
-All planned layer docs exist and are kept aligned with implementation:
-
-`architecture.md`, `backend.md`, `auth.md`, `dynamodb-schema.md`, `ml-pipeline.md`, `lgpd.md`, `frontend.md`, `design-system.md`, `security.md`, `student-data-features.md`.
-
-Recent additions cover LGPD legal bases, institution consent, and the graduated-autonomy model.
-
-### Security & compliance (public-repo rules)
-
-Per `docs/security.md`: root `.gitignore`, `.gitleaks.toml`, `.pre-commit-config.yaml`, `.github/workflows/secret-scan.yml`, `SECURITY.md`. No secrets, account IDs, or real personal data committed; test fixtures use fabricated identities (`example.com`). Latest hardening: gitleaks-action v3 + checkout v6 in CI.
-
-### Infrastructure — Terraform
-
-- **`aws-bootstrap`**: remote-state bucket (AWS provider 5.x).
-- **`aws-app`**: stateful resources via `resources/main.tf` modules:
-  - `database` — DynamoDB single table (`learning-profile`)
-  - `files` — S3 bucket for reports/documents
-  - `data` — S3 bucket for ML data exports/artifacts
-  - `report_queue` — SQS + Lambda `report-generator`
-  - `feature_export` — nightly snapshot export Lambda (retraining input)
-- Async Lambdas source: `terraform/aws-app/src/` (`feature-export.mjs`, `report-generator.mjs`).
-
-### Backend API — SAM (`sam-app/`)
-
-14 API Gateway–triggered Lambda functions (`template.yaml`):
-
-`Health`, `Auth`, `Children`, `Guardianship`, `Consent`, `Autonomy`, `Forms`, `Observations`, `Assessment`, `Predict`, `Recommendations`, `Reports`, `Models`, `Audit`.
-
-Route groups:
-
-- **Auth**: register, login, logout, me — sessions in DynamoDB.
-- **Children & guardianship**: CRUD, guardians add/remove, educator follow/unfollow, student-account creation under guardian consent.
-- **Consent & autonomy**: versioned consent records; autonomy level get/patch (supervised/guided/autonomous).
-- **Forms engine**: form definitions + versions (`GET/POST /forms*`); submissions stored separately from classification; guardians may submit student-audience forms on their own account when filling together with the child (assisted administration — provenance kept via `submittedByRole`).
-- **Assessment & prediction**: classification of stored submissions (`/children/{id}/assessments`, `/children/{id}/predict`) — fully decoupled steps; inference reads the active model from the registry (`MODEL#name#version`).
-- **Recommendations**: propose/approve/delete lifecycle (educator workflow).
-- **Reports**: generate (async via SQS), list, download (presigned URL), delete.
-- **Models registry**: list/get, activate, retire (admin-only).
-- **Audit**: trail listing + per-child audit query.
-
-Shared library (`src/lib/`): validation, sessions, role/scope enforcement, ID encoding, HTTP helpers, DynamoDB access.
-
-Forms definitions (`src/forms/definitions/`): `vark-kids` (student), `anamnesis` (guardian), `socioemotional` + `behavior-checklist` (educator), each versioned; processors in `src/forms/processors/vark.mjs`.
-
-### Graduated student autonomy
-
-Students are minors with a restricted self-view (no observations, no raw ML output). Autonomy levels gate what a student can see/do themselves:
-
-- **supervised** — actions require guardian mediation
-- **guided** — limited self-service (label-only predictions)
-- **autonomous** — full restricted self-view
-
-Enforced in handlers + scope lib; covered by unit tests (`tests/unit/autonomy.test.mjs`) and e2e flows (including the educator-led no-guardian case).
-
-### Tests (`sam-app/tests/`)
-
-- **Unit**: VARK processor scoring, forms JSON schema, forms engine, autonomy matrix.
-- **E2E** (`api.test.mjs`): runs against a deployed API endpoint (`API_BASE`), creates only its own fixture users/children, and cleans up after itself (`aws-cleanup.mjs` purges test-only emails and orphan sessions). Covers 20 scenario blocks end-to-end: health, auth lifecycle, permissions matrix, consent, guardianship/student account, form visibility by role, submission→classification decoupling, prediction, follow/lists, observations, recommendation approval flow, autonomy-gated predict, reports generation/download, model RBAC, audit trail.
-
-### Tooling & scripts
-
-`sam-app/Makefile`, `samconfig.toml`, `scripts/gen-env.mjs` (env.json.example generator), `scripts/seed.mjs`; `resources.env` for deploy-time config.
+- **Infra**: Terraform stateful stack (DynamoDB single table, S3 files/data buckets, SQS report queue, async Lambdas) + SAM app with API-triggered functions.
+- **Backend API**: auth/sessions, children & guardianship, versioned consent, graduated autonomy, forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
+- **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/model/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); it scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `docs/ml-pipeline.md`).
+- **Security tooling**: gitleaks + pre-commit + CI secret scan; packaged-model commit exception documented.
 
 ---
 
 ## Pending work
 
-1. **Frontend SPA** (`frontend/`) — React + Vite, pt-BR, accessible; consumes `/api/*` through the same CloudFront domain (see `docs/frontend.md`, `docs/design-system.md`). Largest remaining piece of the MVP.
-2. **ML integration** — spec finalized in `docs/ml-pipeline.md`: new `ml/` module trains offline on `datasets/vark/data.csv` (committed, 1210 records); trained artifact is bundled into a Python `InferenceFunction` in SAM; form submissions trigger it via asynchronous invoke (**no SQS**); the inference function writes the `PRED#` item itself; `POST /children/:id/predict` is removed (predictions become automatic; `GET /predictions` remains with autonomy gating). Dataset label `V` maps to system profile `R`.
+1. **Deploy ML stack** — `sam build && sam deploy` (python3.12 runtime needs pip available for native builds or use docker), then run e2e against the deployed API.
+2. **Frontend SPA** (`frontend/`) — React + Vite, pt-BR, accessible; consumes `/api/*` through the same CloudFront domain (see `docs/frontend.md`, `docs/design-system.md`). Largest remaining piece of the MVP.
 3. **`terraform/aws-frontend`** — S3 + CloudFront stack for the SPA, wiring the `/api/*` origin to the existing API Gateway stage.
-
----
-
-## MVP vertical slice checklist
-
-| Step | Status |
-|---|---|
-| Auth (guardian/educator/student/admin) | ✅ |
-| Children + guardianship + educator follow | ✅ |
-| LGPD consent (versioned) | ✅ |
-| VARK assessment via forms engine | ✅ |
-| Decoupled assessment → prediction | ✅ (heuristic path; ML prediction pending) |
-| Recommendations lifecycle | ✅ |
-| Async reports (SQS + presigned download) | ⚠️ API ready; report-generator Lambda is still a stub (out of current scope) |
-| Audit trail | ✅ |
-| Frontend UI for all personas | ❌ |
-| Automatic predictions from trained model (`InferenceFunction`) | ❌ (spec finalized; implementation next) |
+4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
 
 ---
 
 ## Suggested next steps (in order)
 
-1. Implement `ml/` offline pipeline and train v0 on the committed dataset; package artifact into the new Python `InferenceFunction`; wire async invoke on submission; remove `POST /children/:id/predict` (see `docs/ml-pipeline.md`).
+1. Deploy the SAM app and register model v2.0.0; validate e2e (submission → async prediction visible in responses).
 2. Scaffold `frontend/` (Vite + React, pt-BR) and implement persona flows against the live API.
 3. Add `terraform/aws-frontend` (CloudFront + S3 + `/api/*` origin integration).
