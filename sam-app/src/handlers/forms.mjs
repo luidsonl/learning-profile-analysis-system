@@ -93,7 +93,7 @@ const submitForm = async (event, ctx) => {
   return ok({ submissionId, formId }, 201);
 };
 
-const INFERENCE_FORMS = (process.env.INFERENCE_FORMS || "vark-kids").split(",").map((s) => s.trim()).filter(Boolean);
+const INFERENCE_FORMS = (process.env.INFERENCE_FORMS || "vark").split(",").map((s) => s.trim()).filter(Boolean);
 
 const triggerInference = async (payload) => {
   if (!INFERENCE_FORMS.includes(payload.formId)) return;

@@ -17,12 +17,12 @@ test("definicoes sao unicas por formId", () => {
 });
 
 test("getFormDefinition encontra e retorna null para desconhecido", () => {
-  assert.ok(getFormDefinition("vark-kids"));
+  assert.ok(getFormDefinition("vark"));
   assert.equal(getFormDefinition("nao-existe"), null);
 });
 
 test("registro de processadores e agnostico", () => {
-  const p = getFormProcessor("vark-kids");
+  const p = getFormProcessor("vark");
   assert.ok(p);
   assert.equal(typeof p.score, "function");
   assert.equal(getFormProcessor("anamnesis"), null);

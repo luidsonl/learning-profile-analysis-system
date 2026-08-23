@@ -32,7 +32,7 @@ export const scoreVark = (definition, answers) => {
 };
 
 export const varkProcessor = {
-  formId: "vark-kids",
+  formId: "vark",
   name: "vark",
   kind: "assessment",
   score: scoreVark,

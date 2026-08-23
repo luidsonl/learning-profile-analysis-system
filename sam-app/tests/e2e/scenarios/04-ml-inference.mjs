@@ -1,7 +1,7 @@
 import { api, expect, pollUntil, step } from "../helpers.mjs";
 
 // Machine-learning inference on form submission: the Forms handler async-invokes
-// the InferenceFunction after storing a vark-kids submission; that function
+// the InferenceFunction after storing a vark submission; that function
 // scores with its bundled model and writes a PRED# item linked to the submission.
 export default async (ctx) => {
   step("ml: automatic inference arrives after vark submission");
@@ -27,7 +27,7 @@ export default async (ctx) => {
   step("ml: prediction is attached to the originating submission");
   {
     const resp = await pollUntil(async () => {
-      const r = await api("GET", `/children/${ctx.childId}/forms/vark-kids/responses`, { token: ctx.guardianToken });
+      const r = await api("GET", `/children/${ctx.childId}/forms/vark/responses`, { token: ctx.guardianToken });
       const subs = r.status === 200 ? r.data?.data || [] : [];
       return subs.length > 0 && subs.every((s) => s.prediction) ? r : null;
     }, { tries: 15 });
@@ -65,7 +65,7 @@ export default async (ctx) => {
     expect("supervised prediction list arrives", !!lst, JSON.stringify(lst || { count: 0 }));
     expect("supervised prediction is label-only", lst?.data?.[0]?.scores === undefined && lst?.data?.[0]?.confidence === undefined, JSON.stringify(lst?.data?.[0]));
 
-    const own = await api("GET", `/children/${ctx.childId}/forms/vark-kids/responses`, { token: ctx.studentToken });
+    const own = await api("GET", `/children/${ctx.childId}/forms/vark/responses`, { token: ctx.studentToken });
     const ownPred = own.data?.data?.find((s) => s.submissionId === ctx.varkSubmissionId)?.prediction;
     expect("supervised responses hide scores too", ownPred && ownPred.scores === undefined && ownPred.confidence === undefined && !!ownPred.label, JSON.stringify(ownPred));
   }

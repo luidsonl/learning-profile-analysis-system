@@ -6,26 +6,26 @@ export default async (ctx) => {
   step("forms: student sees only student forms");
   {
     const all = await api("GET", "/forms", { token: ctx.studentToken });
-    expect("student lists forms", all.status === 200 && all.data.data.length === 1 && all.data.data[0].formId === "vark-kids", JSON.stringify(all.data));
+    expect("student lists forms", all.status === 200 && all.data.data.length === 1 && all.data.data[0].formId === "vark", JSON.stringify(all.data));
     expect("form definition served from code with version", all.data.data[0].version === 1 && Array.isArray(all.data.data[0].sections), JSON.stringify(all.data.data[0]));
 
     const guardianForms = await api("GET", "/forms", { token: ctx.guardianToken });
     expect("guardian sees all forms", guardianForms.status === 200 && guardianForms.data.count === 4, JSON.stringify(guardianForms.data));
 
-    const one = await api("GET", "/forms/vark-kids", { token: ctx.studentToken });
-    expect("get single form definition", one.status === 200 && one.data.form.formId === "vark-kids", JSON.stringify(one.data));
+    const one = await api("GET", "/forms/vark", { token: ctx.studentToken });
+    expect("get single form definition", one.status === 200 && one.data.form.formId === "vark", JSON.stringify(one.data));
   }
 
   step("forms: submit tests (decoupled from classification)");
   {
-    const r = await api("POST", `/children/${ctx.childId}/forms/vark-kids/responses`, {
+    const r = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
       token: ctx.studentToken,
       body: { answers, requestId: "test-run-1" },
     });
     expect("vark submission accepted", r.status === 201 && !!r.data.submissionId, JSON.stringify(r.data));
     ctx.varkSubmissionId = r.data.submissionId;
 
-    const dup = await api("POST", `/children/${ctx.childId}/forms/vark-kids/responses`, {
+    const dup = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
       token: ctx.studentToken,
       body: { answers, requestId: "test-run-1" },
     });
@@ -38,13 +38,13 @@ export default async (ctx) => {
     expect("guardian anamnesis accepted", byGuardian.status === 201, JSON.stringify(byGuardian.data));
     ctx.anamnesisSubmissionId = byGuardian.data.submissionId;
 
-    const assisted = await api("POST", `/children/${ctx.childId}/forms/vark-kids/responses`, {
+    const assisted = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
       token: ctx.guardianToken,
       body: { answers, requestId: "test-run-guardian" },
     });
     expect("guardian-assisted vark submission accepted", assisted.status === 201 && !!assisted.data.submissionId, JSON.stringify(assisted.data));
 
-    const assistedDup = await api("POST", `/children/${ctx.childId}/forms/vark-kids/responses`, {
+    const assistedDup = await api("POST", `/children/${ctx.childId}/forms/vark/responses`, {
       token: ctx.guardianToken,
       body: { answers, requestId: "test-run-guardian" },
     });
@@ -59,7 +59,7 @@ export default async (ctx) => {
     const noAssessYet = await api("GET", `/children/${ctx.childId}/assessments`, { token: ctx.guardianToken });
     expect("no assessment persisted yet (decoupled)", noAssessYet.status === 200 && noAssessYet.data.count === 0, JSON.stringify(noAssessYet.data));
 
-    const perForm = await api("GET", `/children/${ctx.childId}/forms/vark-kids/responses`, { token: ctx.guardianToken });
+    const perForm = await api("GET", `/children/${ctx.childId}/forms/vark/responses`, { token: ctx.guardianToken });
     expect("per-form responses listed", perForm.status === 200 && perForm.data.count === 2, JSON.stringify(perForm.data));
   }
 

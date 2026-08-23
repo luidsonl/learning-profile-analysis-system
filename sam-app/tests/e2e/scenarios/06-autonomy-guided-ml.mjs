@@ -24,7 +24,7 @@ export default async (ctx) => {
     const pedroToken = stu.data.token;
     ctx.pedroToken = pedroToken;
 
-    const sub = await api("POST", `/children/${ctx.noGuardianChildId}/forms/vark-kids/responses`, { token: pedroToken, body: { answers } });
+    const sub = await api("POST", `/children/${ctx.noGuardianChildId}/forms/vark/responses`, { token: pedroToken, body: { answers } });
     expect("student without guardian submits own form", sub.status === 201, JSON.stringify(sub.data));
 
     const obsDenied = await api("GET", `/children/${ctx.noGuardianChildId}/observations`, { token: pedroToken });
@@ -54,7 +54,7 @@ export default async (ctx) => {
     expect("guided predict includes scores", !!guidedPreds && guidedPreds.data[0].scores && guidedPreds.data[0].confidence !== undefined, JSON.stringify(guidedPreds?.data?.[0]));
 
     const own = await pollUntil(async () => {
-      const r = await api("GET", `/children/${ctx.noGuardianChildId}/forms/vark-kids/responses`, { token: ctx.pedroToken });
+      const r = await api("GET", `/children/${ctx.noGuardianChildId}/forms/vark/responses`, { token: ctx.pedroToken });
       const pred = r.data?.data?.[0]?.prediction;
       return pred && pred.scores !== undefined ? r : null;
     }, { tries: 15 });
