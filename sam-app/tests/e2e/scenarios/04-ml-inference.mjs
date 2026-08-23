@@ -6,9 +6,12 @@ import { api, expect, pollUntil, step } from "../helpers.mjs";
 export default async (ctx) => {
   step("ml: automatic inference arrives after vark submission");
   {
+    // First prediction of the suite pays the inference cold start (sklearn
+    // load on a fresh container can exceed 80s right after a deploy) — give
+    // it a generous window; later polls ride warm containers.
     const preds = await pollUntil(
       () => api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.guardianToken }),
-      { tries: 40 },
+      { tries: 60, delayMs: 3000 },
     ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
     expect("auto prediction arrived", !!preds, JSON.stringify(preds || { count: 0 }));
 
