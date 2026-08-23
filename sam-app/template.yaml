@@ -33,8 +33,9 @@ Globals:
         FILES_BUCKET: !Ref FilesBucket
         DATA_BUCKET: !Ref DataBucket
         REPORT_QUEUE_URL: !Ref ReportQueueUrl
-        INFERENCE_MODEL: vark-predictor
         DYNAMODB_ENDPOINT: ""
+        INFERENCE_FUNCTION_NAME: !Ref InferenceFunction
+        INFERENCE_FORMS: vark-kids
     LoggingConfig:
       LogFormat: JSON
       ApplicationLogLevel: INFO
@@ -91,6 +92,10 @@ Resources:
                 Action:
                   - sqs:SendMessage
                 Resource: !Sub arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:learning-profile_reports
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt InferenceFunction.Arn
 
   # ------------------------------------------------------------------------
   # Handlers
@@ -358,20 +363,6 @@ Resources:
             RestApiId: !Ref Api
             Path: /children/{id}/assessments
             Method: GET
-
-  PredictFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/
-      Handler: handlers/predict.lambdaHandler
-      Role: !GetAtt ApiRole.Arn
-      Events:
-        Predict:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /children/{id}/predict
-            Method: POST
         ListPredictions:
           Type: Api
           Properties:
@@ -443,38 +434,6 @@ Resources:
             Path: /reports/{reportId}
             Method: DELETE
 
-  ModelsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/
-      Handler: handlers/models.lambdaHandler
-      Role: !GetAtt ApiRole.Arn
-      Events:
-        ListModels:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /models
-            Method: GET
-        GetModel:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /models/{name}
-            Method: GET
-        ActivateModel:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /models/{name}/activate
-            Method: POST
-        RetireModel:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /models/{name}/retire
-            Method: POST
-
   AuditFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -494,6 +453,47 @@ Resources:
             RestApiId: !Ref Api
             Path: /audit
             Method: GET
+
+  # ------------------------------------------------------------------------
+  # ML inference — Python Lambda with the trained model bundled in the package.
+  # Invoked asynchronously (Event) by the Forms handler after a new submission;
+  # it scores the answers and writes the PRED# item itself. No SQS, no API.
+  # ------------------------------------------------------------------------
+  InferenceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: learning-profile-inference-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource:
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
+
+  InferenceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/inference/
+      Handler: handler.lambda_handler
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 512
+      Role: !GetAtt InferenceRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DynamoDBTableName
 
 Outputs:
   ApiEndpoint:

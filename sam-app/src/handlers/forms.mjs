@@ -3,7 +3,7 @@ import { ok, errorResponse, parseBody, param, qparam, HttpError } from "../lib/h
 import { nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild, getStudentChildId, requireStudentAccess } from "../lib/scope.mjs";
+import { auditChild, assertScopeChild, getStudentChildId, requireStudentAccess, studentAccess } from "../lib/scope.mjs";
 import { getActiveForm, getFormVersion, listFormsByAudience, listAllForms, publishFormDefinition } from "../forms/service.mjs";
 import { validateFormDefinition } from "../forms/engine.mjs";
 import { AUDIENCES } from "../forms/schema.mjs";
@@ -116,7 +116,28 @@ const submitForm = async (event, ctx) => {
   await client.send(new CMD.put({ TableName: TABLE, Item: submissionItem, ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)" }));
   await auditChild(childId, ctx, "form_submitted", `form:${formId}`, { formVersion: form.version });
 
+  await triggerInference({ childId, formId, formVersion: String(form.version), submissionId, answers: body.answers });
+
   return ok({ submissionId, formId }, 201);
+};
+
+const INFERENCE_FORMS = (process.env.INFERENCE_FORMS || "vark-kids").split(",").map((s) => s.trim()).filter(Boolean);
+
+const triggerInference = async (payload) => {
+  if (!INFERENCE_FORMS.includes(payload.formId)) return;
+  try {
+    const { LambdaClient, InvokeCommand } = await import("@aws-sdk/client-lambda");
+    const lambdaClient = new LambdaClient();
+    await lambdaClient.send(
+      new InvokeCommand({
+        FunctionName: process.env.INFERENCE_FUNCTION_NAME,
+        InvocationType: "Event",
+        Payload: JSON.stringify(payload),
+      }),
+    );
+  } catch (err) {
+    console.error("inference_invoke_failed", JSON.stringify({ formId: payload.formId, error: err.message }));
+  }
 };
 
 const listSubmissions = async (event, ctx) => {
@@ -143,6 +164,39 @@ const listSubmissions = async (event, ctx) => {
   return ok({ data, count: data.length });
 };
 
+const shapePrediction = (i, full) => {
+  const p = {
+    predictionId: i.SK.S.replace("PRED#", ""),
+    model: i.model.S,
+    modelVersion: i.modelVersion.S,
+    method: i.method.S,
+    label: i.label.S,
+    createdAt: i.createdAt.S,
+  };
+  if (full) {
+    p.scores = JSON.parse(i.scores.S);
+    p.confidence = Number(i.confidence.N);
+  }
+  return p;
+};
+
+const latestPredictionsBySubmission = async (childId, full) => {
+  const res = await client.send(
+    new CMD.query({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      ExpressionAttributeValues: { ":pk": { S: `PRED#${childId}` }, ":sk": { S: "PRED#" } },
+    }),
+  );
+  const bySubmission = new Map();
+  for (const item of res.Items || []) {
+    const sub = item.submission?.S;
+    if (!sub) continue;
+    bySubmission.set(sub, shapePrediction(item, full));
+  }
+  return bySubmission;
+};
+
 const getResponses = async (event, ctx) => {
   const childId = param(event, "id");
   const formId = param(event, "formId");
@@ -156,6 +210,8 @@ const getResponses = async (event, ctx) => {
       ExpressionAttributeValues: { ":pk": { S: `CHILD#${childId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
     }),
   );
+  const full = await studentAccess(childId, ctx, "predict_full");
+  const predictions = await latestPredictionsBySubmission(childId, full);
   const data = (res.Items || []).map((i) => ({
     submissionId: i.submissionId.S,
     formId: i.formId.S,
@@ -164,6 +220,7 @@ const getResponses = async (event, ctx) => {
     submittedBy: i.submittedBy.S,
     submittedByRole: i.submittedByRole.S,
     createdAt: i.createdAt.S,
+    prediction: predictions.get(i.submissionId.S) || null,
   }));
   return ok({ data, count: data.length });
 };

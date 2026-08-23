@@ -1,0 +1,119 @@
+{
+  "name": "vark-predictor",
+  "version": "2.0.0",
+  "features": [
+    {
+      "datasetIndex": 0,
+      "questionId": "q01",
+      "group": "r"
+    },
+    {
+      "datasetIndex": 1,
+      "questionId": "q02",
+      "group": "r"
+    },
+    {
+      "datasetIndex": 2,
+      "questionId": "q03",
+      "group": "r"
+    },
+    {
+      "datasetIndex": 3,
+      "questionId": "q04",
+      "group": "r"
+    },
+    {
+      "datasetIndex": 4,
+      "questionId": "q05",
+      "group": "r"
+    },
+    {
+      "datasetIndex": 5,
+      "questionId": "q06",
+      "group": "a"
+    },
+    {
+      "datasetIndex": 6,
+      "questionId": "q07",
+      "group": "a"
+    },
+    {
+      "datasetIndex": 7,
+      "questionId": "q08",
+      "group": "a"
+    },
+    {
+      "datasetIndex": 8,
+      "questionId": "q09",
+      "group": "a"
+    },
+    {
+      "datasetIndex": 9,
+      "questionId": "q10",
+      "group": "a"
+    },
+    {
+      "datasetIndex": 10,
+      "questionId": "q11",
+      "group": "k"
+    },
+    {
+      "datasetIndex": 11,
+      "questionId": "q12",
+      "group": "k"
+    },
+    {
+      "datasetIndex": 12,
+      "questionId": "q13",
+      "group": "k"
+    },
+    {
+      "datasetIndex": 13,
+      "questionId": "q14",
+      "group": "k"
+    },
+    {
+      "datasetIndex": 14,
+      "questionId": "q15",
+      "group": "k"
+    }
+  ],
+  "labelMap": {
+    "A": "R",
+    "V": "A",
+    "K": "K"
+  },
+  "classes": [
+    "A",
+    "K",
+    "V"
+  ],
+  "metrics": {
+    "accuracy": 0.9339,
+    "macroF1": 0.9312,
+    "weightedF1": 0.9342
+  },
+  "perClass": {
+    "A": {
+      "precision": 0.9061,
+      "recall": 0.979,
+      "f1": 0.9412,
+      "support": 286
+    },
+    "K": {
+      "precision": 0.9807,
+      "recall": 0.8999,
+      "f1": 0.9386,
+      "support": 679
+    },
+    "V": {
+      "precision": 0.8597,
+      "recall": 0.9755,
+      "f1": 0.914,
+      "support": 245
+    }
+  },
+  "trainedAt": "2026-08-23T18:43:11Z",
+  "datasetSha256": "b2ac9f1cd725626882874be7dc6aa8c44e8d71a7bab2d8618e135d1197bcc4ee",
+  "sklearnVersion": "1.9.0"
+}

@@ -253,10 +253,24 @@ try {
     expect("assessment listed", list.status === 200 && list.data.count >= 1, JSON.stringify(list.data));
   }
 
-  step("predict: model inference, no bundled recommendations");
+  step("prediction: generated automatically after submission (async inference)");
   {
-    const p = await api("POST", `/children/${childId}/predict`, { token: guardianToken });
-    expect("prediction created", p.status === 201 && p.data.prediction.label === "R" && !!p.data.prediction.model, JSON.stringify(p.data));
+    let preds = null;
+    for (let i = 0; i < 10; i++) {
+      const lst = await api("GET", `/children/${childId}/predictions`, { token: guardianToken });
+      if (lst.status === 200 && lst.data.count >= 1) {
+        preds = lst.data;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    expect("auto prediction arrived", !!preds, JSON.stringify(preds || { count: 0 }));
+    const p = preds?.data?.[0];
+    expect(
+      "prediction is ml-generated with model metadata",
+      p && ["R", "A", "K"].includes(p.label) && p.method === "ml" && !!p.model && !!p.modelVersion,
+      JSON.stringify(p),
+    );
 
     const recs = await api("GET", `/children/${childId}/recommendations`, { token: guardianToken });
     expect("no recommendations bundled with prediction", recs.status === 200 && recs.data.count === 0, JSON.stringify(recs.data));
@@ -308,13 +322,19 @@ try {
     expect("student sees approved recommendation", studentRecs3.status === 200 && studentRecs3.data.count === 1, JSON.stringify(studentRecs3.data));
   }
 
-  step("autonomy: supervised student predict is label-only");
+  step("autonomy: supervised student sees label-only predictions");
   {
-    const p = await api("POST", `/children/${childId}/predict`, { token: studentToken });
-    expect("supervised predict is label-only", p.status === 201 && p.data.prediction.label === "R" && p.data.prediction.scores === undefined, JSON.stringify(p.data));
-
-    const lst = await api("GET", `/children/${childId}/predictions`, { token: studentToken });
-    expect("supervised prediction list label-only", lst.status === 200 && lst.data.data[0]?.scores === undefined, JSON.stringify(lst.data));
+    let lst = null;
+    for (let i = 0; i < 10; i++) {
+      const res = await api("GET", `/children/${childId}/predictions`, { token: studentToken });
+      if (res.status === 200 && res.data.count >= 1) {
+        lst = res.data;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    expect("supervised prediction list arrives", !!lst, JSON.stringify(lst || { count: 0 }));
+    expect("supervised prediction is label-only", lst?.data?.[0]?.scores === undefined && lst?.data?.[0]?.confidence === undefined, JSON.stringify(lst?.data?.[0]));
   }
 
   step("autonomy: student without guardian (educator-led)");
@@ -356,8 +376,16 @@ try {
     const subsOk = await api("GET", `/children/${noGuardianChildId}/submissions`, { token: pedroToken });
     expect("guided lists own submissions", subsOk.status === 200 && subsOk.data.count >= 1, JSON.stringify(subsOk.data));
 
-    const pred = await api("POST", `/children/${noGuardianChildId}/predict`, { token: pedroToken });
-    expect("guided predict includes scores", pred.status === 201 && pred.data.prediction.scores && pred.data.prediction.confidence !== undefined, JSON.stringify(pred.data));
+    let guidedPreds = null;
+    for (let i = 0; i < 10; i++) {
+      const res = await api("GET", `/children/${noGuardianChildId}/predictions`, { token: pedroToken });
+      if (res.status === 200 && res.data.count >= 1) {
+        guidedPreds = res.data;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    expect("guided predict includes scores", !!guidedPreds && guidedPreds.data[0].scores && guidedPreds.data[0].confidence !== undefined, JSON.stringify(guidedPreds?.data?.[0]));
 
     const hist = await api("GET", `/children/${noGuardianChildId}/autonomy`, { token: educatorToken });
     expect("autonomy history recorded", hist.status === 200 && hist.data.current.level === "guided" && hist.data.history.length >= 1, JSON.stringify(hist.data));
@@ -375,12 +403,6 @@ try {
 
     const list = await api("GET", `/children/${childId}/reports`, { token: guardianToken });
     expect("report listed", list.status === 200 && list.data.count >= 1, JSON.stringify(list.data));
-  }
-
-  step("models: RBAC");
-  {
-    const noAdmin = await api("GET", "/models", { token: guardianToken });
-    expect("guardian cannot list models", noAdmin.status === 403, JSON.stringify(noAdmin.data));
   }
 
   step("audit trail");

@@ -2,7 +2,7 @@ import { CMD, client, TABLE } from "../lib/db.mjs";
 import { ok, errorResponse, param, HttpError } from "../lib/http.mjs";
 import { nowIso } from "../lib/ids.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditChild, assertScopeChild } from "../lib/scope.mjs";
+import { auditChild, assertScopeChild, studentAccess } from "../lib/scope.mjs";
 import { getAssessmentProcessor } from "../forms/engine.mjs";
 import { classifyLatestSubmission } from "../forms/classify.mjs";
 
@@ -83,6 +83,36 @@ const listAssessments = async (event, ctx) => {
   return ok({ data, count: data.length });
 };
 
+const listPredictions = async (event, ctx) => {
+  const childId = param(event, "id");
+  await assertScopeChild(childId, ctx);
+  const full = await studentAccess(childId, ctx, "predict_full");
+  const res = await client.send(
+    new CMD.query({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      ScanIndexForward: false,
+      ExpressionAttributeValues: { ":pk": { S: `PRED#${childId}` }, ":sk": { S: "PRED#" } },
+    }),
+  );
+  const data = (res.Items || []).map((i) => {
+    const base = {
+      predictionId: i.SK.S.replace("PRED#", ""),
+      model: i.model.S,
+      modelVersion: i.modelVersion.S,
+      method: i.method.S,
+      label: i.label.S,
+      createdAt: i.createdAt.S,
+    };
+    if (full) {
+      base.scores = JSON.parse(i.scores.S);
+      base.confidence = Number(i.confidence.N);
+    }
+    return base;
+  });
+  return ok({ data, count: data.length });
+};
+
 export const lambdaHandler = async (event) => {
   try {
     const route = `${event.httpMethod} ${event.resource}`;
@@ -92,6 +122,8 @@ export const lambdaHandler = async (event) => {
         return await runAssessment(event, ctx);
       case "GET /children/{id}/assessments":
         return await listAssessments(event, ctx);
+      case "GET /children/{id}/predictions":
+        return await listPredictions(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");
     }

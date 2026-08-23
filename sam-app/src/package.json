@@ -6,6 +6,7 @@
   "description": "learning-profile API Lambda handlers (Node.js ESM)",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.799.0",
+    "@aws-sdk/client-lambda": "^3.799.0",
     "@aws-sdk/client-s3": "^3.799.0",
     "@aws-sdk/client-sqs": "^3.799.0",
     "@aws-sdk/lib-dynamodb": "^3.799.0",
