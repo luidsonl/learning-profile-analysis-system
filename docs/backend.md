@@ -20,7 +20,7 @@
   | 409 | `conflict` (unique email, version conflict) |
   | 500 | `internal_error` |
 - **Pagination**: list endpoints return `{ data: [...], nextToken }`; `nextToken` passed as `?cursor=` (DynamoDB `ExclusiveStartKey` base64).
-- **Validation**: request bodies validated against the form/type schemas in `src/lib/validation.mjs`; reject unknown fields.
+- **Validation**: request bodies validated against the form/type schemas in `src/api/lib/validate.mjs`; reject unknown fields.
 - **Audit**: actions touching a child's data write `AUDIT#STUDENT#<id>` items via the same transaction where possible (see schema).
 
 ## Endpoints

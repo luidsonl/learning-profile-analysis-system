@@ -125,7 +125,8 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   ├── samconfig.toml     # SAM config (stack name, parameter overrides)
 │   ├── resources.env      # Central resource names (source of truth)
 │   ├── Makefile           # deploy, redeploy-api, unit/e2e tests, db-clean/db-wipe, clean
-│   └── src/handlers/      # Lambda code (Node.js ESM)
+│   ├── src/api/           # Lambda code — Node.js handlers, forms engine, lib
+│   └── src/inference/      # Lambda code — Python + bundled model.joblib
 │       ├── health.mjs, auth.mjs, students.mjs, guardianship.mjs,
 │       ├── observations.mjs, forms.mjs (submissions, assessments,
 │       │                  predictions),
@@ -166,7 +167,7 @@ SAM manages **stateless, ephemeral compute** (API-triggered Lambdas) plus API Ga
 | Resource | Responsibility |
 |----------|----------------|
 | `template.yaml` | All API handlers (Node.js 22 ESM), inference Lambda (Python 3.12, bundled model, invoked asynchronously by the Forms handler), REST API Gateway |
-`sam-app/src/handlers/` | Business logic
+`sam-app/src/api/handlers/` | Business logic
 
 The API is exercised via the deployed stack (`make e2e-test` in `sam-app/`); no local Lambda/DynamoDB emulation is wired up.
 
@@ -238,7 +239,7 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 
 - **RBAC:** roles `guardian | educator | student | admin` enforced by `requireRole` middleware on top of Bearer-token sessions (0shared auth flow).
 - **Scope enforcement:** guardians query children via their `USER#` partition (guardianship edges); educators via `FOLLOW#` edges; students access only their own child profile through a dedicated student link. No cross-tenant enumeration.
-- **Binary student self-service:** there are no autonomy levels — access is binary. A user either has an account or does not; a form is filled either by its intended audience or by the responsible adult acting for them. A student account holder gets the full self-view of own data (submissions, predictions with scores, observations, reports) and can only edit their own name. Enforcement lives in `src/lib/scope.mjs`.
+- **Binary student self-service:** there are no autonomy levels — access is binary. A user either has an account or does not; a form is filled either by its intended audience or by the responsible adult acting for them. A student account holder gets the full self-view of own data (submissions, predictions with scores, observations, reports) and can only edit their own name. Enforcement lives in `src/api/lib/scope.mjs`.
 - **Explicit consent:** consent (versioned, with **legal basis** `guardian | institution_authorization | self_consent` and `grantedByRole`) is required before a child's data is processed. Creating a student account is initiated by the guardian **or an educator following the child** (institution-led onboarding for students without a guardian) and gated by consent. Consent revocation blocks new processing.
 - **Audit log:** every access/action on a student's data writes a `AUDIT#` item (who, what, when).
 - **Data minimization & retention:** students' records are kept minimal; retention/erasure policy is documented in `lgpd.md`.
@@ -305,7 +306,7 @@ Cleanup happens in reverse order.
 
 ## Extending This Architecture
 
-- **New API handler:** add `sam-app/src/handlers/<name>.mjs`, wire in `template.yaml` under `/api/*`.
+- **New API handler:** add `sam-app/src/api/handlers/<name>.mjs`, wire in `template.yaml` under `/api/*` (`CodeUri: src/api/`).
 - **New async processing:** add a Terraform-managed Lambda + SQS/EventBridge wiring in `terraform/aws-app`.
 - **New model:** extend the offline `ml/` pipeline (see [ML Pipeline](./ml-pipeline.md)) and bundle it into the inference handler.
 - **New DynamoDB access pattern:** document it in `dynamodb-schema.md` first, then add the GSI/attribute — schema changes are treated as design changes, not hacks.

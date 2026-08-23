@@ -36,7 +36,7 @@
                                            scopeCheck(studentId, role)  → edges
 ```
 
-## Middleware (`sam-app/src/handlers/middleware/`)
+## Middleware (`sam-app/src/api/lib/`)
 
 | Middleware | Responsibility |
 |------------|----------------|
@@ -64,7 +64,7 @@ Scope checks are **edge lookups, not role checks** — a guardian cannot enumera
 
 ## Student Self-View
 
-Access is **binary** — there are no autonomy levels. A user either has an account or does not; a form is filled either by its intended audience or by the responsible adult acting for them. A student account holder gets the **full self-view** of their own data: profile, submissions, predictions (label + scores + confidence), observations (read-only), recommendations (published) and reports (generate/list/download). Enforcement lives in `src/lib/scope.mjs`; students can only edit their own name and never access the audit trail, other students' data, or raw model internals.
+Access is **binary** — there are no autonomy levels. A user either has an account or does not; a form is filled either by its intended audience or by the responsible adult acting for them. A student account holder gets the **full self-view** of their own data: profile, submissions, predictions (label + scores + confidence), observations (read-only), recommendations (published) and reports (generate/list/download). Enforcement lives in `src/api/lib/scope.mjs`; students can only edit their own name and never access the audit trail, other students' data, or raw model internals.
 
 ## Student (Minor) Accounts
 
