@@ -29,8 +29,11 @@ install:
 validate:
 	sam validate --lint
 
+# --cached skips the heavy pip install (numpy/scikit-learn) unless
+# src/inference/requirements.txt actually changes. Model training NEVER runs
+# here: the artifact is a static file under src/inference/model/.
 build:
-	sam build
+	sam build --cached
 
 deploy: build
 	@out=$$(sam deploy --resolve-s3 --no-confirm-changeset --no-fail-on-empty-changeset \
@@ -47,19 +50,26 @@ deploy: build
 	else echo "$$out"; exit 1; fi
 	@$(MAKE) redeploy-api
 
+# Fast dev loop: syncs changed handler code straight to the real Lambdas in
+# seconds (no CloudFormation wait). Template.yaml changes take the slow CFN
+# path automatically. Run a final `make deploy` before considering work done.
+sync:
+	sam sync --stack-name $(STACK_NAME) --watch
+
 # Workaround for the SAM "empty deployment" race: force a fresh deployment so
 # the Prod stage actually exposes the routes (avoids "Missing Authentication
-# Token" after no-op deploys).
+# Token" after no-op deploys). NOTE: our template declares an EXPLICIT Api
+# resource (logical id "Api", stage "prod"), not SAM's implicit one.
 redeploy-api:
 	@REST_API_ID=$$(aws cloudformation describe-stack-resource \
 		--stack-name $(STACK_NAME) \
-		--logical-resource-id ServerlessRestApi \
+		--logical-resource-id Api \
 		--query "StackResourceDetail.PhysicalResourceId" \
 		--output text --region $(REGION)); \
 	echo "Forcing fresh API Gateway deployment for $$REST_API_ID"; \
 	aws apigateway create-deployment \
 		--rest-api-id $$REST_API_ID \
-		--stage-name Prod \
+		--stage-name prod \
 		--region $(REGION) >/dev/null
 
 unit-test:

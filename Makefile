@@ -45,6 +45,10 @@ infra:
 backend:
 	cd sam-app && $(MAKE) deploy
 
+# Dev loop: watch mode syncing handler code to live Lambdas in seconds.
+sync:
+	cd sam-app && $(MAKE) sync
+
 # 4. Frontend (placeholder until terraform/aws-frontend + SPA land)
 frontend:
 	@echo "--> frontend/ not started yet — skipping (see docs/progress.md)"
