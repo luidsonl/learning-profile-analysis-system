@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Greenfield project: **Sistema de Análise de Perfil de Aprendizado**. Personalizes teaching for gifted children and children with specific needs (educators, parents/guardians, children are the personas). No source code exists yet — everything below is the agreed architecture, not yet implemented.
+Project: **Sistema de Análise de Perfil de Aprendizado**. Personalizes teaching for gifted children and children with specific needs (educators, parents/guardians, children are the personas). Backend vertical slice (Terraform infra, SAM API, forms engine, tests, docs) is implemented; **frontend SPA, ML pipeline (`ml/`), and `terraform/aws-frontend` are not started** — current status and next steps: see `docs/progress.md`.
 
 ## Architecture (agreed — mirror https://github.com/luidsonl/0shared)
 
