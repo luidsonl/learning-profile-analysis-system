@@ -219,20 +219,29 @@ try {
     });
     expect("guardian anamnesis accepted", byGuardian.status === 201, JSON.stringify(byGuardian.data));
 
-    const forbidden = await api("POST", `/children/${childId}/forms/vark-kids/responses`, { token: guardianToken, body: { answers } });
-    expect("guardian cannot submit student form", forbidden.status === 403, JSON.stringify(forbidden.data));
+    const assisted = await api("POST", `/children/${childId}/forms/vark-kids/responses`, {
+      token: guardianToken,
+      body: { answers, requestId: "test-run-guardian" },
+    });
+    expect("guardian-assisted vark submission accepted", assisted.status === 201 && !!assisted.data.submissionId, JSON.stringify(assisted.data));
+
+    const assistedDup = await api("POST", `/children/${childId}/forms/vark-kids/responses`, {
+      token: guardianToken,
+      body: { answers, requestId: "test-run-guardian" },
+    });
+    expect("guardian-assisted duplicate idempotent", assistedDup.status === 200 && assistedDup.data.submittedBy === "already_exists", JSON.stringify(assistedDup.data));
   }
 
   step("submissions: fetch stored tests (no classification side-effect)");
   {
     const before = await api("GET", `/children/${childId}/submissions`, { token: guardianToken });
-    expect("submissions listed without assessment yet", before.status === 200 && before.data.count === 2, JSON.stringify(before.data));
+    expect("submissions listed without assessment yet", before.status === 200 && before.data.count === 3, JSON.stringify(before.data));
 
     const noAssessYet = await api("GET", `/children/${childId}/assessments`, { token: guardianToken });
     expect("no assessment persisted yet (decoupled)", noAssessYet.status === 200 && noAssessYet.data.count === 0, JSON.stringify(noAssessYet.data));
 
     const perForm = await api("GET", `/children/${childId}/forms/vark-kids/responses`, { token: guardianToken });
-    expect("per-form responses listed", perForm.status === 200 && perForm.data.count === 1, JSON.stringify(perForm.data));
+    expect("per-form responses listed", perForm.status === 200 && perForm.data.count === 2, JSON.stringify(perForm.data));
   }
 
   step("assessment: classify stored submissions");

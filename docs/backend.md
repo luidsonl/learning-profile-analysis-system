@@ -63,7 +63,7 @@
 | `GET /api/forms/:formId` | any | Active form definition | `FORM#<id>/CURRENT` → `VERSION#<v>` |
 | `GET /api/forms/:formId/versions/:version` | admin, scoped | Historical definition | `FORM#<id>/VERSION#<v>` |
 | `POST /api/forms` | admin | Publish a new form version (never destructive) | `VERSION#` + `CURRENT` (txn) |
-| `POST /api/children/:id/forms/:formId/responses` | persona allowed for the form | Submit responses (idempotent via `requestId`) | `SUBMISSION#` only — classification is a separate step |
+| `POST /api/children/:id/forms/:formId/responses` | persona of the form; **guardian may also submit student-audience forms** (child fills together with the guardian on the guardian's account) | Submit responses (idempotent via `requestId`) | `SUBMISSION#` only — classification is a separate step |
 | `GET /api/children/:id/forms/:formId/responses` | scoped | Submission history | Query `SUBMISSION#<formId>#` prefix |
 | `GET /api/children/:id/submissions` | scoped | Stored tests across all forms (newest first) | Query `SUBMISSION#` prefix on `CHILD#` |
 

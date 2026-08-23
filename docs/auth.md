@@ -58,7 +58,7 @@ Scope checks are **edge lookups, not role checks** — a guardian cannot enumera
 | Reports | own children (incl. generate) | followed | own if `autonomous` | all |
 | Consent | own children (grant/revoke) | followed (admin-like) | ✗ | all |
 | Autonomy level | own children (set) | followed (set) | ✗ | all |
-| Forms definition | list/fill by audience | list/fill by audience | list/fill by audience | define/edit |
+| Forms definition | list/fill by audience (+ student forms assisted) | list/fill by audience | list/fill by audience | define/edit |
 | Models registry | ✗ | ✗ | ✗ | ✓ |
 | Audit | own children (read) | ✗ | ✗ | all |
 

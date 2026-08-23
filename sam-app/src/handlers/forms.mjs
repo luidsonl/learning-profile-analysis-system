@@ -64,6 +64,7 @@ const publishForm = async (event, ctx) => {
 const audienceOkForRole = (ctx, formAudience) => {
   if (ctx.role === "admin") return true;
   if (ctx.role === "student") return formAudience === "student";
+  if (ctx.role === "guardian") return formAudience === "guardian" || formAudience === "student";
   return ctx.role === formAudience;
 };
 

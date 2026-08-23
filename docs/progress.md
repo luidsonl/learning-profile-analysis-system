@@ -57,7 +57,7 @@ Route groups:
 - **Auth**: register, login, logout, me — sessions in DynamoDB.
 - **Children & guardianship**: CRUD, guardians add/remove, educator follow/unfollow, student-account creation under guardian consent.
 - **Consent & autonomy**: versioned consent records; autonomy level get/patch (supervised/guided/autonomous).
-- **Forms engine**: form definitions + versions (`GET/POST /forms*`); submissions stored separately from classification.
+- **Forms engine**: form definitions + versions (`GET/POST /forms*`); submissions stored separately from classification; guardians may submit student-audience forms on their own account when filling together with the child (assisted administration — provenance kept via `submittedByRole`).
 - **Assessment & prediction**: classification of stored submissions (`/children/{id}/assessments`, `/children/{id}/predict`) — fully decoupled steps; inference reads the active model from the registry (`MODEL#name#version`).
 - **Recommendations**: propose/approve/delete lifecycle (educator workflow).
 - **Reports**: generate (async via SQS), list, download (presigned URL), delete.
