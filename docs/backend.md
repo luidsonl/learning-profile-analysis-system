@@ -81,10 +81,11 @@
 |---------------|-------|-------------|--------------|
 | `POST /api/children/:id/assessments` | student (own), guardian, educator | Classify the child's latest stored submission | `ASSESS#vark#<ts>` + child profile fields |
 | `GET /api/children/:id/assessments?profile=vark` | scoped | Assessment history | `ASSESS#<profile>#` prefix desc |
-| `POST /api/children/:id/predict` | scoped | Run inference on the stored submission (active model registry) | `PRED#<profile>#<ts>` (no `REC#`) |
 | `GET /api/children/:id/predictions?profile=vark` | scoped | Prediction history with confidence | `PRED#<profile>#` prefix desc |
 
-> Student view shows only their own latest profile/confidence — never raw model internals.
+**Automatic predictions**: storing a *new* form submission triggers the Python inference Lambda asynchronously (`InvocationType: "Event"` — no SQS); it scores the bundled model and writes the `PRED#` item itself. The API never waits on inference and there is no synchronous predict endpoint. If inference fails, no prediction is created; the submission stands.
+
+> Student view shows only their own latest profile/confidence — never raw model internals. Autonomy gating applies at read time: supervised students receive label-only prediction payloads.
 
 ### Recommendations
 | Method & Path | Roles | Description | Schema items |

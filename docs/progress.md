@@ -17,7 +17,7 @@ The backend vertical slice (auth → children/guardianship → forms/VARK assess
 | Graduated student autonomy | ✅ Done | supervised / guided / autonomous levels |
 | Test suites (`sam-app/tests/`) | ✅ Done | Unit + e2e against a deployed API, self-cleaning fixtures |
 | Frontend SPA (`frontend/`) | ❌ Not started | React + Vite, pt-BR |
-| ML pipeline (`ml/`) | ❌ Not started | Offline training on exported snapshots |
+| ML integration (`ml/` + `InferenceFunction`) | 📝 Spec finalized | Offline training; async invoke on submission; no SQS |
 
 ---
 
@@ -92,7 +92,7 @@ Enforced in handlers + scope lib; covered by unit tests (`tests/unit/autonomy.te
 ## Pending work
 
 1. **Frontend SPA** (`frontend/`) — React + Vite, pt-BR, accessible; consumes `/api/*` through the same CloudFront domain (see `docs/frontend.md`, `docs/design-system.md`). Largest remaining piece of the MVP.
-2. **ML pipeline** (`ml/`) — dataset preparation (Armand & Eboue 2021 + own collected data), offline scikit-learn training, artifact registry upload to S3 (`MODEL#name#version`), evaluation; per `docs/ml-pipeline.md`. Backend inference handler already exists — it needs a packaged model artifact to serve.
+2. **ML integration** — spec finalized in `docs/ml-pipeline.md`: new `ml/` module trains offline on `datasets/vark/data.csv` (committed, 1210 records); trained artifact is bundled into a Python `InferenceFunction` in SAM; form submissions trigger it via asynchronous invoke (**no SQS**); the inference function writes the `PRED#` item itself; `POST /children/:id/predict` is removed (predictions become automatic; `GET /predictions` remains with autonomy gating). Dataset label `V` maps to system profile `R`.
 3. **`terraform/aws-frontend`** — S3 + CloudFront stack for the SPA, wiring the `/api/*` origin to the existing API Gateway stage.
 
 ---
@@ -105,17 +105,17 @@ Enforced in handlers + scope lib; covered by unit tests (`tests/unit/autonomy.te
 | Children + guardianship + educator follow | ✅ |
 | LGPD consent (versioned) | ✅ |
 | VARK assessment via forms engine | ✅ |
-| Decoupled assessment → prediction | ✅ (backend ready; awaits first trained model artifact) |
+| Decoupled assessment → prediction | ✅ (heuristic path; ML prediction pending) |
 | Recommendations lifecycle | ✅ |
-| Async reports (SQS + presigned download) | ✅ |
+| Async reports (SQS + presigned download) | ⚠️ API ready; report-generator Lambda is still a stub (out of current scope) |
 | Audit trail | ✅ |
 | Frontend UI for all personas | ❌ |
-| First trained model deployed to PredictFunction | ❌ |
+| Automatic predictions from trained model (`InferenceFunction`) | ❌ (spec finalized; implementation next) |
 
 ---
 
 ## Suggested next steps (in order)
 
-1. Scaffold `frontend/` (Vite + React, pt-BR) and implement persona flows against the live API.
-2. Add `terraform/aws-frontend` (CloudFront + S3 + `/api/*` origin integration).
-3. Build `ml/` offline pipeline; train v0 on the public dataset; package artifact into `PredictFunction`.
+1. Implement `ml/` offline pipeline and train v0 on the committed dataset; package artifact into the new Python `InferenceFunction`; wire async invoke on submission; remove `POST /children/:id/predict` (see `docs/ml-pipeline.md`).
+2. Scaffold `frontend/` (Vite + React, pt-BR) and implement persona flows against the live API.
+3. Add `terraform/aws-frontend` (CloudFront + S3 + `/api/*` origin integration).

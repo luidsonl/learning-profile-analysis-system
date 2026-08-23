@@ -133,8 +133,10 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 | PK | SK | Attributes |
 |----|----|-----------|
-| `PRED#<childId>` | `PRED#<predictionId>` | `childId`, `model`, `modelVersion`, `method` (`ml|heuristic`), `label`, `scores`, `confidence`, `form`, `submission` (source `SUBMISSION#` SK), `createdBy`, `createdAt` |
+| `PRED#<childId>` | `PRED#<predictionId>` | **Machine-generated** (written by the inference Lambda, never by API handlers): `childId`, `model`, `modelVersion`, `method` (`ml`), `label`, `scores`, `confidence`, `form`, `createdBy` (`system:inference`), `createdAt` |
 | — | — | GSI1PK `PRED#<model>`, GSI1SK `PRED#<model>#<timestamp>` |
+
+> Predictions are produced automatically after form submissions via asynchronous invoke (no SQS). Submissions (`SUBMISSION#`) and assessments (`ASSESS#`) are human-flow data; `PRED#` is generated data in its own partition.
 
 > Prediction runs inference on the stored submission using the **active model registry** (`MODEL#<name>/CURRENT`). It never creates recommendations — `REC#` is educator-driven only.
 

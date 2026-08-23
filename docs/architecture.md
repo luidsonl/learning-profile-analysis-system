@@ -6,7 +6,7 @@ The Learning Profile Analysis System is a serverless platform that personalizes 
 
 Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (the child, with a restricted self-view), and **admin**. Access control is role- and scope-based: guardians see only their own children; educators see only children they follow; students see only their own profile, recommendations, and approved reports; administrators manage users, the institution's data, and the model registry.
 
-The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for a React+Vite SPA, and **DynamoDB single-table** design. It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), artifacts are versioned in S3, and inference is served from a Lambda with a small packaged model. The system itself never trains models.
+The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for a React+Vite SPA, and **DynamoDB single-table** design. It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
 
 The backend API is served under the `/api` path prefix so a single CloudFront distribution serves both the static frontend (`/*`) and the API (`/api/*`) from one domain, without CORS.
 
@@ -71,11 +71,15 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
                                                       │ (classify.mjs — form processor score)
                                                       ▼
                                                 DynamoDB (ASSESS# item + child profile fields)
-  User ──► POST /api/children/:id/predict ──► Inference Lambda ──► Model artifact (S3 layer)
-                                                      │  (classifies the stored submission;
-                                                      │   active MODEL# registry drives method/version)
+  User ──► POST /api/children/:id/forms/:formId/responses ──► Forms Lambda stores SUBMISSION#
+                                                      │ fire-and-forget async invoke ("Event")
                                                       ▼
-                                                DynamoDB (PRED# item, confidence + modelVersion)
+                                  Inference Lambda (Python, bundled model) ──► scores features
+                                                      ▼
+                                                DynamoDB (PRED# item, written by inference fn)
+
+  Predictions are machine-generated data, distinct from human input (submissions/assessments).
+  There is no synchronous predict endpoint; scoped readers poll GET /api/children/:id/predictions.
 
   Recommendations are a separate, educator-driven concern:
   User ──► POST /api/children/:id/recommendations ──► DynamoDB (REC# item, proposed)
@@ -94,14 +98,15 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
 **Feedback loop (offline ML retraining):**
 
 ```
-  VARK submissions + observations ──► nightly EventBridge ──► feature-export Lambda
+  (future phase) VARK submissions + observations ──► nightly EventBridge ──► feature-export Lambda
                                                                     │ (S3 snapshot + manifest)
-  ML pipeline (offline / CI): snapshot → train when ≥20 new labeled samples
-      → new artifact MODEL#<name>#<version> in S3 + DynamoDB registry
-      → redeploy inference Lambda with new packaged model → updated recommendations
+  v0: ml/ pipeline trains locally on datasets/vark/data.csv
+      → make package bundles model.joblib into sam-app/src/inference/model/
+      → register MODEL#<name>#<version> (scripts/register-model.mjs)
+      → sam build && sam deploy → predictions now carry the new version
 ```
 
-Training always happens **outside** the deployed system (local machine or CI). The AWS side only exports data snapshots and stores artifacts; it never runs a training job.
+Training always happens **outside** the deployed system (local machine). The deployed stack only stores submissions and serves auto-generated predictions from the bundled artifact; it never runs a training job, and **no SQS/queue participates in the ML path** — the submission→prediction trigger is a direct asynchronous Lambda invoke.
 
 ---
 
@@ -161,7 +166,7 @@ SAM manages **stateless, ephemeral compute** (API-triggered Lambdas) plus API Ga
 
 | Resource | Responsibility |
 |----------|----------------|
-| `template.yaml` | All API handlers (Node.js 22 ESM), inference Lambda (Python 3.x, packaged model), REST API Gateway |
+| `template.yaml` | All API handlers (Node.js 22 ESM), inference Lambda (Python 3.12, bundled model, invoked asynchronously by the Forms handler), REST API Gateway |
 | `src/handlers/` | Business logic |
 
 `sam local start-api` enables local testing of API-triggered Lambdas against local DynamoDB.
@@ -221,10 +226,10 @@ The core idea: **a profile is traced from a filled form.** Forms collect structu
 
 Machine learning is a *separate, offline* layer that classifies those profiles:
 
-- The running system **never trains**. It exports data snapshots and serves predictions from packaged artifacts (details in [ML Pipeline](./ml-pipeline.md)).
-- Training runs offline (local/CI) on the public dataset and exported snapshots; artifacts + `metadata.json` land on the `-data` bucket and a `MODEL#<name>#<version>` registry item in DynamoDB.
-- Inference runs in a Python Lambda with a small packaged model: `POST /api/children/:id/predict` returns a profile prediction with confidence and persists a `PRED#` item.
-- MVP models: `vark-predictor` (offline-trained multi-label classifier) plus heuristic `giftedness-indicator` and `difficulty-indicator` (rule-based and explainable until labeled data accumulates).
+- The running system **never trains**. It stores submissions and serves machine-generated predictions from the artifact bundled into the inference function (details in [ML Pipeline](./ml-pipeline.md)).
+- Training runs offline (local machine) on the committed public dataset (`datasets/vark/data.csv`); the packaged `model.joblib` + `meta.json` are **copied into** `sam-app/src/inference/model/` and deployed with SAM — no S3 fetch at runtime, and the `MODEL#<name>#<version>` registry item stays informational/auditable.
+- Inference runs asynchronously: storing a new submission fires a fire-and-forget invoke (`InvocationType: "Event"`, **no SQS**) at the Python inference Lambda, which scores and persists the `PRED#` item itself. There is no synchronous predict endpoint.
+- MVP model: `vark-predictor` (offline-trained Logistic Regression; dataset label `V` is mapped to `R` at the serving boundary). Heuristic `giftedness-indicator` and `difficulty-indicator` remain rule-based registry companions.
 
 The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1), the snapshot/export contract, training, registry, and retraining are documented in the standalone **[ML Pipeline](./ml-pipeline.md)** spec — kept separate so future trainings and ideas can evolve it without touching the system.
 

@@ -29,7 +29,7 @@
 
 ## 4. Datasets & ML artifacts
 
-- **Do not commit the raw training dataset** (Armand, Eboue 2021, DOI: 10.17632/bwrr6zypcj.1). It is CC BY 4.0 — redistribute only per its license and with attribution. `ml/data/raw/` and `ml/data/snapshots/` are git-ignored; a documented script downloads the file.
+- **The public training dataset is intentionally committed** (owner decision): `datasets/vark/data.csv` (Armand, Eboue 2021, CC BY 4.0) with attribution in `datasets/vark/citation.txt`. It contains no personal data — only questionnaire answers. Keep it inside `datasets/` and keep the attribution file next to it; do not commit any other dataset without the same vetting (license, no PII, attribution).
 - Do not commit trained model artifacts (`*.joblib`, `*.parquet`) — they can embed/overfit personal data from exported snapshots and bloat the repo.
 - The anonymized export contract (see [ML Pipeline](./ml-pipeline.md)) guarantees exported snapshots contain no direct identifiers; still, never commit a snapshot.
 
@@ -59,7 +59,7 @@
 - [ ] Confirm no `*.tfstate`, `.env`, `env.json`, `*.pem`, `*.key`, `*.joblib`, `*.parquet` tracked (`git ls-files | grep`).
 - [ ] Confirm no 12-digit AWS account ID and no real emails/names in tracked files.
 - [ ] Test data confirmed fabricated (grep for real-looking names in fixtures).
-- [ ] Dataset/models confirmed absent (download-only).
+- [ ] Model artifacts confirmed absent (`git ls-files | grep`); dataset allowed only at `datasets/` with attribution present.
 - [ ] Choose and add a **LICENSE** file (legal decision — pick explicitly; do not publish without one).
 - [ ] `SECURITY.md` present with a vulnerability-reporting contact/policy.
 - [ ] If any secret ever existed in history, rewrite history (filter-branch/BFG) and rotate the secret before publishing.

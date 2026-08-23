@@ -2,7 +2,16 @@
 
 ## Overview
 
-Machine learning is **fully decoupled** from the running system. The deployed AWS stack never trains a model; it only *exports data snapshots* and *serves predictions* from packaged artifacts. All training happens **offline** (a local machine or CI) in the Python pipeline under `ml/`.
+Machine learning is **fully decoupled** from the running system. The deployed AWS stack **never trains** a model; all training happens **offline** (a local machine) in the Python pipeline under `ml/`. The trained artifact is **bundled directly into** a Python-runtime inference Lambda deployed together with the SAM app — there is no runtime download, no queue, and no event-driven magic in the ML path.
+
+### Operating principles (contract)
+
+1. **Training is 100% offline** — `ml/` runs locally (`make train`). No AWS resource ever trains or scores during training.
+2. **The inference Lambda only classifies and persists.** It loads a joblib model bundled in its deployment package, scores features, and writes the resulting `PRED#` item to DynamoDB. Nothing else.
+3. **Trigger = asynchronous invoke on form submission.** After the Forms Lambda stores a *new* submission, it fires `lambda.invoke(InvocationType: "Event")` at the inference function — fire-and-forget. **No SQS**, no streams, no EventBridge in the ML path. The user never waits for inference.
+4. **Form data and inference data are distinct entities**: submissions (`SUBMISSION#`) are human input; predictions (`PRED#`) are machine-generated output written solely by the inference function (`createdBy: system:inference`). Assessments (`ASSESS#`, rule-based classification from the forms engine) are also human-flow data and are separate from predictions.
+5. **Failure is silent and safe**: if the inference function fails or is unreachable, the submission stands and no prediction is created. Predictions are eventually available via `GET /api/children/:id/predictions`.
+6. **Extensible by addition**: a future form/model pairs a curated form definition with a new offline pipeline and (if needed) another inference function — no changes to the running API.
 
 This separation is intentional and is the contract that makes future models possible:
 
@@ -15,26 +24,35 @@ This separation is intentional and is the contract that makes future models poss
 ## Data flow
 
 ```
-  System (DynamoDB) ──► feature-export Lambda (nightly, EventBridge) ──► S3 (-data bucket)
-                                                                        snapshots: Parquet + manifest
-                                                                              │
-                          ┌───────────────────────────────────────────────────┤
-                          ▼ (offline — local machine or CI, never in AWS)
-                 ┌──────────────────┐
-                 │  ml/ pipeline    │  1. read public dataset + exported snapshots
-                 │  (Python/sklearn)│  2. feature engineering
-                 │                  │  3. train + k-fold CV + metrics
-                 │                  │  4. write model.joblib + metadata.json
-                 └────────┬─────────┘
-                          ▼
-                  S3 (-data bucket): s3://…/models/<name>/<version>/
-                          │
-                          ▼
-                  Registry (DynamoDB): MODEL#<name>#<version>  (metrics, schema, artifact key)
-                          │
-                          ▼ (deploy step)
-                  Inference Lambda (Python, packaged model)  ← POST /api/children/:id/predict
+  datasets/vark/data.csv (committed, public CC BY 4.0)
+          │
+          ▼  (offline — local machine, never in AWS)
+  ┌─────────────────────┐
+  │  ml/ pipeline       │  1. prepare (positional load, X = 15 Likert items, y = Learner)
+  │  (Python/sklearn)   │  2. train (LogisticRegression, stratified CV)
+  │                     │  3. evaluate (accuracy, macro-F1, per-class report)
+  │                     │  4. package → model.joblib + meta.json copied INTO the Lambda source
+  └─────────┬───────────┘
+            ▼
+  sam-app/src/inference/ (model bundled in deployment package)
+            │
+            ▼  sam build && sam deploy
+
+  ──────────────── runtime ────────────────
+
+  Persona ──► POST /api/children/:id/forms/:formId/responses ──► Forms Lambda
+                                                                    │ stores SUBMISSION#
+                                                                    │ fire-and-forget:
+                                                                    ▼
+                                                    lambda.invoke(Event) ──► Inference Lambda (Python)
+                                                                                │ scores features,
+                                                                                ▼
+                                                                        DynamoDB (PRED# item)
+
+  Scoped reads ──► GET /api/children/:id/predictions ──► PRED# history (autonomy-gated payload)
 ```
+
+> The nightly `feature-export` snapshot pipeline described below is a **planned future phase** (the Lambda exists as a stub). The v0 integration above does not depend on it.
 
 ---
 
@@ -43,23 +61,25 @@ This separation is intentional and is the contract that makes future models poss
 ### Public dataset (primary training source)
 
 - **Armand, Eboue (2021), "Student Learning Preferences", Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1** (License CC BY 4.0)
-- Observed schema (V1): 18 columns — `Gender` (Male/Female), `Age` (integer), **15 VARK Likert items rated 1–5**, and a single-modality `Learner` label (e.g., `A`, `K`). The 15 items form three 5-item subscales by wording: **reading/writing** (e.g., "I learn better by reading than by listening to someone"), **aural** (e.g., "I remember things I have heard in class better than things I have read"), and **kinesthetic** (e.g., "I enjoy learning in class by doing experiments"). There is no explicit multimodal label column in the sample; multimodal behavior must be derived from subscale scores.
-- The raw file is downloaded into `ml/data/` by a documented script (`ml/data/README.md` explains provenance and download); large/binary artifacts are kept out of git.
-- **Domain-gap caveat:** the subjects are university students, not children. The MVP therefore uses an adapted **kids** VARK form in the system and complements training with exported system submissions (see below).
+- **Committed in this repository at `datasets/vark/data.csv` by owner decision** (public dataset, CC BY 4.0 permits redistribution with attribution — provenance kept in `datasets/vark/citation.txt`). Model artifacts (`*.joblib`, `*.parquet`) remain git-ignored.
+- Observed schema: 18 columns — `Gender` (`Male/Female`), `Age` (10–18+; **school-age students**, not university as previously assumed), **15 VARK Likert items rated 1–5** in three 5-item subscales (**reading/writing**, **aural**, **kinesthetic**), and a single-modality `Learner` label.
+- **Label distribution is imbalanced**: `K` 679 (~56%), `A` 286, `V` 245 of 1210 records. Metrics must therefore report macro-F1 and per-class results alongside accuracy.
+- **Label space caveat**: the dataset has **no `R` class** despite containing reading/writing items — reading-dominant subjects are labeled `V`. At the serving boundary the model's `V` output is **mapped to `R`** so predictions match the system's profile vocabulary (`R/A/K`).
+- **Parsing quirk**: two columns share the same header text ("role-playing"). The loader must reference columns **by position**, never by name.
 
-### System-exported snapshots
+### System-exported snapshots (planned future phase)
 
-- Every night an EventBridge schedule triggers the `feature-export` Lambda, which exports labeled VARK submissions (assessments) and observation aggregates into versioned snapshots on the `-data` bucket.
-- Snapshot layout and manifest format are the **decoupling contract**: any future model consumes the same snapshots without system changes.
+- The `feature-export` Lambda (nightly EventBridge schedule) will export labeled submissions and observation aggregates into versioned snapshots on the `-data` bucket. It is currently a stub and **not part of the v0 integration** — v0 trains exclusively on the committed public dataset.
+- Snapshot layout and manifest format are the **decoupling contract** for later models: any future model consumes the same snapshots without system changes.
 
 ---
 
 ## Feature engineering
 
-`ml/features/` transforms raw submissions into feature vectors. The feature schema is recorded in each model's `metadata.json` and in the registry item.
+`ml/features/` transforms the raw dataset into feature vectors. The feature schema is recorded in each model's `meta.json` and in the registry item.
 
-- VARK (primary dataset): the 15 Likert items are ordinal features; per-subscale scores (sum/mean of each 5-item group) are derived, plus `Gender` and `Age` as demographic features. Label = `Learner` (single modality).
-- Kids form in the system: same per-modality scoring applied to the adapted kids' items, so model and form remain aligned.
+- **v0 uses only the 15 Likert items** (ordinal 1–5) — no `Gender`/`Age`. Rationale: the kids form does not collect demographics at submission time, so training and serving must share the exact same feature space; dropping demographics also avoids amplifying domain gap.
+- The dataset's item order is mapped **positionally** to the `vark-kids` question ids (`q01…q15`) in a table stored in `meta.json`, so serving can build vectors from submission answers without name-based guessing.
 - Snapshot features are kept generic so future profiles (giftedness, difficulty, socioemotional) can reuse the export without new system work.
 
 ---
@@ -68,10 +88,11 @@ This separation is intentional and is the contract that makes future models poss
 
 `ml/train/` implements the pipeline:
 
-- Frameworks: scikit-learn (multi-label classifiers — Binary Relevance / MLkNN, plus a baseline Random Forest).
-- Validation: k-fold cross-validation with stratified folds per label.
-- Metrics: accuracy, macro/weighted F1, **Hamming loss**, per-label precision/recall; a written evaluation report is stored alongside the artifact.
-- Output: `model.joblib` + `metadata.json` (model name, version, feature schema, metrics, trained_at, dataset hash) uploaded to `s3://learning-profile-data/models/<name>/<version>/`.
+- Frameworks: scikit-learn. v0 baseline = **Logistic Regression** (multinomial, `class_weight="balanced"` to counter the K-heavy imbalance, standardized features).
+- Validation: stratified k-fold cross-validation.
+- Metrics: accuracy, **macro-F1**, per-class precision/recall/F1 and confusion matrix; a written evaluation report (`metrics.json`) is stored next to the artifact and registered with the model.
+- Output: `model.joblib` + `meta.json` (model name, version, feature order + question-id mapping, label map `{V→R}`, metrics, trained_at, sklearn/joblib versions, dataset sha256). `make package` copies both into `sam-app/src/inference/model/`.
+- Multi-label approaches (Binary Relevance / MLkNN) remain a documented future upgrade, not v0.
 
 ---
 
@@ -83,35 +104,37 @@ A `MODEL#<name>#<version>` item in DynamoDB records:
 |-----------|-------------|
 | `name` | Model identifier (e.g. `vark-predictor`) |
 | `version` | Semantic version |
-| `status` | `latest` | `superseded` |
+| `status` | `active` \| `retired` |
 | `metrics` | Offline evaluation results |
 | `feature_schema` | Input feature names/encoding |
-| `artifact_key` | S3 key of the packaged artifact |
 | `trained_at` | Training timestamp |
-| `dataset_ref` | Snapshot manifest or public dataset reference |
+| `dataset_ref` | Dataset reference + hash |
 
-The inference Lambda is deployed with the artifact of the `latest` version.
+The registry is **informational and auditable** (admin visibility via `/api/models`). At runtime the inference function uses the artifact bundled in its own package; each `PRED#` item records `model` + `modelVersion` from `meta.json`, so every prediction is traceable to exactly what produced it regardless of registry state. Registration after training happens via `sam-app/scripts/register-model.mjs`; activation/retirement via the existing admin endpoints.
 
 ---
 
 ## Inference
 
-- A Python-runtime Lambda bundles the packaged model (small enough for a 1 GB deployment package with dependencies).
-- `POST /api/children/:id/predict` loads the child's latest applicable form responses, runs the model, and returns the profile prediction with confidence, persisting a `PRED#` item (see [DynamoDB Schema](./dynamodb-schema.md)).
-- Heuristic indicators (e.g., giftedness/difficulty in the MVP) are rule-based companions to ML predictions, not trained models.
+- The inference function (`InferenceFunction` in `sam-app/template.yaml`) is a **Python 3.12 Lambda** deployed with the SAM app; its deployment package bundles `model.joblib` + `meta.json`. It is **never invoked synchronously by the API**.
+- **Trigger**: after the Forms Lambda stores a *new* (non-idempotent-duplicate) submission, it fires an asynchronous invoke — `InvocationType: "Event"`, best-effort; an invoke failure never fails the submission.
+- **Contract** (payload from Forms Lambda): `{ childId, formId, formVersion, answers }`.
+- **Behavior**: builds the feature vector per `meta.json`'s positional mapping, scores with the bundled model, maps `V→R`, computes confidence = max class probability, and writes the `PRED#` item itself (`createdBy: "system:inference"`, `method: "ml"`). On any error it logs and exits — **no prediction is created and the submission stands**.
+- **Read path**: `GET /api/children/:id/predictions` (existing handler) serves history with autonomy gating at read time — supervised students see label-only payloads; guided/autonomous see scores + confidence.
+- Heuristic indicators (`giftedness-indicator`, `difficulty-indicator`) remain rule-based registry companions, not trained models. The former heuristic predict path is retired together with `POST /api/children/:id/predict`.
 
 ---
 
 ## Retraining loop
 
 ```
-  1. Nightly export writes a new snapshot manifest.
-  2. Offline (engineer or CI): if the manifest shows ≥20 new labeled samples, run ml/ pipeline.
-  3. Register the new MODEL#<name>#<version>, mark previous as superseded.
-  4. Redeploy the inference Lambda with the new artifact.
+  1. Offline (engineer): run ml/ pipeline locally → make train (prepare → train → evaluate)
+  2. make package → new model.joblib + meta.json copied into sam-app/src/inference/model/
+  3. sam-app/scripts/register-model.mjs → registers MODEL#<name>#<version> with metrics
+  4. sam build && sam deploy → inference function now produces predictions with the new version
 ```
 
-Retraining is **never scheduled inside AWS** — it is a deliberate human/CI step.
+Retraining is **never scheduled inside AWS** — it is a deliberate human step on a local machine. There are no queues, schedulers, or event-driven triggers anywhere in this loop beyond the submission-triggered inference itself.
 
 ---
 
@@ -120,11 +143,11 @@ Retraining is **never scheduled inside AWS** — it is a deliberate human/CI ste
 The pipeline is designed so new classifications are additive:
 
 1. **New form → new profile:** add a curated form (see Architecture — Forms Engine); submissions are stored by the generic engine.
-2. **New model:** add a model under `ml/` (features + train + evaluate), train offline on the exported snapshots, register it in the registry.
-3. **Deploy:** package and redeploy the inference Lambda with the new artifact; expose prediction through the existing predict endpoint or a new one.
-4. No changes to the running system's data model are required — the snapshot contract already carries the data.
+2. **New model:** add a model under `ml/` (features + train + evaluate), train offline (on exported snapshots once the export phase exists), register it in the registry.
+3. **Deploy:** package and redeploy the inference Lambda with the new artifact — predictions for that form's submissions start flowing automatically through the same async invoke; no new endpoint is required.
+4. No changes to the running system's data model are required — the submission contract already carries the data.
 
-Examples of future models: giftedness indicator, learning-difficulty indicator, socioemotional profile — all driven by the same form→snapshot→train→serve loop.
+Examples of future models: giftedness indicator, learning-difficulty indicator, socioemotional profile — all driven by the same form→train→bundle→serve loop.
 
 ---
 
