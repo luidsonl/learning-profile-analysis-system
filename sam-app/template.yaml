@@ -102,7 +102,7 @@ Resources:
   HealthFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/health.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -116,7 +116,7 @@ Resources:
   AuthFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/auth.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -148,7 +148,7 @@ Resources:
   StudentsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/students.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -180,7 +180,7 @@ Resources:
   GuardianshipFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/guardianship.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -230,7 +230,7 @@ Resources:
   ConsentFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/consent.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -250,7 +250,7 @@ Resources:
   FormsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/forms.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       # Function-level Environment REPLACES Globals (no merge) — repeat all
@@ -317,7 +317,7 @@ Resources:
   ObservationsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/observations.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -343,7 +343,7 @@ Resources:
   RecommendationsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/recommendations.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -375,7 +375,7 @@ Resources:
   ReportsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/reports.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:
@@ -407,7 +407,7 @@ Resources:
   AuditFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
+      CodeUri: src/api/
       Handler: handlers/audit.lambdaHandler
       Role: !GetAtt ApiRole.Arn
       Events:

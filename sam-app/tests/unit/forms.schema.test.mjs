@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateFormDefinition } from "../../src/forms/schema.mjs";
+import { validateFormDefinition } from "../../src/api/forms/schema.mjs";
 
 const valid = {
   formId: "minha-form",

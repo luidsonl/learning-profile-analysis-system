@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getDefinitions, getFormDefinition, getFormProcessor, getAssessmentProcessor } from "../../src/forms/engine.mjs";
-import { validateFormDefinition } from "../../src/forms/schema.mjs";
+import { getDefinitions, getFormDefinition, getFormProcessor, getAssessmentProcessor } from "../../src/api/forms/engine.mjs";
+import { validateFormDefinition } from "../../src/api/forms/schema.mjs";
 
 test("todas as definicoes registradas sao validas", () => {
   const defs = getDefinitions();

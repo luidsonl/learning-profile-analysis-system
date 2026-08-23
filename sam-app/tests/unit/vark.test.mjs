@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scoreVark } from "../../src/forms/processors/vark.mjs";
+import { scoreVark } from "../../src/api/forms/processors/vark.mjs";
 
 const def = {
   sections: [
