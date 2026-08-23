@@ -5,7 +5,7 @@ import { ok, errorResponse, parseBody, param, HttpError, noContent } from "../li
 import { assert } from "../lib/validate.mjs";
 import { uid, nowIso } from "../lib/ids.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditStudent, assertScopeStudent, requireStudentAccess } from "../lib/scope.mjs";
+import { auditStudent, assertScopeStudent } from "../lib/scope.mjs";
 import { getStudent } from "./students.mjs";
 
 const s3 = new S3Client({ region: process.env.AWS_REGION || process.env.REGION || "us-east-1" });
@@ -14,9 +14,8 @@ const FILES_BUCKET = process.env.FILES_BUCKET || "learning-profile-files";
 const generateReport = async (event, ctx) => {
   const studentId = param(event, "id");
   await assertScopeStudent(studentId, ctx);
-  await requireStudentAccess(studentId, ctx, "reports_self");
-  const child = await getStudent(studentId);
-  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
+  const student = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Student not found");
 
   const body = parseBody(event);
   const kind = body.kind || "profile";
@@ -60,7 +59,6 @@ const generateReport = async (event, ctx) => {
 const listReports = async (event, ctx) => {
   const studentId = param(event, "id");
   await assertScopeStudent(studentId, ctx);
-  await requireStudentAccess(studentId, ctx, "reports_self");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
@@ -94,7 +92,6 @@ const downloadReport = async (event, ctx) => {
   const item = report.Items?.[0];
   if (!item) throw new HttpError(404, "report_not_found", "Report not found");
   await assertScopeStudent(item.studentId.S, ctx);
-  await requireStudentAccess(item.studentId.S, ctx, "reports_self");
   if (item.status.S !== "generated") throw new HttpError(409, "report_not_ready", "Report is not generated yet");
 
   const url = await getSignedUrl(

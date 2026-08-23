@@ -126,7 +126,6 @@ export async function cleanupStudent(studentId) {
   if (!studentId) return;
   await deletePartition(`STUDENT#${studentId}`);
   await deletePartition(`CONSENT#${studentId}`);
-  await deletePartition(`AUTONOMY#${studentId}`);
   await deletePartition(`PRED#${studentId}`);
   await deletePartition(`ASSESS#${studentId}`);
   await deletePartition(`REPORT#${studentId}`);

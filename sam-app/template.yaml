@@ -34,7 +34,6 @@ Globals:
         DATA_BUCKET: !Ref DataBucket
         REPORT_QUEUE_URL: !Ref ReportQueueUrl
         DYNAMODB_ENDPOINT: ""
-        INFERENCE_FUNCTION_NAME: !Ref InferenceFunction
         INFERENCE_FORMS: vark
     LoggingConfig:
       LogFormat: JSON
@@ -248,32 +247,23 @@ Resources:
             Path: /students/{id}/consent
             Method: POST
 
-  AutonomyFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/
-      Handler: handlers/autonomy.lambdaHandler
-      Role: !GetAtt ApiRole.Arn
-      Events:
-        GetAutonomy:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /students/{id}/autonomy
-            Method: GET
-        SetAutonomy:
-          Type: Api
-          Properties:
-            RestApiId: !Ref Api
-            Path: /students/{id}/autonomy
-            Method: PATCH
-
   FormsFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
       Handler: handlers/forms.lambdaHandler
       Role: !GetAtt ApiRole.Arn
+      # Function-level Environment REPLACES Globals (no merge) — repeat all
+      # shared vars here plus the inference trigger target.
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DynamoDBTableName
+          FILES_BUCKET: !Ref FilesBucket
+          DATA_BUCKET: !Ref DataBucket
+          REPORT_QUEUE_URL: !Ref ReportQueueUrl
+          DYNAMODB_ENDPOINT: ""
+          INFERENCE_FORMS: vark
+          INFERENCE_FUNCTION_NAME: !Ref InferenceFunction
       Events:
         ListForms:
           Type: Api

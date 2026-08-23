@@ -22,8 +22,8 @@ export default async (ctx) => {
     const o = await api("POST", `/students/${ctx.studentId}/observations`, { token: ctx.educatorToken, body: { category: "academic", text: "Demonstra grande curiosidade por ciências.", rating: 4 } });
     expect("observation added", o.status === 201, JSON.stringify(o.data));
 
-    const studentDenied = await api("GET", `/students/${ctx.studentId}/observations`, { token: ctx.studentToken });
-    expect("student cannot view observations", studentDenied.status === 403, JSON.stringify(studentDenied.data));
+    const studentView = await api("GET", `/students/${ctx.studentId}/observations`, { token: ctx.studentToken });
+    expect("student reads own observations", studentView.status === 200 && studentView.data.count === 1, JSON.stringify(studentView.data));
 
     const list = await api("GET", `/students/${ctx.studentId}/observations`, { token: ctx.educatorToken });
     expect("educator lists observations", list.status === 200 && list.data.count === 1, JSON.stringify(list.data));

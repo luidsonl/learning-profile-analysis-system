@@ -3,7 +3,7 @@ import { ok, errorResponse, parseBody, param, qparam, HttpError } from "../lib/h
 import { nowIso } from "../lib/ids.mjs";
 import { assert, requireKeys } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditStudent, assertScopeStudent, getOwnStudentId, requireStudentAccess, studentAccess } from "../lib/scope.mjs";
+import { auditStudent, assertScopeStudent, getOwnStudentId } from "../lib/scope.mjs";
 import { getDefinitions, getFormDefinition, getAssessmentProcessor } from "../forms/engine.mjs";
 import { classifyLatestSubmission } from "../forms/classify.mjs";
 import { AUDIENCES } from "../forms/schema.mjs";
@@ -54,8 +54,8 @@ const submitForm = async (event, ctx) => {
     await assertScopeStudent(studentId, ctx);
   }
 
-  const child = await getStudent(studentId);
-  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
+  const student = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Student not found");
   assert(student.consentStatus === "active", "consent_required", "Active consent is required to submit forms", 409);
 
   const body = parseBody(event);
@@ -115,7 +115,6 @@ const triggerInference = async (payload) => {
 const listSubmissions = async (event, ctx) => {
   const studentId = param(event, "id");
   await assertScopeStudent(studentId, ctx);
-  await requireStudentAccess(studentId, ctx, "submissions_list");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
@@ -173,7 +172,6 @@ const getResponses = async (event, ctx) => {
   const studentId = param(event, "id");
   const formId = param(event, "formId");
   await assertScopeStudent(studentId, ctx);
-  await requireStudentAccess(studentId, ctx, "submissions_list");
 
   const res = await client.send(
     new CMD.query({
@@ -182,8 +180,7 @@ const getResponses = async (event, ctx) => {
       ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
     }),
   );
-  const full = await studentAccess(studentId, ctx, "predict_full");
-  const predictions = await latestPredictionsBySubmission(studentId, full);
+  const predictions = await latestPredictionsBySubmission(studentId, true);
   const data = (res.Items || []).map((i) => ({
     submissionId: i.submissionId.S,
     formId: i.formId.S,
@@ -277,7 +274,6 @@ const listAssessments = async (event, ctx) => {
 const listPredictions = async (event, ctx) => {
   const studentId = param(event, "id");
   await assertScopeStudent(studentId, ctx);
-  const full = await studentAccess(studentId, ctx, "predict_full");
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
@@ -286,7 +282,7 @@ const listPredictions = async (event, ctx) => {
       ExpressionAttributeValues: { ":pk": { S: `PRED#${studentId}` }, ":sk": { S: "PRED#" } },
     }),
   );
-  const data = (res.Items || []).map((i) => shapePrediction(i, full));
+  const data = (res.Items || []).map((i) => shapePrediction(i, true));
   return ok({ data, count: data.length });
 };
 

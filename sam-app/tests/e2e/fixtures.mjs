@@ -8,6 +8,7 @@ export const TEST_FIXTURES = [
   { email: "prof.joao@example.com", name: "João Pereira", password: "senha12345", role: "educator" },
   { email: "ana.clara@example.com", name: "Ana Clara", password: "senha12345", role: "student" },
   { email: "pedro.aluno@example.com", name: "Pedro Silva", password: "senha12345", role: "student" },
+  { email: "pedro.alves@example.com", name: "Pedro Alves", password: "pedro12345", role: "student" },
 ];
 
 // Decisively reading/writing-dominant answers: R=5.0, A=1.0, K=2.0 (R-K=3 > 2,

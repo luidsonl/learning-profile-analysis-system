@@ -4,7 +4,7 @@ import { ok, errorResponse, parseBody, param, HttpError } from "../lib/http.mjs"
 import { uid, nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditStudent, assertScopeStudent, requireStudentAccess } from "../lib/scope.mjs";
+import { auditStudent, assertScopeStudent } from "../lib/scope.mjs";
 
 export const getStudent = async (studentId) => {
   const res = await client.send(
@@ -16,14 +16,14 @@ export const getStudent = async (studentId) => {
 const createChild = async (event, ctx) => {
   const body = parseBody(event);
   requireKeys(body, ["name", "birthDate"]);
-  assert(["guardian", "educator", "admin"].includes(ctx.role), "forbidden", "Role cannot register children", 403);
+  assert(["guardian", "educator", "admin"].includes(ctx.role), "forbidden", "Role cannot register students", 403);
 
   const studentId = uid();
   const at = nowIso();
   const item = {
     PK: { S: `STUDENT#${studentId}` },
     SK: { S: "META" },
-    type: { S: "child" },
+    type: { S: "student" },
     studentId: { S: studentId },
     name: { S: body.name },
     birthDate: { S: body.birthDate },
@@ -32,7 +32,6 @@ const createChild = async (event, ctx) => {
     school: body.school ? { S: body.school } : { NULL: true },
     specialNeeds: body.specialNeeds ? { SS: body.specialNeeds } : { NULL: true },
     status: { S: "active" },
-    autonomyLevel: { S: "supervised" },
     accountability: body.accountability ? { S: JSON.stringify(body.accountability) } : { NULL: true },
     createdBy: { S: ctx.userId },
     createdAt: { S: at },
@@ -107,8 +106,8 @@ const listChildren = async (event, ctx) => {
     );
     for (const edge of res.Items || []) {
       const studentId = edge.SK.S.replace("GUARD#", "");
-      const child = await getStudent(studentId);
-      if (child) items.push(child);
+      const student = await getStudent(studentId);
+      if (student) items.push(student);
     }
   } else if (ctx.role === "educator") {
     const res = await client.send(
@@ -116,8 +115,8 @@ const listChildren = async (event, ctx) => {
     );
     for (const edge of res.Items || []) {
       const studentId = edge.SK.S.replace("FOLLOW#", "");
-      const child = await getStudent(studentId);
-      if (child) items.push(child);
+      const student = await getStudent(studentId);
+      if (student) items.push(student);
     }
   } else if (ctx.role === "admin") {
     const res = await client.send(
@@ -128,7 +127,7 @@ const listChildren = async (event, ctx) => {
       items.push(plain);
     }
   } else {
-    throw new HttpError(403, "forbidden", "Students cannot list children");
+    throw new HttpError(403, "forbidden", "Students cannot list students");
   }
   return ok({ data: items, count: items.length });
 };
@@ -136,21 +135,20 @@ const listChildren = async (event, ctx) => {
 const getStudentHandler = async (event, ctx) => {
   const studentId = param(event, "id");
   await assertScopeStudent(studentId, ctx);
-  const child = await getStudent(studentId);
-  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
-  return ok({ child });
+  const student = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Student not found");
+  return ok({ student });
 };
 
 const updateChild = async (event, ctx) => {
   const studentId = param(event, "id");
   await assertScopeStudent(studentId, ctx);
-  const child = await getStudent(studentId);
-  if (!student) throw new HttpError(404, "student_not_found", "Child not found");
+  const student = await getStudent(studentId);
+  if (!student) throw new HttpError(404, "student_not_found", "Student not found");
 
   const body = parseBody(event);
   if (ctx.role === "student") {
-    await requireStudentAccess(studentId, ctx, "profile_edit");
-    assert(body.name !== undefined && body.name !== child.name, "validation_failed", "Autonomous students can only edit their own name");
+    assert(body.name !== undefined && body.name !== student.name, "validation_failed", "Students can only edit their own name");
   }
   const allowed = ctx.role === "student" ? ["name"] : ["name", "birthDate", "gender", "grade", "school", "specialNeeds"];
   const updateAttrs = allowed.filter((k) => body[k] !== undefined);

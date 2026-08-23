@@ -2,11 +2,11 @@ import { purgeOrphanSessions } from "./aws-cleanup.mjs";
 import { api, summary } from "./helpers.mjs";
 import { TEST_FIXTURES, purgeFixtures } from "./fixtures.mjs";
 import s01 from "./scenarios/01-health-auth.mjs";
-import s02 from "./scenarios/02-children-consent-student.mjs";
+import s02 from "./scenarios/02-students-consent.mjs";
 import s03 from "./scenarios/03-forms-submissions.mjs";
 import s04 from "./scenarios/04-ml-inference.mjs";
 import s05 from "./scenarios/05-guardianship-observations-recommendations.mjs";
-import s06 from "./scenarios/06-autonomy-guided-ml.mjs";
+import s06 from "./scenarios/06-student-self-view.mjs";
 import s07 from "./scenarios/07-reports-audit.mjs";
 
 const BASE = process.env.API_BASE;

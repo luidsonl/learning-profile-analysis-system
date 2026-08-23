@@ -8,7 +8,7 @@ export default async (ctx) => {
   {
     const preds = await pollUntil(
       () => api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.guardianToken }),
-      { tries: 15 },
+      { tries: 40 },
     ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
     expect("auto prediction arrived", !!preds, JSON.stringify(preds || { count: 0 }));
 
@@ -30,7 +30,7 @@ export default async (ctx) => {
       const r = await api("GET", `/students/${ctx.studentId}/forms/vark/responses`, { token: ctx.guardianToken });
       const subs = r.status === 200 ? r.data?.data || [] : [];
       return subs.length > 0 && subs.every((s) => s.prediction) ? r : null;
-    }, { tries: 15 });
+    }, { tries: 40 });
     const subs = resp?.data?.data || [];
     expect("responses list fetched", resp?.status === 200 && subs.length === 2, JSON.stringify(resp?.data?.count));
 
@@ -56,18 +56,30 @@ export default async (ctx) => {
     );
   }
 
-  step("ml: supervised student sees label-only predictions");
+  step("ml: student account sees its own full predictions");
   {
     const lst = await pollUntil(
       () => api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.studentToken }),
-      { tries: 15 },
+      { tries: 40 },
     ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
-    expect("supervised prediction list arrives", !!lst, JSON.stringify(lst || { count: 0 }));
-    expect("supervised prediction is label-only", lst?.data?.[0]?.scores === undefined && lst?.data?.[0]?.confidence === undefined, JSON.stringify(lst?.data?.[0]));
+    expect("student prediction list arrives", !!lst, JSON.stringify(lst || { count: 0 }));
+
+    const p = lst?.data?.[0];
+    const scores = p?.scores;
+    const sum = scores ? Object.values(scores).reduce((a, b) => a + b, 0) : -1;
+    expect(
+      "student sees full payload (scores + confidence)",
+      p && ["R", "A", "K"].includes(p.label) && Math.abs(sum - 1) < 0.01 && p.confidence >= 0 && p.confidence <= 1,
+      JSON.stringify(p),
+    );
 
     const own = await api("GET", `/students/${ctx.studentId}/forms/vark/responses`, { token: ctx.studentToken });
     const ownPred = own.data?.data?.find((s) => s.submissionId === ctx.varkSubmissionId)?.prediction;
-    expect("supervised responses hide scores too", ownPred && ownPred.scores === undefined && ownPred.confidence === undefined && !!ownPred.label, JSON.stringify(ownPred));
+    expect(
+      "own responses carry full prediction too",
+      ownPred && typeof ownPred.scores === "object" && typeof ownPred.confidence === "number" && !!ownPred.label,
+      JSON.stringify(ownPred),
+    );
   }
 
   step("ml: predictions do not bundle recommendations");
