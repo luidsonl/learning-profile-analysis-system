@@ -2,6 +2,7 @@ const likert = (id, group, text) => ({ id, type: "likert", group, text, options:
 
 export const behaviorChecklistDefinition = {
   formId: "behavior-checklist",
+  version: 1,
   name: "Checklist de comportamento",
   audience: "educator",
   description: "Checklist comportamental observado em sala de aula.",

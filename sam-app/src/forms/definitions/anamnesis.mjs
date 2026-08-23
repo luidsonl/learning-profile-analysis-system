@@ -1,5 +1,6 @@
 export const anamnesisDefinition = {
   formId: "anamnesis",
+  version: 1,
   name: "Anamnese",
   audience: "guardian",
   description: "Entrevista inicial de anamnese preenchida pelo responsável.",

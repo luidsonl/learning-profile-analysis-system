@@ -1,22 +1,20 @@
 import { CMD, client, TABLE } from "../lib/db.mjs";
 import { ok, errorResponse, parseBody, param, qparam, HttpError } from "../lib/http.mjs";
 import { nowIso } from "../lib/ids.mjs";
-import { requireKeys, assert } from "../lib/validate.mjs";
+import { assert, requireKeys } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
 import { auditChild, assertScopeChild, getStudentChildId, requireStudentAccess, studentAccess } from "../lib/scope.mjs";
-import { getActiveForm, getFormVersion, listFormsByAudience, listAllForms, publishFormDefinition } from "../forms/service.mjs";
-import { validateFormDefinition } from "../forms/engine.mjs";
+import { getDefinitions, getFormDefinition, getAssessmentProcessor } from "../forms/engine.mjs";
+import { classifyLatestSubmission } from "../forms/classify.mjs";
 import { AUDIENCES } from "../forms/schema.mjs";
 import { getChild } from "./children.mjs";
 
 const listForms = async (event, ctx) => {
   const audience = qparam(event, "audience");
-  let forms;
+  let forms = getDefinitions();
   if (audience) {
     assert(AUDIENCES.includes(audience), "invalid_audience", "audience must be guardian, educator or student");
-    forms = await listFormsByAudience(audience);
-  } else {
-    forms = await listAllForms();
+    forms = forms.filter((f) => f.audience === audience);
   }
   if (ctx.role === "student") {
     forms = forms.filter((f) => f.audience === "student");
@@ -26,39 +24,12 @@ const listForms = async (event, ctx) => {
 
 const getForm = async (event, ctx) => {
   const formId = param(event, "formId");
-  const form = await getActiveForm(formId);
+  const form = getFormDefinition(formId);
+  if (!form) throw new HttpError(404, "form_not_found", "Form not found");
   if (ctx.role === "student" && form.audience !== "student") {
     throw new HttpError(403, "forbidden", "Students can only access their own forms");
   }
   return ok({ form });
-};
-
-const getFormVersionHandler = async (event, ctx) => {
-  assert(ctx.role === "admin", "forbidden", "Only admins can view version history", 403);
-  const formId = param(event, "formId");
-  const version = Number(param(event, "version"));
-  const form = await getFormVersion(formId, version);
-  return ok({ form });
-};
-
-const publishForm = async (event, ctx) => {
-  assert(ctx.role === "admin", "forbidden", "Only admins can publish forms", 403);
-  const body = parseBody(event);
-  requireKeys(body, ["formId", "name", "audience", "sections"]);
-
-  const definition = {
-    formId: body.formId,
-    name: body.name,
-    audience: body.audience,
-    description: body.description || "",
-    sections: body.sections,
-  };
-
-  const errors = validateFormDefinition(definition);
-  assert(errors.length === 0, "invalid_form_definition", errors.join("; "));
-
-  const { formId, version } = await publishFormDefinition(definition, { actorId: ctx.userId });
-  return ok({ formId, version }, 201);
 };
 
 const audienceOkForRole = (ctx, formAudience) => {
@@ -71,7 +42,8 @@ const audienceOkForRole = (ctx, formAudience) => {
 const submitForm = async (event, ctx) => {
   const childId = param(event, "id");
   const formId = param(event, "formId");
-  const form = await getActiveForm(formId);
+  const form = getFormDefinition(formId);
+  if (!form) throw new HttpError(404, "form_not_found", "Form not found");
 
   assert(audienceOkForRole(ctx, form.audience), "forbidden", `Form ${formId} is not available to role ${ctx.role}`, 403);
 
@@ -225,6 +197,99 @@ const getResponses = async (event, ctx) => {
   return ok({ data, count: data.length });
 };
 
+const runAssessment = async (event, ctx) => {
+  const childId = param(event, "id");
+  await assertScopeChild(childId, ctx);
+
+  const processor = getAssessmentProcessor();
+  if (!processor) throw new HttpError(404, "no_assessment_processor", "No assessment processor registered");
+
+  const result = await classifyLatestSubmission(childId, processor.formId);
+  if (!result) throw new HttpError(404, "no_submission", "No assessment submission available yet");
+
+  const at = nowIso();
+  await client.send(
+    new CMD.put({
+      TableName: TABLE,
+      Item: {
+        PK: { S: `ASSESS#${childId}` },
+        SK: { S: `VARK#${at}` },
+        type: { S: "assessment" },
+        kind: { S: "vark" },
+        scores: { S: JSON.stringify(result.scores) },
+        label: { S: result.label },
+        multimodal: { BOOL: result.multimodal },
+        method: { S: result.method },
+        submission: { S: result.submission },
+        createdAt: { S: at },
+      },
+    }),
+  );
+
+  await client.send(
+    new CMD.update({
+      TableName: TABLE,
+      Key: { PK: { S: `CHILD#${childId}` }, SK: { S: "META" } },
+      UpdateExpression: "SET #varkLabel = :l, #varkScores = :s, #varkMultimodal = :m, #updatedAt = :at",
+      ExpressionAttributeNames: {
+        "#varkLabel": "varkLabel",
+        "#varkScores": "varkScores",
+        "#varkMultimodal": "varkMultimodal",
+        "#updatedAt": "updatedAt",
+      },
+      ExpressionAttributeValues: {
+        ":l": { S: result.label },
+        ":s": { S: JSON.stringify(result.scores) },
+        ":m": { BOOL: result.multimodal },
+        ":at": { S: at },
+      },
+    }),
+  );
+
+  await auditChild(childId, ctx, "assessment_ran", `child:${childId}`, { kind: processor.kind, submission: result.submission });
+
+  return ok({ childId, kind: processor.kind, ...result, createdAt: at }, 201);
+};
+
+const listAssessments = async (event, ctx) => {
+  const childId = param(event, "id");
+  await assertScopeChild(childId, ctx);
+  const res = await client.send(
+    new CMD.query({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      ScanIndexForward: false,
+      ExpressionAttributeValues: { ":pk": { S: `ASSESS#${childId}` }, ":sk": { S: "VARK#" } },
+    }),
+  );
+  const data = (res.Items || []).map((i) => ({
+    kind: i.kind.S,
+    scores: JSON.parse(i.scores.S),
+    label: i.label.S,
+    multimodal: i.multimodal.BOOL,
+    method: i.method.S,
+    submission: i.submission?.S || null,
+    createdAt: i.createdAt.S,
+  }));
+  return ok({ data, count: data.length });
+};
+
+const listPredictions = async (event, ctx) => {
+  const childId = param(event, "id");
+  await assertScopeChild(childId, ctx);
+  const full = await studentAccess(childId, ctx, "predict_full");
+  const res = await client.send(
+    new CMD.query({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      ScanIndexForward: false,
+      ExpressionAttributeValues: { ":pk": { S: `PRED#${childId}` }, ":sk": { S: "PRED#" } },
+    }),
+  );
+  const data = (res.Items || []).map((i) => shapePrediction(i, full));
+  return ok({ data, count: data.length });
+};
+
 export const lambdaHandler = async (event) => {
   try {
     const route = `${event.httpMethod} ${event.resource}`;
@@ -234,16 +299,18 @@ export const lambdaHandler = async (event) => {
         return await listForms(event, ctx);
       case "GET /forms/{formId}":
         return await getForm(event, ctx);
-      case "GET /forms/{formId}/versions/{version}":
-        return await getFormVersionHandler(event, ctx);
-      case "POST /forms":
-        return await publishForm(event, ctx);
       case "POST /children/{id}/forms/{formId}/responses":
         return await submitForm(event, ctx);
       case "GET /children/{id}/forms/{formId}/responses":
         return await getResponses(event, ctx);
       case "GET /children/{id}/submissions":
         return await listSubmissions(event, ctx);
+      case "POST /children/{id}/assessments":
+        return await runAssessment(event, ctx);
+      case "GET /children/{id}/assessments":
+        return await listAssessments(event, ctx);
+      case "GET /children/{id}/predictions":
+        return await listPredictions(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");
     }

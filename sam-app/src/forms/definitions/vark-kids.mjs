@@ -2,6 +2,7 @@ const likert = (id, group, text) => ({ id, type: "likert", group, text, options:
 
 export const varkKidsDefinition = {
   formId: "vark-kids",
+  version: 1,
   name: "VARK Kids",
   audience: "student",
   description: "Questionário VARK adaptado para crianças — como você prefere aprender?",

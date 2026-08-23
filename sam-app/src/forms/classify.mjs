@@ -1,6 +1,5 @@
 import { CMD, client, TABLE } from "../lib/db.mjs";
-import { getFormProcessor } from "./engine.mjs";
-import { getActiveForm } from "./service.mjs";
+import { getFormProcessor, getFormDefinition } from "./engine.mjs";
 
 export const latestSubmission = async (childId, formId) => {
   const res = await client.send(
@@ -19,7 +18,7 @@ export const classifyLatestSubmission = async (childId, formId) => {
   const submission = await latestSubmission(childId, formId);
   if (!submission) return null;
 
-  const form = await getActiveForm(formId);
+  const form = getFormDefinition(formId);
   const processor = getFormProcessor(formId);
   const answers = JSON.parse(submission.answers.S);
   const scored = processor?.score ? processor.score(form, answers) : { scores: null, label: null };

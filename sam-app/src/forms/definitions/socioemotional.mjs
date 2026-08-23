@@ -2,6 +2,7 @@ const likert = (id, group, text) => ({ id, type: "likert", group, text, options:
 
 export const socioemotionalDefinition = {
   formId: "socioemotional",
+  version: 1,
   name: "Socioemocional",
   audience: "educator",
   description: "Avaliação socioemocional observada pelo educador.",
