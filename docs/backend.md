@@ -60,7 +60,7 @@
 | `GET /api/forms?audience=` | any | List forms available to the persona (served from code) | in-memory registry |
 | `GET /api/forms/:formId` | scoped | Form definition (read-only) | in-memory registry |
 | `POST /api/students/:id/forms/:formId/responses` | persona of the form; **guardian may also submit student-audience forms** (child fills together with the guardian on the guardian's account) | Submit responses (idempotent via `requestId`) | `SUBMISSION#` only — classification is a separate step |
-| `GET /api/students/:id/forms/:formId/responses` | scoped | Submission history | Query `SUBMISSION#<formId>#` prefix |
+| `GET /api/students/:id/forms/:formId/responses` | scoped | Submission history; each item rides along its `assessment` (deterministic classification, once run) and ML `prediction` (once inference lands) | Query `SUBMISSION#<formId>#` prefix + `ASSESS#`/`PRED#` lookups keyed by submission |
 | `GET /api/students/:id/submissions` | scoped | Stored tests across all forms (newest first) | Query `SUBMISSION#` prefix on `STUDENT#` |
 
 ### Observations
