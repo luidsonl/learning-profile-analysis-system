@@ -55,10 +55,10 @@ export default async (ctx) => {
 
   step("self-view: student sees full ML prediction");
   {
-    const preds = await pollUntil(
-      () => api("GET", `/students/${ctx.noGuardianStudentId}/predictions`, { token: ctx.pedroToken }),
-      { tries: 40 },
-    ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
+    const preds = await pollUntil(async () => {
+      const r = await api("GET", `/students/${ctx.noGuardianStudentId}/predictions`, { token: ctx.pedroToken });
+      return r.status === 200 && r.data.count >= 1 ? r.data : null;
+    }, { tries: 40 });
     expect("student prediction list arrives", !!preds, JSON.stringify(preds || { count: 0 }));
 
     const p = preds?.data?.[0];

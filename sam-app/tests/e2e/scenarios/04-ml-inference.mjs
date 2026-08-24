@@ -6,13 +6,12 @@ import { api, expect, pollUntil, step } from "../helpers.mjs";
 export default async (ctx) => {
   step("ml: automatic inference arrives after vark submission");
   {
-    // First prediction of the suite pays the inference cold start (sklearn
-    // load on a fresh container can exceed 80s right after a deploy) — give
-    // it a generous window; later polls ride warm containers.
-    const preds = await pollUntil(
-      () => api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.guardianToken }),
-      { tries: 60, delayMs: 3000 },
-    ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
+    // Predicate must live INSIDE fn: api() resolves with any HTTP response
+    // (even 200/count:0), so a bare api() call would return on first poll.
+    const preds = await pollUntil(async () => {
+      const r = await api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.guardianToken });
+      return r.status === 200 && r.data.count >= 1 ? r.data : null;
+    }, { tries: 60, delayMs: 3000 });
     expect("auto prediction arrived", !!preds, JSON.stringify(preds || { count: 0 }));
 
     const p = preds?.data?.[0];
@@ -61,10 +60,10 @@ export default async (ctx) => {
 
   step("ml: student account sees its own full predictions");
   {
-    const lst = await pollUntil(
-      () => api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.studentToken }),
-      { tries: 40 },
-    ).then((r) => (r && r.status === 200 && r.data.count >= 1 ? r.data : null));
+    const lst = await pollUntil(async () => {
+      const r = await api("GET", `/students/${ctx.studentId}/predictions`, { token: ctx.studentToken });
+      return r.status === 200 && r.data.count >= 1 ? r.data : null;
+    }, { tries: 40 });
     expect("student prediction list arrives", !!lst, JSON.stringify(lst || { count: 0 }));
 
     const p = lst?.data?.[0];

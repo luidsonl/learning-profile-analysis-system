@@ -8,6 +8,7 @@ import s04 from "./scenarios/04-ml-inference.mjs";
 import s05 from "./scenarios/05-guardianship-observations-recommendations.mjs";
 import s06 from "./scenarios/06-student-self-view.mjs";
 import s07 from "./scenarios/07-reports-audit.mjs";
+import s08 from "./scenarios/08-vark-form-classification.mjs";
 
 const BASE = process.env.API_BASE;
 if (!BASE) {
@@ -19,7 +20,7 @@ const TABLE = process.env.TABLE_NAME || "learning-profile";
 
 // Scenarios run in order and share fixture state through ctx
 // (tokens, student ids, submission ids created along the way).
-const scenarios = [s01, s02, s03, s04, s05, s06, s07];
+const scenarios = [s01, s02, s03, s04, s05, s06, s07, s08];
 const ctx = {};
 
 const cleanupErrors = [];
