@@ -40,10 +40,10 @@ Balaji et al. [R2] found that models using only behavioral features achieve mini
 
 | Feature | Type | Source in this system | Refs |
 |---------|------|----------------------|------|
-| Age / birth date | integer/date | Child profile (`STUDENT#`) | [R2][R8][R9] |
-| Sex / gender | categorical | Child profile | [R1][R2][R8] |
-| Year/grade level | ordinal | Child profile | [R2][R4] |
-| School / institution | categorical | Child profile | [R4] |
+| Age / birth date | integer/date | Student profile (`STUDENT#`) | [R2][R8][R9] |
+| Sex / gender | categorical | Student profile | [R1][R2][R8] |
+| Year/grade level | ordinal | Student profile | [R2][R4] |
+| School / institution | categorical | Student profile | [R4] |
 | Mode of study | categorical | anamnesis form | [R2] |
 | Disability indicator | boolean | anamnesis form | [R2] |
 | Commuting (travel time) | categorical | anamnesis form | [R2] |
@@ -120,9 +120,9 @@ These are validated instruments. The system should store **scores/ratings** as s
 | Feature | Type | Source in this system | Refs |
 |---------|------|----------------------|------|
 | Educator/class assignment | categorical | guardianship/follow edges | [R4] |
-| Program/course type | categorical | child profile | [R2][R4] |
-| Teaching environment (classroom/online/blended) | categorical | child profile | [R1][R3] |
-| Institution/school | categorical | child profile | [R4] |
+| Program/course type | categorical | Student profile | [R2][R4] |
+| Teaching environment (classroom/online/blended) | categorical | Student profile | [R1][R3] |
+| Institution/school | categorical | Student profile | [R4] |
 
 ---
 
@@ -142,7 +142,7 @@ These are validated instruments. The system should store **scores/ratings** as s
 
 Current collection points already cover most categories:
 
-- **Child profile (`STUDENT#`)** → demographic, institutional.
+- **Student profile (`STUDENT#`)** → demographic, institutional.
 - **`anamnesis` form (guardian)** → family/socio-economic, academic history, development/readiness.
 - **`behavior-checklist` + observations (educator)** → engagement/behavioral, academic performance (activity, attendance, submissions, scores).
 - **`socioemotional` form (educator)** → psychological/socioemotional (motivation, self-efficacy, emotions).

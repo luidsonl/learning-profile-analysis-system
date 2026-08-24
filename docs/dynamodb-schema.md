@@ -50,7 +50,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 > Access patterns: validate token → `GSI1` Query `SESSION#<token>`; revoke/list user sessions → Query `USER#<u>` SK begins_with `SESSION#`.
 
-### CHILD
+### STUDENT
 
 **Profile item**
 | PK | SK | Attributes |
@@ -107,7 +107,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | `ASSESS#<studentId>` | `VARK#<timestamp>` | `studentId`, `kind` (`vark`), `scores` (`{R, A, K}`), `label` (e.g. `K`, `multimodal`), `multimodal`, `method` (`flemming`), `submission` (source `SUBMISSION#` SK), `createdAt` |
 | — | — | GSI1PK `ASSESS#vark`, GSI1SK `ASSESS#vark#<timestamp>` |
 
-> Classification is **decoupled from submission**: `POST /students/:id/assessments` reads the latest stored submission (`src/forms/classify.mjs`) and writes this item. Labeled assessments are the **training labels** for retraining (export via GSI1).
+> Classification is **decoupled from submission**: `POST /students/:id/assessments` reads the latest stored submission (`src/api/forms/classify.mjs`) and writes this item. Labeled assessments are the **training labels** for retraining (export via GSI1).
 
 ### PRED (ML prediction)
 
@@ -116,9 +116,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | `PRED#<studentId>` | `PRED#<predictionId>` | **Machine-generated** (written by the inference Lambda, never by API handlers): `studentId`, `model`, `modelVersion`, `method` (`ml`), `label`, `scores`, `confidence`, `form`, `createdBy` (`system:inference`), `createdAt` |
 | — | — | GSI1PK `PRED#<model>`, GSI1SK `PRED#<model>#<timestamp>` |
 
-> Predictions are produced automatically after form submissions via asynchronous invoke (no SQS). Submissions (`SUBMISSION#`) and assessments (`ASSESS#`) are human-flow data; `PRED#` is generated data in its own partition.
-
-> Predictions are produced automatically after form submissions via asynchronous invoke (no SQS). Submissions (`SUBMISSION#`) and assessments (`ASSESS#`) are human-flow data; `PRED#` is generated data in its own partition. There is no model registry — each prediction carries the `model` + `modelVersion` that produced it.
+> Predictions are produced automatically after form submissions via asynchronous invoke (no SQS). Submissions (`SUBMISSION#`) and assessments (`ASSESS#`) are human-flow data; `PRED#` is machine-generated data in its own partition. There is no model registry — each prediction carries the `model` + `modelVersion` that produced it.
 
 ### REC (recommendations)
 
@@ -163,10 +161,10 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Labeled assessments by profile (retrain) | GSI1 Query `ASSESS#vark` |
 | Latest prediction for profile | Query `PRED#<c>`, SK begins_with `PRED#`, desc → first |
 | Observations by category (analytics) | GSI1 Query `OBS#<category>` |
-| Recommendations for a child | Query `STUDENT#<c>`, SK `REC#` prefix, desc |
+| Recommendations for a student | Query `STUDENT#<c>`, SK `REC#` prefix, desc |
 | Report by id | GSI1 Query `REPORT#<reportId>` |
-| Reports of a child | Query `STUDENT#<c>`, SK `REPORT#` prefix |
-| Audit trail of a child | Query `AUDIT#STUDENT#<studentId>`, SK `EVENT#` prefix, desc |
+| Reports of a student | Query `STUDENT#<c>`, SK `REPORT#` prefix |
+| Audit trail of a student | Query `AUDIT#STUDENT#<studentId>`, SK `EVENT#` prefix, desc |
 
 ---
 
@@ -189,7 +187,7 @@ Uniqueness reservations (`EMAIL#`) use **conditional writes** inside the transac
 
 ## Consistency & Partitioning Notes
 
-- A child's core record lives in one partition (`STUDENT#<studentId>`): guardians, educators, consent, submissions, recommendations, observations, reports. Assessments (`ASSESS#<studentId>`) and predictions (`PRED#<studentId>`) live in dedicated partitions so their `SK` can be a pure timestamp id without the child's data mixing; reads stay single-partition and ordered by timestamp.
+- A student's core record lives in one partition (`STUDENT#<studentId>`): guardians, educators, consent, submissions, recommendations, observations, reports. Assessments (`ASSESS#<studentId>`) and predictions (`PRED#<studentId>`) live in dedicated partitions so their `SK` can be a pure timestamp id without mixing entity kinds in one SK range; reads stay single-partition and ordered by timestamp.
 - Export partitions (`SUBMISSION#<formId>`, `ASSESS#vark`, `OBS#<category>`, `PRED#<model>`) live on **GSI1** so the nightly `feature-export` Lambda scans one hot GSI partition per form/profile instead of a full table scan.
 - No item approaches 400 KB: submissions store answers as a small JSON map; VARK form keeps ~15 Likert items.
 - High-frequency counters (e.g., "total submissions for retraining trigger") should be maintained as atomic `Add` on dedicated counter items dedicated counter items if needed — not scanned.

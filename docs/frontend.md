@@ -28,8 +28,8 @@
 |------|---------|------|
 | `/login` | public | Login |
 | `/` | guardian/educator/admin | Dashboard (students in scope) |
-| `/students/:id` | scoped | Child profile + consent status |
-| `/students/:id/forms` | scoped | Available forms for the child |
+| `/students/:id` | scoped | Student profile + consent status |
+| `/students/:id/forms` | scoped | Available forms for the student |
 | `/students/:id/forms/vark` | student (own) | VARK questionnaire (kid-friendly wizard) |
 | `/students/:id/profile` | scoped | Learning profile (V/A/R/K + multimodal) |
 | `/students/:id/recommendations` | scoped | Adapted pedagogical strategies |

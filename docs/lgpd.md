@@ -22,7 +22,7 @@
 | Item | Entities (`dynamodb-schema.md`) | Purpose |
 |------|--------------------------------|---------|
 | Identity & contacts | `USER#` | Accounts, login, roles |
-| Child profile | `STUDENT#/META` | Guardianship, consent, personalization |
+| Student profile | `STUDENT#/META` | Guardianship, consent, personalization |
 | Form responses | `SUBMISSION#` | Profile tracing (VARK scoring) |
 | Observations | `OBS#` | Educator feedback, features for future models |
 | Scores & labels | `ASSESS#` | Profile interpretation (V/A/R/K + multimodal) |
@@ -34,19 +34,19 @@
 ## Consent Lifecycle
 
 - **Versioned**: each consent record has `consentVersion` (the terms version accepted) + timestamp; stored as `STUDENT#<c>/CONSENT#<version>#<ts>` and denormalized on `STUDENT#/META` (`consentVersion`, `consentAt`, `consentBy`) together with `consentLegalBasis` and `consentGrantedByRole`.
-- **Grant**: guardian, educator (institution authorization, child followed), or admin calls `POST /api/students/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
+- **Grant**: guardian, educator (institution authorization, student followed), or admin calls `POST /api/students/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
 - **Erasure-adjacent control**: self-service is independent of consent — a student account never bypasses consent; revoking consent blocks processing regardless of who holds the account.
 - **Revocation**: writes a new `CONSENT#` item with `status=revoked` and updates `META`. After revocation:
   - new submissions, assessments, predictions, observations are rejected (403);
   - read access is limited to what's needed for the rights (access, erasure) and legal obligations;
   - nightly export excludes the student.
 - **Re-consent**: a new consent version is accepted explicitly; old version history retained for proof.
-- **Student account gating**: creating a student account requires an active consent for the child; a minor can never consent themselves.
+- **Student account gating**: creating a student account requires an active consent for the student; a minor can never consent themselves.
 
 ## Audit Log
 
-- Every access/action on a child's data writes `AUDIT#STUDENT#<id>` (actorId, actorRole, action, resource, detail, ip, timestamp).
-- User- and form-scoped trails: `AUDIT#USER#<id>`, `AUDIT#FORM#<id>`.
+- Every access/action on a student's data writes `AUDIT#STUDENT#<id>` (actorId, actorRole, action, resource, detail, ip, timestamp).
+- User- and student-scoped trails: `AUDIT#USER#<id>` (by actor), `AUDIT#STUDENT#<id>` (by subject).
 - Retained according to the retention policy (below); not used for analytics/training.
 
 ## Data Minimization & Retention

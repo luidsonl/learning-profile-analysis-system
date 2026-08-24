@@ -1,13 +1,13 @@
 # Design System — Learning Profile Analysis System
 
-> Tokens, components, and accessibility rules for the React SPA (pt-BR). Aimed at three very different audiences — **children** (students), **guardians**, and **educators** — with a fourth **admin** mode. Accessibility is a first-class requirement, not a polish item.
+> Tokens, components, and accessibility rules for the React SPA (pt-BR). Aimed at three very different audiences — **students** (usually minors), **guardians**, and **educators** — with a fourth **admin** mode. Accessibility is a first-class requirement, not a polish item.
 
 ## Audiences & Modes
 
 | Mode | Audience | Design emphasis |
 |------|----------|-----------------|
 | Default | guardian / educator | Clear, calm, information-dense but not cluttered |
-| Student | child (minor) | Simplified self-view: large type, high contrast, few options, non-childish but friendly copy |
+| Student | usually a minor | Full self-view of own data: large type, high contrast, friendly copy |
 | Admin | administrator | Dense tables, registry/audit browsing |
 
 The student mode is triggered by the `student` role (see [Authentication](./auth.md)); it is a **reduced view**, not a "cartoon" theme — LGPD-friendly wording and no gamification that could manipulate a minor.

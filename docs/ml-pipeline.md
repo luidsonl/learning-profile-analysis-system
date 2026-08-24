@@ -162,7 +162,7 @@ Beyond the primary dataset (Armand, Eboue 2021), these public datasets are candi
 | Dataset | Reference / DOI | Relevance |
 |---------|-----------------|-----------|
 | Student Learning Interaction and VARK Learning Style Dataset | Alzahrani, N. & El-Sabagh, H. A. (2024). Zenodo, 10.5281/zenodo.16506654 | eLearning interaction logs (13 weeks, 135 students) + VARK labels + midterm scores — predicts style from behavior, not questionnaire |
-| DATA SET OF LEARNING STYLE PREFERENCE | Mendeley Data, 10.17632/mtvfdwm3dt.1 | **Elementary-school students** (992, grades 4–5, Indonesia), VAK preferences — closest match to the child persona |
+| DATA SET OF LEARNING STYLE PREFERENCE | Mendeley Data, 10.17632/mtvfdwm3dt.1 | **Elementary-school students** (992, grades 4–5, Indonesia), VAK preferences — closest match to the student persona |
 | Anonymized Moodle interaction dataset for learning style prediction (FSLSM) | Zenodo, 10.5281/zenodo.18624789 | Moodle resource/forum logs + aggregated features → Felder-Silverman styles (clustering + stacking ensemble) |
 | Learning Style Identification | Ayyoub, H. (2023). IEEE DataPort, 10.21227/7tc4-5841 | FSLSM via the 44-item ILS questionnaire + course event logs (2,300+ learners) |
 | Student Performance and Learning Behavior Dataset for Educational Analytics | Zenodo, 10.5281/zenodo.16459132 | 14,003 records: study behavior, engagement, demographics, LearningStyle + grades — general-student categorization |

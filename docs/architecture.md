@@ -4,7 +4,7 @@
 
 The Learning Profile Analysis System is a serverless platform that personalizes education for gifted students and students with specific needs. It ingests data supplied by guardians, educators, and the students themselves through structured **forms** (academic history, learning preferences, observed behaviors, socioemotional indicators), runs machine learning analysis, and produces adapted pedagogical strategies and visual reports shared between families and educators.
 
-Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (the child, with a full self-view of own data), and **admin**. Access control is role- and scope-based: guardians see only their own children; educators see only children they follow; students see only their own profile, submissions, predictions, observations, and reports; administrators manage users and the institution's data.
+Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (usually a minor, with a full self-view of own data), and **admin**. Access control is role- and scope-based: guardians see only their own children; educators see only the students they follow; students see only their own profile, submissions, predictions, observations, and reports; administrators manage users and the institution's data.
 
 The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for a React+Vite SPA, and **DynamoDB single-table** design. It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
 
@@ -56,7 +56,7 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
 **Form filling flow (generic engine — submission and classification are decoupled):**
 
 ```
-  Persona (guardian / educator / student) ──► GET /api/forms/:formId ──► form definition (FORM#)
+  Persona (guardian / educator / student) ──► GET /api/forms/:formId ──► definition from the code registry
       │
       ▼
   Persona ──► POST /api/students/:id/forms/:formId/responses ──► Submission Lambda ──► DynamoDB
@@ -203,7 +203,7 @@ The two layers share values using the same two mechanisms as 0shared:
 
 Data collection is built on a generic, hybrid forms engine:
 
-- **Generic engine underneath:** form definitions (`FORM#<formId>`, versioned) describe sections and typed questions; submissions are stored per child (`STUDENT#<studentId> / SUBMISSION#<formId>#<timestamp>`). Question types: single choice, multiple choice, Likert scale, text, number, date.
+- **Generic engine underneath:** curated form definitions live in code (`src/api/forms/definitions/`, versioned per release) and describe sections and typed questions; submissions are stored per student (`STUDENT#<studentId> / SUBMISSION#<formId>#<timestamp>`). Question types: single choice, multiple choice, Likert scale, text, number, date.
 - **Curated forms library (in code):** definitions live in `src/forms/definitions/` and are served read-only — no form state in the database. The engine ships with domain forms, each targeting a persona:
 
   | Form | Filled by | Purpose |
@@ -238,9 +238,9 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 ## Security & LGPD
 
 - **RBAC:** roles `guardian | educator | student | admin` enforced by `requireRole` middleware on top of Bearer-token sessions (0shared auth flow).
-- **Scope enforcement:** guardians query children via their `USER#` partition (guardianship edges); educators via `FOLLOW#` edges; students access only their own child profile through a dedicated student link. No cross-tenant enumeration.
+- **Scope enforcement:** guardians query students via their `USER#` partition (guardianship edges); educators via `FOLLOW#` edges; students access only their own profile through a dedicated student link. No cross-tenant enumeration.
 - **Binary student self-service:** there are no autonomy levels — access is binary. A user either has an account or does not; a form is filled either by its intended audience or by the responsible adult acting for them. A student account holder gets the full self-view of own data (submissions, predictions with scores, observations, reports) and can only edit their own name. Enforcement lives in `src/api/lib/scope.mjs`.
-- **Explicit consent:** consent (versioned, with **legal basis** `guardian | institution_authorization | self_consent` and `grantedByRole`) is required before a child's data is processed. Creating a student account is initiated by the guardian **or an educator following the child** (institution-led onboarding for students without a guardian) and gated by consent. Consent revocation blocks new processing.
+- **Explicit consent:** consent (versioned, with **legal basis** `guardian | institution_authorization | self_consent` and `grantedByRole`) is required before a student's data is processed. Creating a student account is initiated by the guardian **or an educator following the student** (institution-led onboarding for students without a guardian) and gated by consent. Consent revocation blocks new processing.
 - **Audit log:** every access/action on a student's data writes a `AUDIT#` item (who, what, when).
 - **Data minimization & retention:** students' records are kept minimal; retention/erasure policy is documented in `lgpd.md`.
 - **Encryption:** S3 buckets use SSE; DynamoDB uses AWS KMS; in-transit TLS via CloudFront/API Gateway.
