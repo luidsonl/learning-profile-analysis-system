@@ -168,19 +168,47 @@ const latestPredictionsBySubmission = async (studentId, full) => {
   return bySubmission;
 };
 
+const latestAssessmentsBySubmission = async (studentId) => {
+  const res = await client.send(
+    new CMD.query({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      ScanIndexForward: false,
+      ExpressionAttributeValues: { ":pk": { S: `ASSESS#${studentId}` }, ":sk": { S: "VARK#" } },
+    }),
+  );
+  const bySubmission = new Map();
+  for (const item of res.Items || []) {
+    const sub = item.submission?.S;
+    if (!sub || bySubmission.has(sub)) continue;
+    bySubmission.set(sub, {
+      kind: item.kind.S,
+      scores: JSON.parse(item.scores.S),
+      label: item.label.S,
+      multimodal: item.multimodal.BOOL,
+      method: item.method.S,
+      createdAt: item.createdAt.S,
+    });
+  }
+  return bySubmission;
+};
+
 const getResponses = async (event, ctx) => {
   const studentId = param(event, "id");
   const formId = param(event, "formId");
   await assertScopeStudent(studentId, ctx);
 
-  const res = await client.send(
-    new CMD.query({
-      TableName: TABLE,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
-      ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
-    }),
-  );
-  const predictions = await latestPredictionsBySubmission(studentId, true);
+  const [res, predictions, assessments] = await Promise.all([
+    client.send(
+      new CMD.query({
+        TableName: TABLE,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: { ":pk": { S: `STUDENT#${studentId}` }, ":sk": { S: `SUBMISSION#${formId}#` } },
+      }),
+    ),
+    latestPredictionsBySubmission(studentId, true),
+    latestAssessmentsBySubmission(studentId),
+  ]);
   const data = (res.Items || []).map((i) => ({
     submissionId: i.submissionId.S,
     formId: i.formId.S,
@@ -190,6 +218,8 @@ const getResponses = async (event, ctx) => {
     submittedByRole: i.submittedByRole.S,
     createdAt: i.createdAt.S,
     prediction: predictions.get(i.submissionId.S) || null,
+    // Assessments reference the submission by its full SK (SUBMISSION#<form>#<ts>).
+    assessment: assessments.get(i.SK.S) || null,
   }));
   return ok({ data, count: data.length });
 };
