@@ -469,3 +469,5 @@ Outputs:
   ApiEndpoint:
     Description: API Gateway endpoint URL
     Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod"
+    Export:
+      Name: learning-profile-api-ApiEndpoint

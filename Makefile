@@ -5,7 +5,7 @@
 #   1. terraform/aws-bootstrap  → S3 state bucket (one-time)
 #   2. terraform/aws-app        → DynamoDB + S3 buckets + SQS + async Lambdas
 #   3. sam-app                  → API Lambdas + API Gateway (served under /api/*)
-#   4. frontend                 → S3 + CloudFront SPA (not started yet)
+#   4. frontend                 → S3 + CloudFront SPA (single domain for app + /api/*)
 #
 # ML is fully offline: `make train` / `make package` run locally in ml/ and
 # bundle the artifact into sam-app before the next backend deploy.
@@ -49,9 +49,12 @@ backend:
 sync:
 	cd sam-app && $(MAKE) sync
 
-# 4. Frontend (placeholder until terraform/aws-frontend + SPA land)
+# 4. Frontend (React SPA → S3 + CloudFront; serves app + API under the same domain)
 frontend:
-	@echo "--> frontend/ not started yet — skipping (see docs/progress.md)"
+	cd frontend && npm install --no-audit --no-fund && npm run build
+	cd terraform/aws-frontend && $(TF) init -input=false && $(TF) apply -auto-approve
+	@echo ""
+	@echo "--> Frontend disponível em: https://$$(cd terraform/aws-frontend && $(TF) output -raw cloudfront_domain_name)"
 
 # ── Offline ML pipeline (never runs in AWS) ──────────────────────────────────
 train:

@@ -4,7 +4,7 @@ import { uid, nowIso, ttlSeconds } from "../lib/ids.mjs";
 import { requireKeys, isEmail, assert } from "../lib/validate.mjs";
 import { hashPassword, verifyPassword, genToken, getUserByEmail, getUser } from "../lib/auth.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { writeAudit } from "../lib/scope.mjs";
+import { writeAudit, getOwnStudentId } from "../lib/scope.mjs";
 
 const ROLES = ["guardian", "educator", "admin"];
 
@@ -138,7 +138,12 @@ const logout = async (event, ctx) => {
 const me = async (event, ctx) => {
   const user = await getUser(ctx.userId);
   if (!user) throw new HttpError(404, "user_not_found", "User not found");
-  return ok({ user: publicUser(user) });
+  const payload = { user: publicUser(user) };
+  // Student self-view needs the student id that this account owns.
+  if (user.role === "student") {
+    payload.studentId = await getOwnStudentId(user.userId);
+  }
+  return ok(payload);
 };
 
 export const lambdaHandler = async (event) => {
