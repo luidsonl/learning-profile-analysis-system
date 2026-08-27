@@ -2,7 +2,7 @@
 
 ## Status snapshot
 
-**As of:** 2026-08-23 · **Branch:** `main`
+**As of:** 2026-08-27 · **Branch:** `main`
 
 Backend vertical slice + offline ML pipeline are implemented and documented. Remaining: deploy the new inference stack, then the **frontend SPA** and its CloudFront/S3 Terraform stack.
 
@@ -11,13 +11,13 @@ Backend vertical slice + offline ML pipeline are implemented and documented. Rem
 | Docs (`docs/`) | ✅ Done | 10 documents covering every layer |
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
-| Terraform frontend infra (`terraform/aws-frontend`) | ❌ Not started | CloudFront + S3 for the SPA |
+| Terraform frontend infra (`terraform/aws-frontend`) | 🔶 In progress | CloudFront + S3 for the SPA (mirrors 0shared) |
 | Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~43 routes), RBAC + scoping |
 | Forms engine | ✅ Done | Code-defined forms; guardian-assisted submissions |
 | Binary student self-service | ✅ Done | student account = full self-view (no autonomy levels) |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
 | Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; e2e 76/76 green against the real stack |
-| Frontend SPA (`frontend/`) | ❌ Not started | React + Vite, pt-BR |
+| Frontend SPA (`frontend/`) | 🔶 In progress | Tailwind + Radix + Vite; stack decisions locked, docs updated |
 
 ---
 
@@ -36,8 +36,8 @@ Everything below is implemented, tested, and documented in its own layer doc (`d
 ## Pending work
 
 1. **Deploy ML stack** — `make deploy` at the repo root (or `cd sam-app && make deploy`; python3.12 runtime needs pip available for native builds or use docker), then run `make e2e-test` against the deployed API. Ops tooling in place: root orchestrator Makefile, `redeploy-api` race workaround, `db-clean`/`db-wipe`.
-2. **Frontend SPA** (`frontend/`) — React + Vite, pt-BR, accessible; consumes `/api/*` through the same CloudFront domain (see `docs/frontend.md`, `docs/design-system.md`). Largest remaining piece of the MVP.
-3. **`terraform/aws-frontend`** — S3 + CloudFront stack for the SPA, wiring the `/api/*` origin to the existing API Gateway stage.
+2. **Frontend SPA** (`frontend/`) — React + Vite + Tailwind v4 + Radix, pt-BR, accessible; consumes `/api/*` through the same CloudFront domain (see `docs/frontend.md`, `docs/design-system.md`). Largest remaining piece of the MVP. **Stack decisions locked**: full vertical slice of all persona routes; Tailwind + Radix (values of the design-system.md light theme); simple `apiFetch` client (no React Query yet). Scaffold + persona flows next against the live API.
+3. **`terraform/aws-frontend`** — S3 + CloudFront stack for the SPA, wiring the `/api/*` origin to the existing API Gateway stage. Reads `learning-profile-api-ApiEndpoint` via `aws_cloudformation_export`; the SAM template Output needs the matching `Export.Name` added (see `sam-app/template.yaml`).
 4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
 
 ---
@@ -45,5 +45,5 @@ Everything below is implemented, tested, and documented in its own layer doc (`d
 ## Suggested next steps (in order)
 
 1. Deploy the SAM app and register model v2.0.0; validate e2e (submission → async prediction visible in responses).
-2. Scaffold `frontend/` (Vite + React, pt-BR) and implement persona flows against the live API.
-3. Add `terraform/aws-frontend` (CloudFront + S3 + `/api/*` origin integration).
+2. Implement `frontend/` (Tailwind + Radix, pt-BR): scaffold → design system → auth + API client → routing/layouts → pages (all persona flows) → student self-view mode.
+3. Add `sam-app/template.yaml` `ApiEndpoint` Export, then `terraform/aws-frontend` (CloudFront + S3 + `/api/*` origin integration); wire the root `make frontend` target.

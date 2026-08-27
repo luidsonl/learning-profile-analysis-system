@@ -4,16 +4,16 @@
 
 ## Stack
 
-- **React 18 + TypeScript + Vite** (build output → `dist/`).
-- **State**: auth context (token + user/role) + lightweight data fetching layer over the API client; React Query for cache/retry where server state grows.
-- **Styling**: design tokens + component library from [Design System](./design-system.md).
-- **Routing**: `react-router` (or framework-agnostic equivalent), role-guarded routes.
-- **Accessibility**: WCAG 2.1 AA baseline, keyboard-first, reduced-motion, screen-reader labels (see [Design System](./design-system.md)).
+- **React + TypeScript + Vite** (build output → `dist/`). React 19 + react-router v7.
+- **State**: auth context (token + user/role) + lightweight data fetching layer over the API client — no heavy query library yet. React Query can be added later where server state grows (lists with retry/cache), but the MVP ships with a simple `apiFetch` client + hooks.
+- **Styling**: **Tailwind CSS v4** + **Radix UI** primitives, with the design tokens (indigo primary, surfaces, WCAG AA values) from [Design System](./design-system.md) expressed as Tailwind `@theme` variables in `styles/tokens.css`. Chosen to mirror the 0shared stack; token values follow this project's light theme, not 0shared's monospace dark theme.
+- **Routing**: `react-router` v7, role-guarded routes.
+- **Accessibility**: WCAG 2.1 AA baseline, keyboard-first, reduced-motion, screen-reader labels (see [Design System](./design-system.md)), Radix handles focus trap/radiogroup keyboard semantics where applicable.
 
 ## API Client & Proxy
 
 - All calls go to relative `/api/...` — no absolute URLs.
-- **Dev**: Vite dev server proxies `/api` → `http://localhost:3000` (the SAM local API). Config in `frontend/vite.config.ts`.
+- **Dev**: Vite dev server proxies `/api` → `http://127.0.0.1:3000` (the SAM local API); override with `VITE_API_BASE` if the deployed API should be used in dev. Config in `frontend/vite.config.ts`.
 - **Prod**: CloudFront routes `/api/*` → API Gateway, `/*` → SPA. No per-environment configuration in app code.
 - The client attaches `Authorization: Bearer <token>` from the auth context; on 401 it clears the session and redirects to `/login`.
 
@@ -62,15 +62,16 @@ Terminal 1:  sam local start-api --env-vars env.json --host 0.0.0.0   (API on :3
 Terminal 2:  npm run dev                                             (Vite on :5173)
 ```
 
-- `frontend/.env` (dev only) sets `VITE_API_PROXY_TARGET=http://localhost:3000`; production builds contain **no** environment-specific values (relative `/api`).
+- `frontend/.env` (dev only, git-ignored) may set `VITE_API_BASE=http://127.0.0.1:3000` (or the deployed CloudFront/API URL); production builds contain **no** environment-specific values (relative `/api`).
+- Runtime API base mirror: `public/env.js` exposes `window.__ENV__.API_BASE` (empty by default → relative `/api`, routed by CloudFront). Same mechanism as 0shared; keeps no config in app code for prod.
 
 ## Build & Deploy
 
 1. `npm run build` → `dist/` (TypeScript check + Vite).
-2. Upload to `s3://learning-profile-front/` (with `--cache-control` for hashed assets).
-3. CloudFront (`terraform/aws-frontend`) serves `dist/`; invalidation on release.
+2. `terraform/aws-frontend` builds/uploads: `aws s3 sync dist/ → s3://learning-profile-front/ --delete` (hashed assets get long cache via CloudFront) and creates a `/*` invalidation on release, via a `null_resource` that re-runs on any frontend source change.
+3. CloudFront serves `dist/` for `/*` and proxies `/api/*` to the API Gateway origin (read from the SAM CloudFormation export `learning-profile-api-ApiEndpoint`).
 
-Deployment order and Terraform wiring: [Architecture — Deployment Order](./architecture.md#deployment-order).
+Single command from the repo root: `make frontend` (build + `terraform apply`). Deployment order and Terraform wiring: [Architecture — Deployment Order](./architecture.md#deployment-order). The SAM template exports `ApiEndpoint` (see `sam-app/template.yaml` Outputs) which `terraform/aws-frontend` reads via `aws_cloudformation_export`.
 
 ---
 

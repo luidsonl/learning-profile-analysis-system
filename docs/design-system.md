@@ -14,7 +14,7 @@ The student mode is triggered by the `student` role (see [Authentication](./auth
 
 ## Design Tokens
 
-Defined as CSS custom properties in `frontend/src/styles/tokens.css`.
+Defined as Tailwind CSS v4 `@theme` variables in `frontend/src/styles/tokens.css` (light theme; indigo primary). Values below are the source of truth; they compile into Tailwind utility classes (`bg-surface`, `text-primary`, etc.). Stack details in [Frontend](./frontend.md).
 
 ### Color
 
@@ -55,16 +55,18 @@ Rules: never rely on color alone (paired with icons/text); text/background contr
 
 ## Components
 
+Built with Tailwind + Radix UI primitives (Radix provides the accessibility semantics: focus trap, arrow-key list navigation, `role="radiogroup"`/`aria-checked`, select behavior). Small composable library under `frontend/src/components/`:
+
 | Component | Notes |
 |-----------|-------|
 | `Button` | Variants: primary, secondary, ghost, danger; `disabled` semantics; ≥44px touch target; focus ring |
-| `Input / Select / Textarea` | Labeled (always), `aria-describedby` for hints/errors, `aria-invalid`, clear error + helper text |
+| `Input / Select / Textarea` | Labeled (always), `aria-describedby` for hints/errors, `aria-invalid`, clear error + helper text. `Select` wraps Radix |
 | `Card` | Surface grouping; headers with icon + text (no color-only status) |
 | `Fieldset / QuestionGroup` | Used by the form renderer; `legend` for question text; Likert as radio group with `aria-label` per option |
-| `RadioGroup` | Keyboard arrow-key navigation, `role="radiogroup"`, `aria-checked` |
+| `RadioGroup` | Wraps Radix `RadioGroup` — keyboard arrow-key navigation, `role="radiogroup"`, `aria-checked` |
 | `Stepper` (form wizard) | Shows section progress; keeps state on back/next; used for the VARK wizard |
-| `Modal` / `Dialog` | Focus trap, `aria-modal`, close on `Esc`, labelled via `aria-labelledby` |
-| `Toast` | `role="status"` for success, `role="alert"` for errors; auto-dismiss ≥5s + manual close |
+| `Modal` / `Dialog` | Wraps Radix `Dialog` — focus trap, `aria-modal`, close on `Esc`, labelled via `aria-labelledby` |
+| `Toast` | Via `sonner`; `role="status"` for success, `role="alert"` for errors; auto-dismiss ≥5s + manual close |
 | `Table` (admin) | Sortable, accessible headers, `aria-sort` |
 | `StatusBadge` | Always icon + text (never color-only) |
 | `ProfileBars` (V/A/R/K) | Bar values + numeric values; chart alternatives provided as text for screen readers |
@@ -91,14 +93,18 @@ Rules: never rely on color alone (paired with icons/text); text/background contr
 ```
 frontend/src/
 ├── styles/
-│   ├── tokens.css           # design tokens
-│   └── global.css           # resets, base typography
-├── components/              # library components (above)
+│   ├── tokens.css           # Tailwind @theme design tokens (values above)
+│   └── index.css            # @import tailwindcss + tokens; resets, base typography, reduced-motion
+├── components/
+│   ├── atoms/               # Button, Input, Select, Textarea, Card, Spinner, Skeleton, StatusBadge…
+│   ├── molecules/           # Field, Stepper, ProfileBars, Toaster…
+│   └── organisms/           # Header, form renderer pieces…
 ├── features/                # per-feature components (forms, profile, reports…)
 ├── layouts/                 # AppLayout, StudentLayout, AdminLayout
-├── routes/                  # route wrappers + <RequireRole>
-├── api/                     # API client (relative /api)
+├── routes/                  # RequireAuth / <RequireRole> route wrappers
+├── api/                     # API client (relative /api) + types + endpoints
 ├── auth/                    # AuthContext, token storage, guards
+├── pages/                   # route page components (Login, Dashboard, Student…)
 └── main.tsx, App.tsx
 ```
 
