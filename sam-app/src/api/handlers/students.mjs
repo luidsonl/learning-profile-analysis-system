@@ -16,7 +16,7 @@ export const getStudent = async (studentId) => {
 const createChild = async (event, ctx) => {
   const body = parseBody(event);
   requireKeys(body, ["name", "birthDate"]);
-  assert(["guardian", "educator", "admin"].includes(ctx.role), "forbidden", "Role cannot register students", 403);
+  assert(["educator", "admin"].includes(ctx.role), "forbidden", "Only educators and admins can register students", 403);
 
   const studentId = uid();
   const at = nowIso();
@@ -45,30 +45,7 @@ const createChild = async (event, ctx) => {
       { Put: { TableName: TABLE, Item: item, ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)" } },
     ],
   };
-  if (ctx.role === "guardian") {
-    transact.TransactItems.push(
-      {
-        Put: {
-          TableName: TABLE,
-          Item: {
-            PK: { S: `USER#${ctx.userId}` },
-            SK: { S: `GUARD#${studentId}` },
-            type: { S: "edge" },
-            relation: { S: body.relation || "guardian" },
-            createdAt: { S: at },
-          },
-          ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-        },
-      },
-      {
-        Put: {
-          TableName: TABLE,
-          Item: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `GUARDIAN#${ctx.userId}` }, type: { S: "edge" }, createdAt: { S: at } },
-          ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-        },
-      },
-    );
-  } else if (ctx.role === "educator") {
+  if (ctx.role === "educator") {
     transact.TransactItems.push(
       {
         Put: {

@@ -4,20 +4,20 @@
 
 **As of:** 2026-08-27 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented and documented. Remaining: cloud deploy of the frontend stack (S3 + CloudFront) once AWS creds are available, and the report-generator PDF stub is future work.
+Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented and documented. **RBAC rework** (admin bootstrap + approval flow, educator-only student creation/assignment) is implemented in the backend and docs; the **frontend is not yet reworked to the new role/status rules** (deferred) and remains un-deployed (S3 + CloudFront) pending AWS creds.
 
 | Layer | Status | Notes |
 |---|---|---|
-| Docs (`docs/`) | ✅ Done | 10 documents covering every layer |
+| Docs (`docs/`) | ✅ Done | 10 documents covering every layer; RBAC updated for the new approval/admin flow |
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ✅ Done | S3 + CloudFront + `/api/*` origin; validated, mirrors 0shared |
-| Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~43 routes), RBAC + scoping |
+| Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~46 routes), RBAC (admin bootstrap + approval gating) + scoping; **AdminFunction** added |
 | Forms engine | ✅ Done | Code-defined forms; guardian-assisted submissions |
 | Binary student self-service | ✅ Done | student account = full self-view (no autonomy levels) |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
-| Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; e2e 76/76 green against the real stack |
-| Frontend SPA (`frontend/`) | ✅ Done (code) | Tailwind v4 + Radix + Vite; all persona routes; build + lint green; deploy pending |
+| Tests (`sam-app/tests/`) | In progress | 23 unit passing; e2e rewritten for the new RBAC flow, still to be run against the real stack after data cleanup + deploy |
+| Frontend SPA (`frontend/`) | Partial (code) | Tailwind v4 + Radix + Vite; **not yet reworked for the new RBAC** (admin approval/promotion UI, role-conditional actions, pending-login handling); build + lint green |
 
 ---
 
@@ -26,7 +26,7 @@ Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented 
 Everything below is implemented, tested, and documented in its own layer doc (`docs/`):
 
 - **Infra**: Terraform stateful stack (DynamoDB single table, S3 files/data buckets, SQS report queue, async Lambdas) + SAM app with API-triggered functions.
-- **Backend API**: auth/sessions, students & guardianship, versioned consent, binary student self-service, forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
+- **Backend API**: auth/sessions (admin bootstrap, approval gating), students & guardianship (educator/admin-only creation & assignment), versioned consent, binary student self-service, new **admin user management** (`/admin/users` — approve/deny, promote/demote, reset password, delete), forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
 - **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/model/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); it scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `docs/ml-pipeline.md`).
 - **Security tooling**: gitleaks + pre-commit + CI secret scan; packaged-model commit exception documented.
 - **Dev loop**: `make sync` (`sam sync --watch`) pushes handler code changes straight to the live Lambdas in seconds — no CloudFormation wait; `template.yaml` changes still take the full `make deploy` path, which remains the source of truth.
@@ -37,13 +37,15 @@ Everything below is implemented, tested, and documented in its own layer doc (`d
 
 ## Pending work
 
-1. **Deploy the frontend** — run `make frontend` (requires AWS creds): builds the SPA, `terraform apply`s `terraform/aws-frontend` (S3 + CloudFront), and prints the `cloudfront_domain_name`. Confirm the app loads at the CloudFront URL and `/api/*` reaches the API Gateway origin.
-2. **Optional cloud re-deploy checks** — `make deploy` re-runs infra/backend/frontend end-to-end if the stack changed.
-3. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
+1. **Clean data + deploy + validate e2e (RBAC rework)** — clear the DynamoDB table (e2e assumes a clean table: the first educator must bootstrap as admin), `sam build && sam deploy` (template gained `AdminFunction`), then run `npm run test:e2e` against the real API (e2e rewritten for the admin-pending-approval flow).
+2. **Rework the frontend for the new RBAC** — new admin screens (user management: approval/promotion/password/delete), make creation/assignment/actions conditional by `role`, and handle login of a pending/denied account (status-aware messaging).
+3. **Deploy the frontend** — run `make frontend` (requires AWS creds): builds the SPA, `terraform apply`s `terraform/aws-frontend` (S3 + CloudFront), and prints the `cloudfront_domain_name`. Confirm the app loads at the CloudFront URL and `/api/*` reaches the API Gateway origin.
+4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
 
 ---
 
 ## Suggested next steps (in order)
 
-1. Run `make frontend` with AWS credentials to deploy the SPA and CloudFront distribution; smoke-test the app + API under the single CloudFront domain.
-2. If needed, exercise the full persona flows against the deployed stack (guardian registers → adds student → consent → VARK wizard → async prediction → profile/recommendations/report) and the student self-view login.
+1. Clean the DynamoDB data, deploy the updated backend, and run the rewritten e2e suite (validates the admin bootstrap + approval flow end-to-end).
+2. Rework the frontend to the new role/status rules (admin screens, conditional actions, pending-login handling).
+3. Run `make frontend` with AWS credentials to deploy the SPA and CloudFront distribution; smoke-test the app + API under the single CloudFront domain.

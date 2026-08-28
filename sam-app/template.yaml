@@ -424,6 +424,38 @@ Resources:
             Path: /audit
             Method: GET
 
+  AdminFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/api/
+      Handler: handlers/admin.lambdaHandler
+      Role: !GetAtt ApiRole.Arn
+      Events:
+        ListUsers:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /admin/users
+            Method: GET
+        UpdateUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /admin/users/{id}
+            Method: PATCH
+        ResetPassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /admin/users/{id}/password
+            Method: POST
+        DeleteUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /admin/users/{id}
+            Method: DELETE
+
   # ------------------------------------------------------------------------
   # ML inference — Python Lambda with the trained model bundled in the package.
   # Invoked asynchronously (Event) by the Forms handler after a new submission;

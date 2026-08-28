@@ -28,7 +28,7 @@
 ### Auth
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `POST /api/auth/register` | public | Create guardian/educator/admin account | `USER#` + `EMAIL#` reservation + `AUDIT#USER#` (txn) |
+| `POST /api/auth/register` | public | Create guardian/educator account (role is `guardian` or `educator`; first educator → `admin` bootstrap; others `pending`) | `USER#` + `EMAIL#` reservation + `AUDIT#USER#` (txn) |
 | `POST /api/auth/login` | public | Issue session token | `SESSION#` (GSI1 lookup) |
 | `POST /api/auth/logout` | any | Revoke current session | delete `SESSION#` |
 | `GET /api/auth/me` | any | Current user + role + scoped student count | `USER#<id>/META` |
@@ -36,15 +36,15 @@
 ### Students & guardianship
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `POST /api/students` | guardian, educator, admin | Create student profile | `STUDENT#<id>/META` |
+| `POST /api/students` | educator, admin | Create student profile (educator auto-`FOLLOW#`; guardian **cannot**) | `STUDENT#<id>/META` + `FOLLOW#`/`EDUCATOR#` (txn) when educator |
 | `GET /api/students` | guardian, educator, admin | List students in scope (guardian `GUARD#` / educator `FOLLOW#`; admin all) | Query user partition `GUARD#`/`FOLLOW#` prefix |
 | `GET /api/students/:id` | scoped | Student profile | `STUDENT#<c>/META` |
 | `PATCH /api/students/:id` | scoped, admin | Update profile (non-destructive) | `STUDENT#<c>/META` |
-| `POST /api/students/:id/guardians` | admin, guardian | Grant guardianship to a guardian | `GUARD#` + `GUARDIAN#` + `AUDIT#` (txn) |
-| `DELETE /api/students/:id/guardians/:userId` | admin | Revoke guardianship | reverse txn |
+| `POST /api/students/:id/guardians` | educator (scoped), admin | Grant guardianship to a guardian | `GUARD#` + `GUARDIAN#` + `AUDIT#` (txn) |
+| `DELETE /api/students/:id/guardians/:userId` | educator (scoped), admin | Revoke guardianship | reverse txn |
 | `POST /api/students/:id/follow` | educator | Follow a student | `FOLLOW#` + `EDUCATOR#` + `AUDIT#` (txn) |
 | `DELETE /api/students/:id/follow` | educator | Unfollow | reverse txn |
-| `POST /api/students/:id/student-account` | guardian (of the student), educator (followed), admin | Create the student (minor) account — **consent-gated** (institution-led onboarding when no guardian) | `USER#`+`EMAIL#`+`STUDENT#`+`STUDENT#` edge (txn) |
+| `POST /api/students/:id/student-account` | educator (followed), admin | Create the student (minor) account — **consent-gated** (requires active consent; **not** by guardian) | `USER#`+`EMAIL#`+`STUDENT#`+`STUDENT#` edge (txn) |
 | `GET /api/students/:id/guardians` | scoped | Guardians of this student | `STUDENT#<c>/GUARDIAN#` prefix |
 | `GET /api/students/:id/educators` | scoped | Educators following this student | `STUDENT#<c>/EDUCATOR#` prefix |
 
@@ -52,7 +52,7 @@
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
 | `GET /api/students/:id/consent` | scoped, admin | Current consent + history (incl. `legalBasis`, `grantedByRole`) | `CONSENT#` prefix |
-| `POST /api/students/:id/consent` | guardian (of the student), educator (followed), admin | Grant/revoke versioned consent; `legalBasis: guardian|institution_authorization|self_consent` | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
+| `POST /api/students/:id/consent` | guardian (of the student, via `GUARD#`), educator (followed), admin | Grant/revoke versioned consent; `legalBasis: guardian|institution_authorization|self_consent` | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
 
 ### Forms
 | Method & Path | Roles | Description | Schema items |
@@ -101,6 +101,16 @@
 | `GET /api/reports/:reportId/download` | scoped, sharedWith | Presigned GET URL to the PDF | GSI1 `REPORT#<id>` → S3 presign |
 | `DELETE /api/reports/:reportId` | scoped (any role except student) | Remove report (and object) | delete `REPORT#` + S3 object |
 
+### Admin — User Management (approval & RBAC)
+| Method & Path | Roles | Description | Schema items |
+|---------------|-------|-------------|--------------|
+| `GET /api/admin/users` | admin (all roles), educator (guardian/student only) | List users by optional `role`/`status` filter | GSI2 `RoleStatus` query per role |
+| `PATCH /api/admin/users/:id` | admin, educator | Change `status` (approve/deny) and `role` (promote/demote, admin only); guards: no self-demote, no last-admin removal | `USER#<id>/META` + `AUDIT#USER#` |
+| `POST /api/admin/users/:id/password` | admin | Reset a user's password | update `USER#<id>/META` `passwordHash` |
+| `DELETE /api/admin/users/:id` | admin | Hard-delete account: user items + `EMAIL#` + sessions + reverse edges | deletes across partitions |
+
+> **Approval gating** — educators/guardians register `pending` and can't sign in until approved. Educators may approve/deny `guardian`/`student` accounts (status only). Admins additionally approve/deny educators and promote/demote `educator↔admin`. The **first educator to register** (when no admin exists) becomes the initial `admin`+`active`.
+
 ### Admin — Audit
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
@@ -114,18 +124,19 @@
 
 | Endpoint group | guardian | educator | student | admin |
 |----------------|:--------:|:--------:|:-------:|:-----:|
-| Auth (login/logout/me) | ✓ | ✓ | ✓ | ✓ |
-| Students CRUD | own students | followed (create/edit) | own profile (read; edit name) | ✓ |
-| Guardianship | view own | ✗ | ✗ | ✓ |
+| Auth (login/logout/me) | ✓ (pending must be approved) | ✓ | ✓ | ✓ |
+| Students CRUD | assigned (read/edit; **no create**) | followed (create/edit) | own profile (read; edit name) | ✓ |
+| Guardianship | view assigned | assign (scoped)/✓ | ✗ | ✓ |
 | Follow | ✗ | ✓ | ✗ | ✗ |
-| Student account | own students | followed (institution onboarding) | ✗ | ✓ |
-| Consent | own students | followed (grant/revoke, institution basis) | ✗ | ✓ |
+| Student account | ✗ | followed (institution onboarding) | ✗ | ✓ |
+| User management (approval/RBAC) | ✗ | approve guardian/student (status only) | ✗ | ✓ (full) |
+| Consent | assigned students | followed (grant/revoke, institution basis) | ✗ | ✓ |
 | Forms (fill) | anamnesis | socioemotional, behavior-checklist | vark | ✓ all |
 | Observations | ✗ | ✓ | own (read-only) | ✓ |
-| Assessments / Predict | own students | followed | own (full payload) | ✓ |
-| Recommendations | own students (approved) | propose/approve | own (published) | ✓ |
-| Reports | own students | followed | own (incl. generate; never delete) | ✓ |
-| Audit | own students (trail) | ✗ | ✗ | ✓ |
+| Assessments / Predict | assigned students | followed | own (full payload) | ✓ |
+| Recommendations | assigned (approved) | propose/approve | own (published) | ✓ |
+| Reports | assigned students | followed | own (incl. generate; never delete) | ✓ |
+| Audit | assigned students (trail) | ✗ | ✗ | ✓ |
 
 Every data access is additionally **scope-checked** (edges in DynamoDB), not just role-checked — see [Authentication](./auth.md).
 

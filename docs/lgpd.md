@@ -6,8 +6,8 @@
 
 | Processing | Legal basis (LGPD art. 7) | Notes |
 |-----------|----------------------------|-------|
-| Registration of guardian/educator/admin | Consent + legitimate interest of the institution | Adult users |
-| Registration of the student (minor) | **Consent of the guardian** (art. 14 — children's data); for students without a guardian, **institution authorization** (`legalBasis=institution_authorization`) granted by the responsible educator/admin, documented on the consent record | Guardian- or institution-led |
+| Registration of guardian/educator/admin | Consent + legitimate interest of the institution (accounts are `pending` until an educator/admin approves) | Adult users |
+| Registration of the student (minor) | **Consent of the guardian** (art. 14 — children's data); for students without a guardian, **institution authorization** (`legalBasis=institution_authorization`) granted by the responsible educator/admin, documented on the consent record. Students are registered by an **educator/admin** (a guardian is assigned later) | Educator-/institution-led |
 | Filling forms, observations, assessments | Guardian consent or institution authorization (per student, versioned) | `vark`, `anamnesis`, `socioemotional`, `behavior-checklist` |
 | ML prediction & recommendations | Same consent basis; anonymized training outside scope | See data minimization below |
 | Reports (PDF) | Same consent basis; sharing per `sharedWith` | Presigned URLs |

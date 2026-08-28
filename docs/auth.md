@@ -6,19 +6,34 @@
 
 | Role | Sees | Restricted from |
 |------|------|-----------------|
-| `guardian` | Only their own students (via `GUARD#` edges) | Other students, educator observations |
-| `educator` | Only students they follow (via `FOLLOW#` edges) | Guardianship management |
+| `guardian` | Only their assigned students (via `GUARD#` edges) — edit profile + fill forms | Other students; cannot create/remove students |
+| `educator` | Only students they follow (via `FOLLOW#` edges) | Full user management (approve educators, promote/demote, passwords, delete) |
 | `student` | Full self-view of own data — profile, forms/submissions, predictions (with scores), observations, reports | Managing others, audit trail, raw model internals |
-| `admin` | Everything (users, students, audit) | — |
+| `admin` | Everything (users, students, audit) | Cannot demote self / remove last active admin |
 
-> **Educator = admin-like authority over the student flows:** an educator following a student can grant/revoke consent and create the student account (institution-led onboarding), mirroring what an admin can do. Guardians do the same for their own students; a student account holder manages only their own data.
+### Account status & approval flow
+
+Accounts are **approval-gated** before they can sign in:
+
+| Status | Meaning | Notes |
+|--------|---------|-------|
+| `pending` | Awaiting approval | educator/guardian on register; login blocked → `403 pending_approval` |
+| `active` | Approved, can sign in | first educator to register becomes **admin + active** automatically (bootstrap) |
+| `denied` | Rejected by an admin/educator | login blocked → `403 account_denied`; can be re-approved later (`pending`→`active`) |
+
+- **First educator → admin bootstrap**: the very first `educator` to register, when **no admin exists** (`GSI2 RoleStatus` `USER#ROLE#admin` scan), is created as `admin` + `active` immediately. All later `educator` and `guardian` registrations start `pending`.
+- **Who approves whom**: educators can approve/deny `guardian` and `student` accounts (status only, never roles). Admins have full control — approve/deny educators, promote/demote between `educator↔admin`, reset passwords, delete accounts.
+- **`student` accounts are never self-registered** — created by an educator/admin via `POST /students/:id/student-account`; they start `active`.
+- Because `requireAuth` **re-reads the user from the DB on every request** (see [Middleware](#middleware)), approving, denying, or demoting a user takes effect immediately (their session no longer validates).
+
+> **Educator = admin-like authority over the student flows:** an educator following a student can grant/revoke consent and create the student account (institution-led onboarding), mirroring what an admin can do. Guardians only manage **students assigned to them**; a student account holder manages only their own data.
 
 ## Session Flow
 
-1. **Register** — `POST /api/auth/register` creates `USER#<id>/META` + `EMAIL#` reservation in one transaction (409 on duplicate email). Password stored hashed (bcrypt, 12 rounds).
-2. **Login** — `POST /api/auth/login` validates credentials → creates `SESSION#` item (`USER#<id>/SESSION#<token>`, role snapshot, `expiresAt` = 7 days sliding) with GSI1 `SESSION#<token>` lookup.
-3. **Authenticated requests** — `Authorization: Bearer <token>`; `requireAuth` middleware resolves the token via GSI1, checks `status=active` and `expiresAt`, and attaches `{userId, role, scope}` to the request context.
-4. **Logout / revocation** — deletes the `SESSION#` item; admin can suspend a user (`USER#<id>/META.status=suspended`), which blocks all future token validation.
+1. **Register** — `POST /api/auth/register` creates `USER#<id>/META` + `EMAIL#` reservation in one transaction (409 on duplicate email). Educator/guardian accounts start `pending` (unless the first educator bootstrap → `admin`+`active`); password stored hashed (bcrypt, 12 rounds).
+2. **Login** — `POST /api/auth/login` validates credentials → creates `SESSION#` item (`USER#<id>/SESSION#<token>`, role snapshot, `expiresAt` = 7 days sliding) with GSI1 `SESSION#<token>` lookup. Non-`active` accounts (pending/denied) are rejected.
+3. **Authenticated requests** — `Authorization: Bearer <token>`; `requireAuth` middleware resolves the token via GSI1, checks `status=active` and `expiresAt`, and attaches `{userId, role}` to the request context.
+4. **Logout / revocation** — deletes the `SESSION#` item; an admin can set a user's status `pending`/`denied` (or delete the account), which blocks all future token validation.
 5. **TTL** — `SESSION#` items carry `ttl=expiresAt`; expired sessions vanish without cleanup work.
 
 ```
@@ -40,7 +55,7 @@
 
 | Middleware | Responsibility |
 |------------|----------------|
-| `requireAuth` | Validates token → context `{userId, role}`; 401 otherwise |
+| `requireAuth` | Validates token + re-reads user from DB → context `{userId, role}`; 401 otherwise (blocks non-active users immediately) |
 | `requireRole(...roles)` | Rejects if `role` not allowed; 403 |
 | `assertScopeStudent(studentId)` | For student routes: guardian → `GUARD#`/`GUARDIAN#` edge; educator → `FOLLOW#`/`EDUCATOR#` edge; student → own link only; admin → always; else 403. |
 
@@ -54,14 +69,14 @@ Access is **binary** — there are no autonomy levels. A user either has an acco
 
 ## Student (Minor) Accounts
 
-- Created via `POST /api/students/:id/student-account` by the **primary guardian**, an **educator following the student** (institution-led onboarding, e.g. no guardian), or an **admin** — gated by the student's current consent (409 if no active consent).
+- Created via `POST /api/students/:id/student-account` by an **educator following the student** (institution-led onboarding) or an **admin** — **not** by a guardian (guardians manage only assigned students, not account creation) — gated by the student's current consent (409 if no active consent).
 - A minor **cannot** register directly, can only edit their own name, and never sees the audit trail, other students' data, or raw model internals.
 - The student identity is linked through `STUDENT#<c>/STUDENT#<userId>` + `USER#<s>/STUDENT#<c>` edges, written in the same transaction as the user creation.
 - UI: the student persona renders the self-view (see [Frontend](./frontend.md)).
 
 ## Students Without a Guardian
 
-- An educator or admin can register the student (`POST /api/students`) and record optional `accountability` (institution/authorized-by/note) on the student META.
+- An educator or admin can register the student (`POST /api/students`) and record optional `accountability` (institution/authorized-by/note) on the student META. (Guardians do **not** register students.)
 - **Consent is still mandatory** — no processing without a documented legal basis. The educator (or admin) grants consent via the same `POST /api/students/:id/consent` with `legalBasis: "institution_authorization"` (see [LGPD](./lgpd.md)). If a guardian exists, the guardian remains the consent authority.
 - The educator then creates the student account. From that point the student behaves like any other — the only difference is who granted consent.
 
@@ -76,7 +91,7 @@ Access is **binary** — there are no autonomy levels. A user either has an acco
 - All traffic over HTTPS (CloudFront/API Gateway); no secrets in client code.
 - Rate limiting on `login`/`register` (API Gateway throttling) to mitigate brute force.
 - `requireAuth` runs for every handler except `health`, `login`, and `register`.
-- Admin suspension is checked at token validation time (session validity reflects current `USER#<id>/META.status`).
+- User status is checked at token validation time (session validity reflects current `USER#<id>/META.status`), so approval/denial/demotion takes effect on the next request.
 
 ---
 

@@ -8,16 +8,10 @@ import { hashPassword, getUserByEmail, getUser } from "../lib/auth.mjs";
 import { getStudent } from "./students.mjs";
 import { uid } from "../lib/ids.mjs";
 
-const isPrimaryGuardian = async (studentId, ctx) => {
-  if (ctx.role === "admin") return true;
-  if (ctx.role !== "guardian") return false;
-  const student = await getStudent(studentId);
-  return student?.createdBy === ctx.userId;
-};
-
 const grantGuardian = async (event, ctx) => {
   const studentId = param(event, "id");
-  if (!(await isPrimaryGuardian(studentId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian or an admin can grant guardianship");
+  if (!["admin", "educator"].includes(ctx.role)) throw new HttpError(403, "forbidden", "Only educators and admins can assign a responsable");
+  if (ctx.role === "educator") await assertScopeStudent(studentId, ctx);
   const body = parseBody(event);
   requireKeys(body, ["userId"]);
   const userId = body.userId;
@@ -53,7 +47,8 @@ const grantGuardian = async (event, ctx) => {
 const revokeGuardian = async (event, ctx) => {
   const studentId = param(event, "id");
   const userId = param(event, "userId");
-  assert(ctx.role === "admin", "forbidden", "Only admins can revoke guardianship", 403);
+  if (!["admin", "educator"].includes(ctx.role)) throw new HttpError(403, "forbidden", "Only educators and admins can revoke a responsable");
+  if (ctx.role === "educator") await assertScopeStudent(studentId, ctx);
   await client.send(
     new CMD.transact({
       TransactItems: [
@@ -109,13 +104,12 @@ const canCreateStudentAccount = async (studentId, ctx) => {
     await assertScopeStudent(studentId, ctx);
     return true;
   }
-  if (ctx.role === "guardian") return (await getStudent(studentId))?.createdBy === ctx.userId;
   return false;
 };
 
 const createStudentAccount = async (event, ctx) => {
   const studentId = param(event, "id");
-  if (!(await canCreateStudentAccount(studentId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the student or an admin can create the student account");
+  if (!(await canCreateStudentAccount(studentId, ctx))) throw new HttpError(403, "forbidden", "Only an educator following the student or an admin can create the student account");
 
   const student = await getStudent(studentId);
   if (!student) throw new HttpError(404, "student_not_found", "Student not found");

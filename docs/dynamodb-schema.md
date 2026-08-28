@@ -34,8 +34,10 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 **Profile item**
 | PK | SK | Attributes |
 |----|----|-----------|
-| `USER#<userId>` | `META` | `userId`, `email` (normalized), `name`, `role` (`guardian|educator|student|admin`), `status` (`active|suspended|deleted`), `consentGranted`, `createdAt`, `updatedAt` |
-| `USER#<userId>` | `META` | GSI2PK `ROLE#<role>`, GSI2SK `USER#<userId>` |
+| `USER#<userId>` | `META` | `userId`, `email` (normalized), `name`, `role` (`guardian|educator|student|admin`), `status` (`active|pending|denied`; `createdBy` on student accounts), `createdAt`, `updatedAt` |
+| `USER#<userId>` | `META` | GSI2PK `ROLE#<role>`, GSI2SK `USER#<userId>#<status>` |
+
+> **Approval flow**: registration writes `USER#ROLE#<role>` on GSI2. `hasAdmin()` (register bootstrap + delete/last-admin guards) scans `USER#ROLE#admin`; `admin` lists users by role/status via GSI2. Setting status `pending|active|denied` rewrites `GSI2PK`/`GSI2SK` atomically.
 
 **Email uniqueness reservation** — written in the same transaction as the profile (aborts user creation on collision):
 | PK | SK | Attributes |
@@ -153,7 +155,8 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Own record (student self-view) | Query `USER#<s>`, SK `STUDENT#` |
 | Get student profile | Query `STUDENT#<c>` SK `META` |
 | List students by status (admin) | GSI2 Query `STUDENT#STATUS#<status>` |
-| List users by role (admin) | GSI2 Query `ROLE#<role>` |
+| List users by role (admin / educator) | GSI2 Query `ROLE#<role>` (educator restricted to guardian/student) |
+| Check first-admin bootstrap / last-admin | GSI2 Query `USER#ROLE#admin` (count active) |
 | Submissions of a student (one form) | Query `STUDENT#<c>`, SK begins_with `SUBMISSION#<formId>#`, desc |
 | Submissions of a student (all forms) | Query `STUDENT#<c>`, SK begins_with `SUBMISSION#`, desc |
 | Submissions by form (export) | GSI1 Query `SUBMISSION#<formId>` |
@@ -173,6 +176,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Flow | Items written atomically |
 |------|--------------------------|
 | Create user | `USER#<id>/META` + `EMAIL#<email>/USER#<id>` (uniqueness reservation) + `AUDIT#USER#<id>` |
+| Update user status/role (admin) | `USER#<id>/META` (SET `role`/`status` + `GSI2PK`/`GSI2SK`) + `AUDIT#USER#<id>` |
 | Grant guardianship | `USER#<g>/GUARD#<c>` + `STUDENT#<c>/GUARDIAN#<g>` + `AUDIT#STUDENT#<c>` |
 | Educator follow | `USER#<e>/FOLLOW#<c>` + `STUDENT#<c>/EDUCATOR#<e>` + `AUDIT#STUDENT#<c>` |
 | Create student account | `USER#<s>/META` + `EMAIL#` reservation + `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/STUDENT#<s>` + `STUDENT#<c>/META` (set `studentUserId`) + `AUDIT#STUDENT#<c>` |

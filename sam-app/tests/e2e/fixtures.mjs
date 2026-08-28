@@ -3,12 +3,24 @@ import { cleanupStudent, cleanupUser, findStudentsByCreator, findUserByEmail } f
 // Solely the fixture identities the e2e suite itself creates. Cleanup deletes
 // ONLY data added by the tests (users/students keyed to these test-only emails)
 // and never touches anything else in the table.
+//
+// Role flow under the new RBAC rules:
+// - The FIRST educator to register becomes the initial admin (active).
+// - Later educators register as `pending` and are activated by an admin.
+// - Guardian accounts register as `pending` and are activated by an educator/admin.
+// - Student accounts are created by an educator/admin (they do not self-register).
 export const TEST_FIXTURES = [
-  { email: "maria.responsavel@example.com", name: "Maria da Silva", password: "senha12345", role: "guardian" },
+  // First educator to register -> becomes admin (active bootstrap).
+  { email: "admin.sistema@example.com", name: "Adriana Lopes", password: "senha12345", role: "educator" },
+  // Common educator -> registers pending, then approved by the admin.
   { email: "prof.joao@example.com", name: "João Pereira", password: "senha12345", role: "educator" },
+  // Guardian -> registers pending, then approved by an educator/admin.
+  { email: "maria.responsavel@example.com", name: "Maria da Silva", password: "senha12345", role: "guardian" },
+  // Students (self accounts created by educator/admin).
   { email: "ana.clara@example.com", name: "Ana Clara", password: "senha12345", role: "student" },
   { email: "pedro.aluno@example.com", name: "Pedro Silva", password: "senha12345", role: "student" },
   { email: "pedro.alves@example.com", name: "Pedro Alves", password: "pedro12345", role: "student" },
+  { email: "lia.mendes@example.com", name: "Lia Mendes", password: "lia12345", role: "student" },
 ];
 
 // Decisively reading/writing-dominant answers: R=5.0, A=1.0, K=2.0 (R-K=3 > 2,

@@ -8,21 +8,12 @@ import { getStudent } from "./students.mjs";
 
 const LEGAL_BASES = ["guardian", "institution_authorization", "self_consent"];
 
-const isPrimaryGuardian = async (studentId, ctx) => {
-  if (ctx.role === "admin") return true;
-  if (ctx.role !== "guardian") return false;
-  const student = await getStudent(studentId);
-  return student?.createdBy === ctx.userId;
-};
-
 const canSetConsent = async (studentId, ctx) => {
+  // Admin, educator (FOLLOW#), guardian (GUARD#) and self-student (STUDENT#)
+  // with access to the student may set/revoke consent.
   if (ctx.role === "admin") return true;
-  if (ctx.role === "educator") {
-    await assertScopeStudent(studentId, ctx);
-    return true;
-  }
-  if (ctx.role === "guardian") return (await getStudent(studentId))?.createdBy === ctx.userId;
-  return false;
+  await assertScopeStudent(studentId, ctx);
+  return true;
 };
 
 const getConsent = async (event, ctx) => {

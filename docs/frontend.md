@@ -46,6 +46,8 @@ Student persona sees a **simplified self-view**: own profile, recommendations, a
 - Scope is enforced server-side (see [Authentication](./auth.md)); the UI only *hides* what the backend already denies.
 - Student mode: after login as `student`, the app enters a simplified visual mode (larger type, fewer nav items, playful but non-childish copy — LGPD-friendly wording).
 
+> **Not yet reworked for the new RBAC:** the SPA predates the approval/admin-bootstrap backend. Pending work (see [progress](./progress.md)): admin user-approval/promotion/password/delete screens under `/admin/*`, making creation/assignment/consent actions conditional on `role` (only educator/admin create students and assign responsables/self-accounts), and handling login of a `pending`/`denied` account with status-aware messaging instead of a generic failure.
+
 ## Feature Areas
 
 1. **Form engine renderer** — generic renderer over `FORM#` definitions: renders question types (single, multiple, likert, text, number, date), sections, progress, required validation; submit via `POST /api/students/:id/forms/:formId/responses` (idempotent `requestId`).
