@@ -3,33 +3,33 @@ import assert from "node:assert/strict";
 import { getDefinitions, getFormDefinition, getFormProcessor, getAssessmentProcessor } from "../../src/api/forms/engine.mjs";
 import { validateFormDefinition } from "../../src/api/forms/schema.mjs";
 
-test("todas as definicoes registradas sao validas", () => {
+test("all registered definitions are valid", () => {
   const defs = getDefinitions();
   assert.ok(defs.length >= 4);
   for (const def of defs) {
-    assert.deepEqual(validateFormDefinition(def), [], `form ${def.formId} invalida`);
+    assert.deepEqual(validateFormDefinition(def), [], `form ${def.formId} invalid`);
   }
 });
 
-test("definicoes sao unicas por formId", () => {
+test("definitions are unique by formId", () => {
   const ids = getDefinitions().map((d) => d.formId);
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("getFormDefinition encontra e retorna null para desconhecido", () => {
+test("getFormDefinition resolves a known form and returns null for unknown", () => {
   assert.ok(getFormDefinition("vark"));
-  assert.equal(getFormDefinition("nao-existe"), null);
+  assert.equal(getFormDefinition("does-not-exist"), null);
 });
 
-test("registro de processadores e agnostico", () => {
+test("processor registration is agnostic", () => {
   const p = getFormProcessor("vark");
   assert.ok(p);
   assert.equal(typeof p.score, "function");
   assert.equal(getFormProcessor("anamnesis"), null);
-  assert.equal(getFormProcessor("qualquer-coisa"), null);
+  assert.equal(getFormProcessor("anything"), null);
 });
 
-test("processador de assessment e descoberto sem conhecer o formId", () => {
+test("assessment processor is discovered without knowing the formId", () => {
   const p = getAssessmentProcessor();
   assert.ok(p);
   assert.equal(p.kind, "assessment");

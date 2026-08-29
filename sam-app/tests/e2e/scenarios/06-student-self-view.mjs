@@ -1,11 +1,13 @@
 import { api, expect, pollUntil, step } from "../helpers.mjs";
 import { answers } from "../fixtures.mjs";
 
-// Educator-led student (no guardian): institution consent replaces family
-// consent, the educator creates the login, and the student account sees its
-// own data in full — submissions, observations and complete ML predictions.
+// Educator-led student (minor, no guardian): institution consent replaces family
+// consent, the student SELF-REGISTERS a `pending` account, and while pending they
+// only reach a restricted self-service area. The educator LINKS the account
+// (approving it, pending -> active); the linked student sees its own data in full —
+// submissions, observations and complete ML predictions. See specs/auth.md + backend.md.
 export default async (ctx) => {
-  step("self-view: educator-led student setup");
+  step("self-view: minor without guardian setup + pending restriction");
   {
     const c = await api("POST", "/students", { token: ctx.educatorToken, body: { name: "Pedro Alves", birthDate: "2011-09-30" } });
     expect("educator creates student without guardian", c.status === 201 && !!c.data.studentId, JSON.stringify(c.data));
@@ -17,21 +19,36 @@ export default async (ctx) => {
     });
     expect("educator grants institution consent", consent.status === 200 && consent.data.status === "active", JSON.stringify(consent.data));
 
-    const acc = await api("POST", `/students/${ctx.noGuardianStudentId}/student-account`, {
-      token: ctx.educatorToken,
-      body: { email: TEST_EMAIL, name: "Pedro Alves", password: "pedro12345" },
+    // Pedro self-registers (role student + birthDate). Minor, so it starts `pending`.
+    const reg = await api("POST", "/auth/register", {
+      body: { email: PEDRO_EMAIL, name: "Pedro Alves", password: "pedro12345", role: "student", birthDate: "2011-09-30" },
     });
-    expect("educator creates student account", acc.status === 201 && !!acc.data.userId, JSON.stringify(acc.data));
+    expect("student self-registers pending", reg.status === 201 && reg.data.user.role === "student" && reg.data.user.status === "pending", JSON.stringify(reg.data));
+    ctx.pedroUserId = reg.data.user.userId;
 
-    const login = await api("POST", "/auth/login", { body: { email: TEST_EMAIL, password: "pedro12345" } });
-    expect("no-guardian student login", login.status === 200 && !!login.data.token, JSON.stringify(login.data));
+    // Pending student signs in to the restricted self-service area only.
+    const login = await api("POST", "/auth/login", { body: { email: PEDRO_EMAIL, password: "pedro12345" } });
+    expect("pending student can sign in (restricted self-service)", login.status === 200 && !!login.data.token && login.data.user.status === "pending", JSON.stringify(login.data));
     ctx.pedroToken = login.data.token;
+
+    const me = await api("GET", "/auth/me", { token: ctx.pedroToken });
+    expect("pending student sees own account with no entity yet", me.status === 200 && me.data.user.status === "pending" && me.data.studentId === null, JSON.stringify(me.data));
+
+    // Not linked yet -> not scoped to any entity; cannot touch a student's data.
+    const noScoped = await api("GET", `/students/${ctx.noGuardianStudentId}`, { token: ctx.pedroToken });
+    expect("unlinked pending student has no entity access", noScoped.status === 403, JSON.stringify(noScoped.data));
+  }
+
+  step("self-view: educator links account -> active full self-view");
+  {
+    const acc = await api("POST", `/students/${ctx.noGuardianStudentId}/accounts/${ctx.pedroUserId}/link`, { token: ctx.educatorToken, body: {} });
+    expect("educator links + approves student account", acc.status === 200 && acc.data.studentId === ctx.noGuardianStudentId, JSON.stringify(acc.data));
   }
 
   step("self-view: student fills its own form");
   {
     const sub = await api("POST", `/students/${ctx.noGuardianStudentId}/forms/vark/responses`, { token: ctx.pedroToken, body: { answers } });
-    expect("student without guardian submits own form", sub.status === 201 && !!sub.data.submissionId, JSON.stringify(sub.data));
+    expect("linked student submits own form", sub.status === 201 && !!sub.data.submissionId, JSON.stringify(sub.data));
     ctx.pedroSubmissionId = sub.data.submissionId;
   }
 
@@ -92,4 +109,4 @@ export default async (ctx) => {
   }
 };
 
-const TEST_EMAIL = "pedro.alves@example.com";
+const PEDRO_EMAIL = "pedro.alves@example.com";

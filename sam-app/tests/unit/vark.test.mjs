@@ -14,7 +14,7 @@ const def = {
   ],
 };
 
-test("leitura dominante -> label R", () => {
+test("dominant reading -> label R", () => {
   const r = scoreVark(def, { q1: 5, q2: 1, q3: 1 });
   assert.equal(r.label, "R");
   assert.equal(r.scores.R, 5);
@@ -23,35 +23,35 @@ test("leitura dominante -> label R", () => {
   assert.equal(r.multimodal, false);
 });
 
-test("aural dominante -> label A", () => {
+test("dominant aural -> label A", () => {
   const r = scoreVark(def, { q1: 1, q2: 5, q3: 1 });
   assert.equal(r.label, "A");
 });
 
-test("cinestesico dominante -> label K", () => {
+test("dominant kinesthetic -> label K", () => {
   const r = scoreVark(def, { q1: 1, q2: 1, q3: 5 });
   assert.equal(r.label, "K");
 });
 
-test("empate total -> multimodal", () => {
+test("full tie -> multimodal", () => {
   const r = scoreVark(def, { q1: 5, q2: 5, q3: 5 });
   assert.equal(r.label, "multimodal");
   assert.equal(r.multimodal, true);
 });
 
-test("diferenca pequena -> multimodal", () => {
+test("small difference -> multimodal", () => {
   const r = scoreVark(def, { q1: 5, q2: 4, q3: 1 });
   assert.equal(r.label, "multimodal");
 });
 
-test("respostas vazias -> label null", () => {
+test("empty answers -> null label", () => {
   const r = scoreVark(def, {});
   assert.equal(r.label, null);
   assert.equal(r.multimodal, false);
   assert.deepEqual(r.scores, { R: 0, A: 0, K: 0 });
 });
 
-test("respostas parciais usam media por dimensao", () => {
+test("partial answers use per-dimension mean", () => {
   const def2 = {
     sections: [{ questions: [{ id: "q1", group: "r" }, { id: "q2", group: "r" }] }],
   };
@@ -59,7 +59,7 @@ test("respostas parciais usam media por dimensao", () => {
   assert.equal(r.scores.R, 4);
 });
 
-test("grupo desconhecido ignorado", () => {
+test("unknown group is ignored", () => {
   const def2 = { sections: [{ questions: [{ id: "q1", group: "x" }] }] };
   const r = scoreVark(def2, { q1: 5 });
   assert.equal(r.scores.R, 0);

@@ -2,29 +2,41 @@ import { api, expect, pollUntil, step } from "../helpers.mjs";
 import { varkDefinition } from "../../../src/api/forms/definitions/vark.mjs";
 import { scoreVark } from "../../../src/api/forms/processors/vark.mjs";
 
-// Full form → classification loop on a fresh student: the educator creates the
-// student, the vark form is submitted, the deterministic assessment is run, and
-// BOTH the assessment and the ML prediction must ride along in GET .../forms/vark/responses.
+// Full form → classification loop on a fresh student. Lia is an ADULT (>= 18), so
+// she SELF-CONSENTS (legalBasis=self_consent) and her self-registered account is
+// LINKED by the educator. Then the vark form is submitted, the deterministic
+// assessment is run, and BOTH the assessment and the ML prediction must ride along
+// in GET .../forms/vark/responses. See specs/auth.md + lgpd.md (self_consent).
 export default async (ctx) => {
   step("classify: dedicated chain setup");
-  const created = await api("POST", "/students", { token: ctx.educatorToken, body: { name: "Lia Mendes", birthDate: "2012-03-14" } });
+  const created = await api("POST", "/students", { token: ctx.educatorToken, body: { name: "Lia Mendes", birthDate: "2004-04-20" } });
   expect("educator creates dedicated student", created.status === 201 && !!created.data.studentId, JSON.stringify(created.data));
   ctx.liaId = created.data.studentId;
 
-  // Submissions are consent-gated (forms.mjs) — grant before submitting.
-  const consent = await api("POST", `/students/${ctx.liaId}/consent`, { token: ctx.educatorToken, body: { consentVersion: "v1", status: "active", legalBasis: "institution_authorization" } });
-  expect("consent granted for dedicated student", consent.status === 200 && consent.data.status === "active", JSON.stringify(consent.data));
-
-  // The vark form has audience=student, so any persona may fill it: the student's
-  // own account, a guardian or educator acting for them, or an admin. Here we
-  // create the student self-account and submit as herself (the educator still
-  // reads the assessment/prediction via FOLLOW# after creating it).
-  const acc = await api("POST", `/students/${ctx.liaId}/student-account`, { token: ctx.educatorToken, body: { email: "lia.mendes@example.com", name: "Lia Mendes", password: "lia12345" } });
-  expect("educator creates student self-account", acc.status === 201 && !!acc.data.userId, JSON.stringify(acc.data));
+  // Adult student self-registers (pending). The link is consent-gated: an adult
+  // (>= 18) self-consents (self_consent), a minor needs guardian/institution consent
+  // already granted — for Lia the adult self-consent satisfies the gate.
+  const reg = await api("POST", "/auth/register", {
+    body: { email: "lia.mendes@example.com", name: "Lia Mendes", password: "lia12345", role: "student", birthDate: "2004-04-20" },
+  });
+  expect("adult student self-registers pending", reg.status === 201 && reg.data.user.status === "pending", JSON.stringify(reg.data));
+  ctx.liaUserId = reg.data.user.userId;
 
   const login = await api("POST", "/auth/login", { body: { email: "lia.mendes@example.com", password: "lia12345" } });
-  expect("student self login", login.status === 200 && !!login.data.token, JSON.stringify(login.data));
+  expect("pending adult student self login", login.status === 200 && !!login.data.token, JSON.stringify(login.data));
   ctx.liaToken = login.data.token;
+
+  // Educators no longer create accounts — they LINK the self-registered one.
+  const acc = await api("POST", `/students/${ctx.liaId}/accounts/${ctx.liaUserId}/link`, { token: ctx.educatorToken, body: {} });
+  expect("educator links + approves adult student account", acc.status === 200 && acc.data.studentId === ctx.liaId, JSON.stringify(acc.data));
+
+  // A linked ADULT student may self-consent on their own entity (self_consent);
+  // minors (< 18) never can — verified in 09-student-record-rules.mjs.
+  const selfConsent = await api("POST", `/students/${ctx.liaId}/consent`, {
+    token: ctx.liaToken,
+    body: { consentVersion: "v1", status: "active", legalBasis: "self_consent" },
+  });
+  expect("linked adult student self-consents on own entity", selfConsent.status === 200 && selfConsent.data.legalBasis === "self_consent", JSON.stringify(selfConsent.data));
 
   // Kinesthetic-dominant answers (K=5.0, A=2.0, R=1.0 → unimodal gap > 2).
   const answers = {};

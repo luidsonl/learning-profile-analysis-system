@@ -3,67 +3,67 @@ import assert from "node:assert/strict";
 import { validateFormDefinition } from "../../src/api/forms/schema.mjs";
 
 const valid = {
-  formId: "minha-form",
-  name: "Minha Form",
+  formId: "my-form",
+  name: "My Form",
   audience: "student",
   sections: [
-    { id: "s1", title: "Seção 1", questions: [{ id: "x1", type: "likert", text: "Pergunta?", options: [1, 2, 3] }] },
+    { id: "s1", title: "Section 1", questions: [{ id: "x1", type: "likert", text: "Question?", options: [1, 2, 3] }] },
   ],
 };
 
-test("definicao valida passa", () => {
+test("valid definition passes", () => {
   assert.deepEqual(validateFormDefinition(valid), []);
 });
 
-test("rejeita formId invalido", () => {
-  assert.ok(validateFormDefinition({ ...valid, formId: "Form Errada!" }).length > 0);
+test("rejects invalid formId", () => {
+  assert.ok(validateFormDefinition({ ...valid, formId: "Wrong Form!" }).length > 0);
 });
 
-test("rejeita audience desconhecida", () => {
-  assert.ok(validateFormDefinition({ ...valid, audience: "pai" }).length > 0);
+test("rejects unknown audience", () => {
+  assert.ok(validateFormDefinition({ ...valid, audience: "parent" }).length > 0);
 });
 
-test("rejeita sem secoes", () => {
+test("rejects missing sections", () => {
   assert.ok(validateFormDefinition({ ...valid, sections: [] }).length > 0);
 });
 
-test("rejeita tipo de pergunta desconhecido", () => {
+test("rejects unknown question type", () => {
   const d = JSON.parse(JSON.stringify(valid));
   d.sections[0].questions[0].type = "emoji";
   assert.ok(validateFormDefinition(d).length > 0);
 });
 
-test("rejeita pergunta sem texto", () => {
+test("rejects question without text", () => {
   const d = JSON.parse(JSON.stringify(valid));
   d.sections[0].questions[0].text = "";
   assert.ok(validateFormDefinition(d).length > 0);
 });
 
-test("rejeita ids duplicados", () => {
+test("rejects duplicate ids", () => {
   const d = JSON.parse(JSON.stringify(valid));
-  d.sections[0].questions.push({ id: "x1", type: "likert", text: "Outra?", options: [1, 2] });
+  d.sections[0].questions.push({ id: "x1", type: "likert", text: "Other?", options: [1, 2] });
   const errors = validateFormDefinition(d);
   assert.ok(errors.some((e) => e.includes("duplicate question id: x1")));
 });
 
-test("rejeita single/multiple sem options", () => {
+test("rejects single/multiple without options", () => {
   const d = JSON.parse(JSON.stringify(valid));
-  d.sections[0].questions[0] = { id: "x2", type: "single", text: "Qual?" };
+  d.sections[0].questions[0] = { id: "x2", type: "single", text: "Which?" };
   assert.ok(validateFormDefinition(d).length > 0);
 });
 
-test("likert exige options", () => {
+test("likert requires options", () => {
   const d = JSON.parse(JSON.stringify(valid));
-  d.sections[0].questions[0] = { id: "x3", type: "likert", text: "Quanto?" };
+  d.sections[0].questions[0] = { id: "x3", type: "likert", text: "How much?" };
   assert.ok(validateFormDefinition(d).length > 0);
 });
 
-test("aceita text/date/number sem options", () => {
+test("accepts text/date/number without options", () => {
   const d = JSON.parse(JSON.stringify(valid));
   d.sections[0].questions = [
-    { id: "t1", type: "text", text: "Texto" },
-    { id: "d1", type: "date", text: "Data" },
-    { id: "n1", type: "number", text: "Número" },
+    { id: "t1", type: "text", text: "Text" },
+    { id: "d1", type: "date", text: "Date" },
+    { id: "n1", type: "number", text: "Number" },
   ];
   assert.deepEqual(validateFormDefinition(d), []);
 });

@@ -29,9 +29,6 @@ export default async (ctx) => {
 
     const dup = await api("POST", "/auth/register", { body: { email: TEST_FIXTURES[0].email, name: "Outra", password: "senha12345", role: "educator" } });
     expect("duplicate email rejected", dup.status === 409, JSON.stringify(dup.data));
-
-    const badRole = await api("POST", "/auth/register", { body: { email: "estudante@example.com", name: "Aluno", password: "senha12345", role: "student" } });
-    expect("student cannot self-register", badRole.status === 400, JSON.stringify(badRole.data));
   }
 
   step("auth: pending accounts blocked until approved");

@@ -2,18 +2,17 @@ import { api, expect, step } from "../helpers.mjs";
 import { answers } from "../fixtures.mjs";
 
 // Validates the "STUDENT# is a record, not a user" business rule family from
-// specs/auth.md (SSOT) + specs/dynamodb-schema.md:
+// specs/auth.md (SSOT) + specs/dynamodb-schema.md + spec flows:
 //
-//  1. A student entity can be linked ONLY to a guardian (no self-account) —
+//  1. A student entity can be managed by a guardian only (no linked self-account) —
 //     the guardian fills forms and manages the data on the student's behalf.
-//  2. A student entity can ALSO have its own self-account while the guardian
-//     keeps full management (the two relations are cumulative, not exclusive).
+//  2. A student entity can ALSO have its own self-registered account linked while
+//     the guardian keeps full management (the two relations are cumulative).
 //  3. A single guardian guards MANY students (one GUARD# edge per student).
 //  4. A minor (role=student) can NEVER grant/revoke consent — self_consent is
-//     reserved for adult flows (specs/lgpd.md). Restriction enforced in
-//     sam-app/src/api/handlers/consent.mjs.
-//  5. Only an educator (following) or an admin can create the student account;
-//     a guardian cannot (only the student-account creation, not guardianship).
+//     reserved for adult flows (specs/lgpd.md).
+//  5. Only an educator (following) or an admin can LINK/approve a self-registered
+//     student account; a guardian cannot (guardians never link or create accounts).
 //  6. Scope: a guardian cannot access a student they do not guard.
 //
 // Seeds nothing new; consumes ctx from earlier scenarios (Ana Clara = tutor-led
@@ -90,10 +89,18 @@ export default async (ctx) => {
     expect("guardian still grants consent", byGuardian.status === 200 && byGuardian.data.status === "active", JSON.stringify(byGuardian.data));
   }
 
-  step("guardianship: guardian cannot create the student account (403)");
+  step("guardianship: guardian cannot link the student account (403)");
   {
-    const acc = await api("POST", `/students/${managedId}/student-account`, { token: ctx.guardianToken, body: { email: "rafael.nao@example.com", name: "Rafael Souza", password: "senha12345" } });
-    expect("guardian cannot create student account", acc.status === 403, JSON.stringify(acc.data));
+    // The student self-registers (pending); only an educator (following) or an
+    // admin can LINK it to the entity. A guardian cannot — guardians never
+    // create or link student accounts (specs/auth.md).
+    const reg = await api("POST", "/auth/register", {
+      body: { email: "rafael.nao@example.com", name: "Rafael Souza", password: "senha12345", role: "student", birthDate: "2015-07-08" },
+    });
+    expect("student self-registers for guardian-managed entity", reg.status === 201 && reg.data.user.status === "pending", JSON.stringify(reg.data));
+
+    const acc = await api("POST", `/students/${managedId}/accounts/${reg.data.user.userId}/link`, { token: ctx.guardianToken, body: {} });
+    expect("guardian cannot link student account", acc.status === 403, JSON.stringify(acc.data));
   }
 
   step("scope: guardian cannot access an un-guarded student (403)");

@@ -4,11 +4,15 @@ import { cleanupStudent, cleanupUser, findStudentsByCreator, findUserByEmail } f
 // ONLY data added by the tests (users/students keyed to these test-only emails)
 // and never touches anything else in the table.
 //
-// Role flow under the new RBAC rules:
+// Role/flow under the specs (auth.md / backend.md / lgpd.md):
 // - The FIRST educator to register becomes the initial admin (active).
 // - Later educators register as `pending` and are activated by an admin.
 // - Guardian accounts register as `pending` and are activated by an educator/admin.
-// - Student accounts are created by an educator/admin (they do not self-register).
+// - STUDENT accounts SELF-REGISTER via POST /api/auth/register (role: "student",
+//   birthDate for LGPD age eligibility), starting `pending`. An educator (or admin)
+//   LINKs the account to a student entity via POST /students/:id/accounts/:userId/link,
+//   which approves it (pending -> active) and attributes the entity — consent-gated:
+//   adults (>= 18) self-consent; minors (< 18) need guardian or institution consent.
 export const TEST_FIXTURES = [
   // First educator to register -> becomes admin (active bootstrap).
   { email: "admin.sistema@example.com", name: "Adriana Lopes", password: "senha12345", role: "educator" },
@@ -16,11 +20,12 @@ export const TEST_FIXTURES = [
   { email: "prof.joao@example.com", name: "João Pereira", password: "senha12345", role: "educator" },
   // Guardian -> registers pending, then approved by an educator/admin.
   { email: "maria.responsavel@example.com", name: "Maria da Silva", password: "senha12345", role: "guardian" },
-  // Students (self accounts created by educator/admin).
-  { email: "ana.clara@example.com", name: "Ana Clara", password: "senha12345", role: "student" },
-  { email: "pedro.aluno@example.com", name: "Pedro Silva", password: "senha12345", role: "student" },
-  { email: "pedro.alves@example.com", name: "Pedro Alves", password: "pedro12345", role: "student" },
-  { email: "lia.mendes@example.com", name: "Lia Mendes", password: "lia12345", role: "student" },
+  // Minor student accounts (self-register + educator link). Ana Clara is guardian-managed.
+  { email: "ana.clara@example.com", name: "Ana Clara", password: "senha12345", role: "student", birthDate: "2016-03-12" },
+  // Minor student without a guardian -> linked on institution_authorization consent.
+  { email: "pedro.alves@example.com", name: "Pedro Alves", password: "pedro12345", role: "student", birthDate: "2011-09-30" },
+  // ADULT student (>= 18) -> self-consents (self_consent) on its own entity.
+  { email: "lia.mendes@example.com", name: "Lia Mendes", password: "lia12345", role: "student", birthDate: "2004-04-20" },
 ];
 
 // Decisively reading/writing-dominant answers: R=5.0, A=1.0, K=2.0 (R-K=3 > 2,
