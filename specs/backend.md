@@ -75,7 +75,7 @@ requiredBy:
 |---------------|-------|-------------|--------------|
 | `GET /api/forms?audience=` | any | List forms available to the persona (served from code) | in-memory registry |
 | `GET /api/forms/:formId` | scoped | Form definition (read-only) | in-memory registry |
-| `POST /api/students/:id/forms/:formId/responses` | persona of the form; **guardian may also submit student-audience forms** (student fills together with the guardian on the guardian's account) | Submit responses (idempotent via `requestId`) | `SUBMISSION#` only — classification is a separate step |
+| `POST /api/students/:id/forms/:formId/responses` | persona of the form **or any persona acting for the student** (student-audience forms like `vark` may be filled by the student's own account, a guardian or educator acting for them, or an admin) | Submit responses (idempotent via `requestId`); the submission is stored **immediately** — classification/inference is a separate step | `SUBMISSION#` only — classification is a separate step |
 | `GET /api/students/:id/forms/:formId/responses` | scoped | Submission history; each item rides along its `assessment` (deterministic classification, once run) and ML `prediction` (once inference lands) | Query `SUBMISSION#<formId>#` prefix + `ASSESS#`/`PRED#` lookups keyed by submission |
 | `GET /api/students/:id/submissions` | scoped | Submissions across all forms (newest first) | Query `SUBMISSION#` prefix on `STUDENT#` |
 
@@ -147,7 +147,7 @@ requiredBy:
 | Student account | ✗ | followed (institution onboarding) | ✗ | ✓ |
 | User management (approval/RBAC) | ✗ | approve guardian/student (status only) | ✗ | ✓ (full) |
 | Consent | assigned students | followed (grant/revoke, institution basis) | ✗ | ✓ |
-| Forms (fill) | anamnesis | socioemotional, behavior-checklist | vark | ✓ all |
+| Forms (fill) | anamnesis, vark (assistido) | socioemotional, behavior-checklist, vark (assistido) | vark | ✓ all |
 | Observations | ✗ | ✓ | own (read-only) | ✓ |
 | Assessments / Predict | assigned students | followed | own (full payload) | ✓ |
 | Recommendations | assigned (approved) | propose/approve | own (published) | ✓ |

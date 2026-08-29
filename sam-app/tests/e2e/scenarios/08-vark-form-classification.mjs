@@ -15,9 +15,10 @@ export default async (ctx) => {
   const consent = await api("POST", `/students/${ctx.liaId}/consent`, { token: ctx.educatorToken, body: { consentVersion: "v1", status: "active", legalBasis: "institution_authorization" } });
   expect("consent granted for dedicated student", consent.status === 200 && consent.data.status === "active", JSON.stringify(consent.data));
 
-  // The vark form has audience=student, so only a guardian or the student's own
-  // account may fill it. Create the student self-account and submit as herself
-  // (educator still reads the assessment/prediction via FOLLOW#).
+  // The vark form has audience=student, so any persona may fill it: the student's
+  // own account, a guardian or educator acting for them, or an admin. Here we
+  // create the student self-account and submit as herself (the educator still
+  // reads the assessment/prediction via FOLLOW# after creating it).
   const acc = await api("POST", `/students/${ctx.liaId}/student-account`, { token: ctx.educatorToken, body: { email: "lia.mendes@example.com", name: "Lia Mendes", password: "lia12345" } });
   expect("educator creates student self-account", acc.status === 201 && !!acc.data.userId, JSON.stringify(acc.data));
 

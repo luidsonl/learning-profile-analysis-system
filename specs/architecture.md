@@ -228,7 +228,7 @@ Data collection is built on a generic, hybrid forms engine:
 
   | Form | Filled by | Purpose |
   |------|-----------|---------|
-  | `vark` | Student (with guardian/educator help if needed) | VARK questionnaire — scored into a VARK learning profile |
+  | `vark` | Any persona (student; or guardian/educator/admin acting for them) | VARK questionnaire — scored into a VARK learning profile |
   | `anamnesis` | Guardian | Academic history, background, socio-family intake |
   | `socioemotional` | Educator | Socioemotional indicators |
   | `behavior-checklist` | Educator | Observed behaviors / performance feedback |
