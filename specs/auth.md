@@ -1,3 +1,20 @@
+---
+id: auth
+title: Authentication & Authorization
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+  - dynamodb-schema
+requiredBy:
+  - backend
+  - lgpd
+  - security
+  - frontend
+---
+
 # Authentication & Authorization — Learning Profile Analysis System
 
 > Mirrors the 0shared auth flow: bearer-token sessions over a stateless Lambda layer, role middleware, and **scope enforcement** backed by the DynamoDB edges (`GUARD#`, `FOLLOW#`, `STUDENT#`). LGPD consent gates access to students' data.
@@ -94,6 +111,11 @@ Access is **binary** — there are no autonomy levels. A user either has an acco
 - User status is checked at token validation time (session validity reflects current `USER#<id>/META.status`), so approval/denial/demotion takes effect on the next request.
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) (personas, scope model), [dynamodb-schema](./dynamodb-schema.md) (`USER#`/`SESSION#`, edges, consent items).
+- **Required by** (specs that presume this one): [backend](./backend.md) (middleware wiring per endpoint), [lgpd](./lgpd.md) (consent gates, minor accounts), [security](./security.md) (credential handling), [frontend](./frontend.md) (role guarding, student mode).
 
 ## See Also
 

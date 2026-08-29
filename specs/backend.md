@@ -1,3 +1,19 @@
+---
+id: backend
+title: Backend
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+  - dynamodb-schema
+  - auth
+requiredBy:
+  - ml-pipeline
+  - frontend
+---
+
 # Backend — Learning Profile Analysis System
 
 > API-triggered Lambda handlers (Node.js 22 ESM) on AWS SAM, served under `/api/*` behind one CloudFront domain (no CORS). Data access maps 1:1 to the access patterns in [DynamoDB Schema](./dynamodb-schema.md).
@@ -158,6 +174,11 @@ Both are stateful-adjacent and therefore live in `terraform/aws-app`, not SAM.
 The API is exercised via the deployed stack (`make e2e-test` runs the e2e suite against it). There is no local Lambda/DynamoDB emulation wired up — keep the feedback loop on the real stack.
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) (flows, deployment), [dynamodb-schema](./dynamodb-schema.md) (access patterns consumed 1:1), [auth](./auth.md) (`requireAuth`/`requireRole`, scope edges, RBAC).
+- **Required by** (specs that presume this one): [ml-pipeline](./ml-pipeline.md) (inference trigger + `GET /predictions` read path), [frontend](./frontend.md) (endpoints consumed under `/api`).
 
 ## See Also
 

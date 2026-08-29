@@ -1,3 +1,16 @@
+---
+id: design-system
+title: Design System
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+requiredBy:
+  - frontend
+---
+
 # Design System — Learning Profile Analysis System
 
 > Tokens, components, and accessibility rules for the React SPA (pt-BR). Aimed at three very different audiences — **students** (usually minors), **guardians**, and **educators** — with a fourth **admin** mode. Accessibility is a first-class requirement, not a polish item.
@@ -114,6 +127,11 @@ frontend/src/
 - Manual pass before release: keyboard-only walkthrough, screen-reader (NVDA/VoiceOver) smoke test, 200% zoom, reduced-motion check.
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) — personas and their scope. The student mode activation is defined in [auth](./auth.md) (referenced, not restated).
+- **Required by**: [frontend](./frontend.md) — tokens/components are consumed by the SPA.
 
 ## See Also
 

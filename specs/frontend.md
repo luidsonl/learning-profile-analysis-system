@@ -1,3 +1,18 @@
+---
+id: frontend
+title: Frontend
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+  - backend
+  - auth
+  - design-system
+requiredBy: []
+---
+
 # Frontend — Learning Profile Analysis System
 
 > React + Vite + TypeScript SPA (pt-BR, accessible), served from `s3://learning-profile-front` behind CloudFront. One domain serves the app (`/*`) and the API (`/api/*`) — no CORS, no environment-specific config in app code.
@@ -76,6 +91,11 @@ Terminal 2:  npm run dev                                             (Vite on :5
 Single command from the repo root: `make frontend` (build + `terraform apply`). Deployment order and Terraform wiring: [Architecture — Deployment Order](./architecture.md#deployment-order). The SAM template exports `ApiEndpoint` (see `sam-app/template.yaml` Outputs) which `terraform/aws-frontend` reads via `aws_cloudformation_export`.
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) (single-domain design, CloudFront routing), [backend](./backend.md) (endpoints consumed under `/api`), [auth](./auth.md) (sessions, roles, restricted student mode), [design-system](./design-system.md) (tokens, components, accessibility).
+- **Required by**: none currently (design-system references it for stack details; there is no frontend-dependent spec yet).
 
 ## See Also
 

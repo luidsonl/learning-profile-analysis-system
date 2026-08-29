@@ -1,3 +1,18 @@
+---
+id: student-data-features
+title: Student Data Features for Categorization
+type: spec
+status: proposed
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+  - dynamodb-schema
+  - ml-pipeline
+  - lgpd
+requiredBy: []
+---
+
 # Student Data Features for Categorization
 
 > Status: **future direction** — this spec catalogs structured data that can be used to categorize students in supervised ML models. It is **not in scope for the MVP**, which ships only the offline-trained VARK predictor plus heuristic indicators. The purpose here is to register the evidence base and the concrete feature catalog, so future trainings ("categorize students from general data such as academic history") can be designed without re-researching the literature.
@@ -191,6 +206,11 @@ The nightly export (`feature-export` Lambda → S3 snapshot) is the plumbing: an
 **Datasets** (for public data with usable columns, see [ML Pipeline — Candidate datasets](./ml-pipeline.md#candidate-datasets), e.g., UCI Student Performance [R4 uses it], OULAD [R12], xAPI-Edu-Data [R8], Alzahrani & El-Sabagh VARK dataset).
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) (forms engine, profiles, decoupling), [dynamodb-schema](./dynamodb-schema.md) (storage of the attribute sources above), [ml-pipeline](./ml-pipeline.md) (training, datasets, snapshot contract), [lgpd](./lgpd.md) (consent, minimization, anonymization of features).
+- **Required by**: none — this is a `proposed` (future-direction) spec; `ml-pipeline.md` references it as evidence base.
 
 ## See Also
 

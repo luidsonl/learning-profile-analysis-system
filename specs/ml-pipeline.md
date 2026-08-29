@@ -1,3 +1,20 @@
+---
+id: ml-pipeline
+title: ML Pipeline
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+  - dynamodb-schema
+  - backend
+requiredBy:
+  - lgpd
+  - security
+  - student-data-features
+---
+
 # ML Pipeline — Learning Profile Analysis System
 
 ## Overview
@@ -173,6 +190,11 @@ Beyond the primary dataset (Armand, Eboue 2021), these public datasets are candi
 Each candidate should be vetted (license, age range, feature alignment) in `ml/data/README.md` before being used for training.
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) (forms engine, decoupling), [dynamodb-schema](./dynamodb-schema.md) (`SUBMISSION#`/`ASSESS#`/`PRED#` entities), [backend](./backend.md) (submission → async invoke, `GET /predictions`).
+- **Required by** (specs that presume this one): [lgpd](./lgpd.md) (anonymized export contract, snapshot retention), [security](./security.md) (dataset/model artifact policy), [student-data-features](./student-data-features.md) (feature schemas, candidate datasets).
 
 ## See Also
 

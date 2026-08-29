@@ -1,3 +1,23 @@
+---
+id: architecture
+title: Architecture
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn: []
+requiredBy:
+  - dynamodb-schema
+  - auth
+  - backend
+  - ml-pipeline
+  - lgpd
+  - security
+  - design-system
+  - frontend
+  - student-data-features
+---
+
 # Architecture — Learning Profile Analysis System
 
 ## Overview
@@ -139,8 +159,8 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   ├── train/             # scikit-learn training + k-fold CV
 │   ├── evaluate/          # Metrics (accuracy, F1, Hamming loss) + reports
 │   └── serve/             # Package model for Lambda (artifact bundle + sanity checks)
-├── docs/                  # architecture, backend, auth, dynamodb-schema, ml-pipeline,
-│                          #   student-data, lgpd, frontend, design-system
+├── specs/                 # architecture, backend, auth, dynamodb-schema, ml-pipeline,
+│                          #   student-data, lgpd, frontend, design-system (README = graph hub)
 ├── agents.md
 └── Makefile
 ```
@@ -312,6 +332,11 @@ Cleanup happens in reverse order.
 - **New DynamoDB access pattern:** document it in `dynamodb-schema.md` first, then add the GSI/attribute — schema changes are treated as design changes, not hacks.
 
 ---
+
+## Dependencies
+
+- **Root spec** — no prerequisites; read this first. Everything else builds on it (see the [spec dependency graph](./README.md#dependency-graph)).
+- **Required by** (specs that presume this one): [dynamodb-schema](./dynamodb-schema.md), [auth](./auth.md), [backend](./backend.md), [ml-pipeline](./ml-pipeline.md), [lgpd](./lgpd.md), [security](./security.md), [design-system](./design-system.md), [frontend](./frontend.md), [student-data-features](./student-data-features.md).
 
 ## See Also
 

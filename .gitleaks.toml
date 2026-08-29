@@ -12,10 +12,10 @@ useDefault = true
 [[allowlists]]
   description = "Intentional public metadata and test fixtures"
   paths = [
-    '''docs/security\.md''',
-    '''docs/dynamodb-schema\.md''',
-    '''docs/backend\.md''',
-    '''docs/architecture\.md''',
+    '''specs/security\.md''',
+    '''specs/dynamodb-schema\.md''',
+    '''specs/backend\.md''',
+    '''specs/architecture\.md''',
     '''terraform/aws-bootstrap/terraform\.tfvars''',
     '''SECURITY\.md''',
     '''AGENTS\.md''',

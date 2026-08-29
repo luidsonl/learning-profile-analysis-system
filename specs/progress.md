@@ -1,14 +1,25 @@
+---
+id: progress
+title: Project Progress
+type: report
+status: evolving
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn: []
+requiredBy: []
+---
+
 # Project Progress
 
 ## Status snapshot
 
 **As of:** 2026-08-27 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented and documented. **RBAC rework** (admin bootstrap + approval flow, educator-only student creation/assignment) is implemented in the backend and docs; the **frontend is not yet reworked to the new role/status rules** (deferred) and remains un-deployed (S3 + CloudFront) pending AWS creds.
+Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented and documented. **RBAC rework** (admin bootstrap + approval flow, educator-only student creation/assignment) is implemented in the backend and specs; the **frontend is not yet reworked to the new role/status rules** (deferred) and remains un-deployed (S3 + CloudFront) pending AWS creds.
 
 | Layer | Status | Notes |
 |---|---|---|
-| Docs (`docs/`) | ✅ Done | 10 documents covering every layer; RBAC updated for the new approval/admin flow |
+| Specs (`specs/`) | ✅ Done | Index (`specs/README.md`) with dependency graph + 11 layer specs; RBAC updated for the new approval/admin flow |
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ✅ Done | S3 + CloudFront + `/api/*` origin; validated, mirrors 0shared |
@@ -23,11 +34,11 @@ Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented 
 
 ## Completed work
 
-Everything below is implemented, tested, and documented in its own layer doc (`docs/`):
+Everything below is implemented, tested, and documented in its own layer spec (`specs/`, navigable from the [spec index](./README.md) dependency graph):
 
 - **Infra**: Terraform stateful stack (DynamoDB single table, S3 files/data buckets, SQS report queue, async Lambdas) + SAM app with API-triggered functions.
 - **Backend API**: auth/sessions (admin bootstrap, approval gating), students & guardianship (educator/admin-only creation & assignment), versioned consent, binary student self-service, new **admin user management** (`/admin/users` — approve/deny, promote/demote, reset password, delete), forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
-- **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/model/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); it scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `docs/ml-pipeline.md`).
+- **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/model/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); it scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `specs/ml-pipeline.md`).
 - **Security tooling**: gitleaks + pre-commit + CI secret scan; packaged-model commit exception documented.
 - **Dev loop**: `make sync` (`sam sync --watch`) pushes handler code changes straight to the live Lambdas in seconds — no CloudFormation wait; `template.yaml` changes still take the full `make deploy` path, which remains the source of truth.
 - **Frontend SPA** (`frontend/`): React + Vite + Tailwind v4 + Radix, pt-BR, accessible. Full persona slice: auth (login/register), dashboards, student overview + consent (LGPD), generic form engine renderer, dedicated VARK wizard (stepper), V/A/R/K profile view, recommendations, reports (generate/download), observations (educator), per-student + global audit, `/admin` audit trail, and the reduced **student self-view** mode (larger type, own-data only). Simple `apiFetch` client (token + 401 handler, no React Query yet). `npm run build` + `npm run lint` green.

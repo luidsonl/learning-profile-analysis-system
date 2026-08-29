@@ -1,3 +1,20 @@
+---
+id: dynamodb-schema
+title: DynamoDB Schema
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+requiredBy:
+  - auth
+  - backend
+  - ml-pipeline
+  - lgpd
+  - student-data-features
+---
+
 # DynamoDB Schema — Learning Profile Analysis System
 
 > Single-table design on the `learning-profile` table, mirroring the 0shared patterns: entity-prefixed keys, GSIs per access pattern, transactions for multi-item invariants and uniqueness reservations.
@@ -203,6 +220,11 @@ Uniqueness reservations (`EMAIL#`) use **conditional writes** inside the transac
 - **None.** Form definitions live in code (served read-only by the API); every table item is produced at runtime by user actions or the inference Lambda.
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) — single-table philosophy, forms engine, flows, RBAC. Read this first.
+- **Required by** (specs that presume this one): [auth](./auth.md) (sessions, edges, consent), [backend](./backend.md) (access patterns per endpoint), [ml-pipeline](./ml-pipeline.md) (`SUBMISSION#`/`ASSESS#`/`PRED#`), [lgpd](./lgpd.md) (retention/erasure on these items), [student-data-features](./student-data-features.md) (storage of attribute sources).
 
 ## See Also
 

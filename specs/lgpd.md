@@ -1,3 +1,20 @@
+---
+id: lgpd
+title: LGPD Compliance
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+  - dynamodb-schema
+  - auth
+  - ml-pipeline
+requiredBy:
+  - security
+  - student-data-features
+---
+
 # LGPD Compliance — Learning Profile Analysis System
 
 > The system processes personal data of **students** — including minors (children) — in an educational context. LGPD compliance is in scope for the MVP — consent, minimization, audit, and erasure are foundational, not retrofits. This spec documents the data inventory, lawful bases, consent lifecycle, and the operational flows implementing LGPD rights.
@@ -94,6 +111,11 @@ Erasure is a **documented script/runbook** (admin-triggered Lambda or CLI) with 
 | System | Audit trail, scope enforcement, anonymized export |
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) (students/minors, RBAC), [dynamodb-schema](./dynamodb-schema.md) (`CONSENT#`, `AUDIT#`, TTL design), [auth](./auth.md) (consent gates, minor accounts), [ml-pipeline](./ml-pipeline.md) (anonymized export contract, snapshot retention).
+- **Required by** (specs that presume this one): [security](./security.md) (personal-data rules), [student-data-features](./student-data-features.md) (anonymization/minimization of exported features).
 
 ## See Also
 

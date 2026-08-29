@@ -1,3 +1,18 @@
+---
+id: security
+title: Security & Public Repository Rules
+type: spec
+status: stable
+since: 2026-08-27
+lastReviewed: 2026-08-29
+dependsOn:
+  - architecture
+  - auth
+  - ml-pipeline
+  - lgpd
+requiredBy: []
+---
+
 # Security & Public Repository Rules — Learning Profile Analysis System
 
 > **This repository is intended to be public on GitHub.** Everything committed must be safe to publish. These are binding rules — every contributor, every automated agent (including opencode), and every CI step must respect them. Violations are release-blockers.
@@ -70,6 +85,11 @@
 See [SECURITY.md](../../SECURITY.md) — private disclosure, no public posting of live exploits or user data.
 
 ---
+
+## Dependencies
+
+- **Depends on**: [architecture](./architecture.md) (infra that keeps secrets out of code), [auth](./auth.md) (credential handling at runtime), [ml-pipeline](./ml-pipeline.md) (dataset/model artifact policy), [lgpd](./lgpd.md) (personal-data rules).
+- **Required by**: none — binding rules for the whole repository; referenced from `AGENTS.md`.
 
 ## See Also
 
