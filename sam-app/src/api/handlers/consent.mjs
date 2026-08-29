@@ -5,17 +5,29 @@ import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
 import { auditStudent, assertScopeStudent } from "../lib/scope.mjs";
 import { getStudent } from "./students.mjs";
+import { getUser } from "../lib/auth.mjs";
+import { ageFromRecord, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
 
 const LEGAL_BASES = ["guardian", "institution_authorization", "self_consent"];
 
-const canSetConsent = async (studentId, ctx) => {
+const canSetConsent = async (studentId, ctx, legalBasis) => {
   // Admin, educator (FOLLOW#) and guardian (GUARD#) with access to the student
-  // may set/revoke consent. A minor (role=student) never consents for
-  // themselves — self_consent is reserved for adult self-service flows
-  // (specs/lgpd.md). assertScopeStudent would also resolve the student's own
-  // edge, so the student role is excluded explicitly.
+  // may set/revoke consent. A linked ADULT student (>= MIN_SELF_CONSENT_AGE)
+  // may `self_consent` on their own entity; a minor (< 18) never consents for
+  // themselves (specs/lgpd.md). assertScopeStudent resolves the student's own
+  // edge, so the adult gate runs for the student role only.
   if (ctx.role === "admin") return true;
-  if (ctx.role === "student") return false;
+  if (ctx.role === "student") {
+    if (legalBasis !== "self_consent") return false;
+    const user = await getUser(ctx.userId);
+    if (!user || ageFromRecord(user) < MIN_SELF_CONSENT_AGE) return false;
+    try {
+      await assertScopeStudent(studentId, ctx);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   await assertScopeStudent(studentId, ctx);
   return true;
 };
@@ -55,12 +67,12 @@ const getConsent = async (event, ctx) => {
 
 const setConsent = async (event, ctx) => {
   const studentId = param(event, "id");
-  if (!(await canSetConsent(studentId, ctx))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the student or an admin can set consent");
   const body = parseBody(event);
   requireKeys(body, ["consentVersion", "status"]);
   assert(["active", "revoked"].includes(body.status), "invalid_status", "status must be active or revoked");
   const legalBasis = body.legalBasis || (ctx.role === "guardian" ? "guardian" : "institution_authorization");
   assert(LEGAL_BASES.includes(legalBasis), "invalid_legal_basis", `legalBasis must be one of ${LEGAL_BASES.join(", ")}`);
+  if (!(await canSetConsent(studentId, ctx, legalBasis))) throw new HttpError(403, "forbidden", "Only the primary guardian, an educator following the student, an admin or the linked adult student themselves can set consent");
 
   const student = await getStudent(studentId);
   if (!student) throw new HttpError(404, "student_not_found", "Student not found");

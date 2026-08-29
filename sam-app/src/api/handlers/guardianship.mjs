@@ -1,12 +1,12 @@
 import { CMD, client, TABLE } from "../lib/db.mjs";
 import { ok, errorResponse, parseBody, param, HttpError, noContent } from "../lib/http.mjs";
 import { nowIso } from "../lib/ids.mjs";
-import { requireKeys, isEmail, assert } from "../lib/validate.mjs";
+import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
-import { auditStudent, assertScopeStudent } from "../lib/scope.mjs";
-import { hashPassword, getUserByEmail, getUser } from "../lib/auth.mjs";
+import { auditStudent, assertScopeStudent, getOwnStudentId } from "../lib/scope.mjs";
+import { getUser } from "../lib/auth.mjs";
 import { getStudent } from "./students.mjs";
-import { uid } from "../lib/ids.mjs";
+import { ageFromRecord, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
 
 const grantGuardian = async (event, ctx) => {
   const studentId = param(event, "id");
@@ -98,72 +98,42 @@ const unfollow = async (event, ctx) => {
   return noContent();
 };
 
-const canCreateStudentAccount = async (studentId, ctx) => {
-  if (ctx.role === "admin") return true;
-  if (ctx.role === "educator") {
-    await assertScopeStudent(studentId, ctx);
-    return true;
-  }
-  return false;
-};
-
-const createStudentAccount = async (event, ctx) => {
+const linkStudentAccount = async (event, ctx) => {
   const studentId = param(event, "id");
-  if (!(await canCreateStudentAccount(studentId, ctx))) throw new HttpError(403, "forbidden", "Only an educator following the student or an admin can create the student account");
+  const accountUserId = param(event, "userId");
+  if (!["admin", "educator"].includes(ctx.role)) {
+    throw new HttpError(403, "forbidden", "Only an educator following the student or an admin can link a student account");
+  }
+  if (ctx.role === "educator") await assertScopeStudent(studentId, ctx);
 
   const student = await getStudent(studentId);
   if (!student) throw new HttpError(404, "student_not_found", "Student not found");
-  assert(student.consentStatus === "active", "consent_required", "Active consent is required before creating the student account", 409);
-  assert(!student.studentUserId, "student_account_exists", "A student account already exists for this student", 409);
 
-  const body = parseBody(event);
-  requireKeys(body, ["email", "name", "password"]);
-  assert(isEmail(body.email), "invalid_email", "Email is not valid");
-  assert(String(body.password).length >= 8, "weak_password", "Password must have at least 8 characters");
+  const account = await getUser(accountUserId);
+  if (!account || account.role !== "student") throw new HttpError(404, "student_account_not_found", "Student account not found");
 
-  const email = body.email.trim().toLowerCase();
-  if (await getUserByEmail(email)) throw new HttpError(409, "email_in_use", "Email already registered");
+  // At most one in both directions: the entity holds a single `studentUserId`
+  // and the account links to a single entity (specs/dynamodb-schema.md).
+  if (student.studentUserId) throw new HttpError(409, "student_account_exists", "A student account is already linked to this student");
+  if (await getOwnStudentId(accountUserId)) throw new HttpError(409, "account_already_linked", "This student account is already linked to a student");
 
-  const studentUserId = uid();
+  // Consent gates the link: an adult (>= MIN_SELF_CONSENT_AGE) self-consents;
+  // a minor (< 18) requires guardian/institution consent already granted on the
+  // entity (specs/auth.md + lgpd.md — age decided from the account's birth date).
+  const adult = ageFromRecord(account) >= MIN_SELF_CONSENT_AGE;
+  if (!adult && student.consentStatus !== "active") {
+    throw new HttpError(409, "consent_required", "Active consent is required before linking a minor student's account");
+  }
+
   const at = nowIso();
-  const passwordHash = await hashPassword(body.password);
-
   await client.send(
     new CMD.transact({
       TransactItems: [
         {
-          Put: {
-            TableName: TABLE,
-            Item: {
-              PK: { S: `USER#${studentUserId}` },
-              SK: { S: "META" },
-              type: { S: "user" },
-              userId: { S: studentUserId },
-              name: { S: body.name },
-              email: { S: email },
-              role: { S: "student" },
-              passwordHash: { S: passwordHash },
-              status: { S: "active" },
-              createdAt: { S: at },
-              createdBy: { S: ctx.userId },
-              GSI2PK: { S: "USER#ROLE#student" },
-              GSI2SK: { S: `USER#${studentUserId}#active` },
-            },
-            ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-          },
+          Put: { TableName: TABLE, Item: { PK: { S: `USER#${accountUserId}` }, SK: { S: `STUDENT#${studentId}` }, type: { S: "edge" }, createdAt: { S: at } }, ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)" },
         },
         {
-          Put: {
-            TableName: TABLE,
-            Item: { PK: { S: `EMAIL#${email}` }, SK: { S: `EMAIL#${email}` }, type: { S: "email-reservation" }, userId: { S: studentUserId }, GSI1PK: { S: `EMAIL#${email}` }, GSI1SK: { S: `USER#${studentUserId}` } },
-            ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-          },
-        },
-        {
-          Put: { TableName: TABLE, Item: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `LOGIN#${studentUserId}` }, type: { S: "edge" }, createdAt: { S: at } }, ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)" },
-        },
-        {
-          Put: { TableName: TABLE, Item: { PK: { S: `USER#${studentUserId}` }, SK: { S: `STUDENT#${studentId}` }, type: { S: "edge" }, createdAt: { S: at } }, ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)" },
+          Put: { TableName: TABLE, Item: { PK: { S: `STUDENT#${studentId}` }, SK: { S: `LOGIN#${accountUserId}` }, type: { S: "edge" }, createdAt: { S: at } }, ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)" },
         },
         {
           Update: {
@@ -171,19 +141,34 @@ const createStudentAccount = async (event, ctx) => {
             Key: { PK: { S: `STUDENT#${studentId}` }, SK: { S: "META" } },
             UpdateExpression: "SET #studentUserId = :sid, #updatedAt = :at",
             ExpressionAttributeNames: { "#studentUserId": "studentUserId", "#updatedAt": "updatedAt" },
-            ExpressionAttributeValues: { ":sid": { S: studentUserId }, ":at": { S: at } },
+            ExpressionAttributeValues: { ":sid": { S: accountUserId }, ":at": { S: at } },
+            ConditionExpression: "attribute_not_exists(#studentUserId)",
+          },
+        },
+        {
+          Update: {
+            TableName: TABLE,
+            Key: { PK: { S: `USER#${accountUserId}` }, SK: { S: "META" } },
+            UpdateExpression: "SET #status = :st, GSI2PK = :gpk, GSI2SK = :gsk, #updatedAt = :at",
+            ExpressionAttributeNames: { "#status": "status", "#updatedAt": "updatedAt" },
+            ExpressionAttributeValues: {
+              ":st": { S: "active" },
+              ":gpk": { S: "USER#ROLE#student" },
+              ":gsk": { S: `USER#${accountUserId}#active` },
+              ":at": { S: at },
+            },
           },
         },
       ],
     }),
   ).catch((e) => {
-    if (e.name === "TransactionCanceledException") throw new HttpError(409, "conflict", "Could not create student account");
+    if (e.name === "TransactionCanceledException") throw new HttpError(409, "conflict", "Could not link the student account");
     throw e;
   });
 
-  await auditStudent(studentId, ctx, "create_student_account", `student:${studentId}`, { studentUserId });
+  await auditStudent(studentId, ctx, "link_student_account", `student:${studentId}`, { studentUserId: accountUserId, role: "student" });
 
-  return ok({ userId: studentUserId }, 201);
+  return ok({ studentId, userId: accountUserId }, 200);
 };
 
 const listGuardians = async (event, ctx) => {
@@ -229,8 +214,8 @@ export const lambdaHandler = async (event) => {
         return await follow(event, ctx);
       case "DELETE /students/{id}/follow":
         return await unfollow(event, ctx);
-      case "POST /students/{id}/student-account":
-        return await createStudentAccount(event, ctx);
+      case "POST /students/{id}/accounts/{userId}/link":
+        return await linkStudentAccount(event, ctx);
       case "GET /students/{id}/guardians":
         return await listGuardians(event, ctx);
       case "GET /students/{id}/educators":

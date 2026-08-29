@@ -15,8 +15,13 @@ export const requireAuth = async (event) => {
   if (!session) throw new HttpError(401, "unauthorized", "Invalid or expired session");
   const userId = session.userId.S;
   const user = await getUser(userId);
-  if (!user || user.status !== "active") throw new HttpError(401, "unauthorized", "User not active");
-  return { userId, role: user.role, session };
+  if (!user) throw new HttpError(401, "unauthorized", "User not found");
+  // Only active accounts pass normally. A pending STUDENT may reach the
+  // restricted self-service area (own account, no entity yet); every other
+  // non-active role is blocked.
+  const isPendingStudent = user.role === "student" && user.status === "pending";
+  if (user.status !== "active" && !isPendingStudent) throw new HttpError(401, "unauthorized", "User not active");
+  return { userId, role: user.role, status: user.status, session };
 };
 
 export const requireRole = (...roles) => (ctx) => {

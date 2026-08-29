@@ -82,7 +82,7 @@ export default async (ctx) => {
     const dupReg = await api("POST", "/auth/register", {
       body: { email: "ana2@example.com", name: "Ana 2", password: "senha12345", role: "student", birthDate: "2016-03-12" },
     });
-    const s2 = await api("POST", `/students/${ctx.studentId}/accounts/${dupReg.data.userId}/link`, { token: ctx.educatorToken, body: {} });
+    const s2 = await api("POST", `/students/${ctx.studentId}/accounts/${dupReg.data.user.userId}/link`, { token: ctx.educatorToken, body: {} });
     expect("at-most-one account per entity enforced", s2.status === 409, JSON.stringify(s2.data));
   }
 

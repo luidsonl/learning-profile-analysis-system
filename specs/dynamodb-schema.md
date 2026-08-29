@@ -2,7 +2,7 @@
 id: dynamodb-schema
 title: DynamoDB Schema
 type: spec
-status: evolving
+status: stable
 since: 2026-08-27
 lastReviewed: 2026-08-29
 dependsOn:

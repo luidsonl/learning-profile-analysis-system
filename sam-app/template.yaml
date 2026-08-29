@@ -35,6 +35,7 @@ Globals:
         REPORT_QUEUE_URL: !Ref ReportQueueUrl
         DYNAMODB_ENDPOINT: ""
         INFERENCE_FORMS: vark
+        MIN_SELF_CONSENT_AGE: 18
     LoggingConfig:
       LogFormat: JSON
       ApplicationLogLevel: INFO
@@ -212,7 +213,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /students/{id}/student-account
+            Path: /students/{id}/accounts/{userId}/link
             Method: POST
         ListGuardians:
           Type: Api

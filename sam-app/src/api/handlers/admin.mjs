@@ -3,6 +3,7 @@ import { HttpError, errorResponse, ok } from "../lib/http.mjs";
 import { requireAuth } from "../lib/session.mjs";
 import { hashPassword } from "../lib/auth.mjs";
 import { writeAudit } from "../lib/scope.mjs";
+import { computeAge, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
 
 const ROLES = ["guardian", "educator", "admin", "student"];
 const STATUSES = ["pending", "active", "denied"];
@@ -61,44 +62,72 @@ const listUsers = async (event, ctx) => {
   return ok({ data: users, count: users.length });
 };
 
-const publicUser = (u) => ({
-  userId: u.userId,
-  name: u.name,
-  email: u.email,
-  role: u.role,
-  status: u.status,
-  createdAt: u.createdAt,
-});
+const publicUser = (u) => {
+  const out = {
+    userId: u.userId,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    createdAt: u.createdAt,
+  };
+  if (u.birthDate !== undefined) out.birthDate = u.birthDate;
+  if (u.age !== undefined) out.age = u.age;
+  if (u.consentEligible !== undefined) out.consentEligible = u.consentEligible;
+  return out;
+};
 
-const applyChanges = async (userId, actorId, actorRole, ip, { role, status }) => {
+const applyChanges = async (userId, actorId, actorRole, ip, { role, status, birthDate }) => {
   const user = await getUser(userId);
   if (!user) throw new HttpError(404, "user_not_found", "User not found");
 
   const newRole = role ?? user.role;
   const newStatus = status ?? user.status;
+  const newBirthDate = birthDate ?? user.birthDate;
   if (!ROLES.includes(newRole)) throw new HttpError(400, "invalid_role", "Invalid role");
   if (!STATUSES.includes(newStatus)) throw new HttpError(400, "invalid_status", "Invalid status");
+  if (birthDate !== undefined && !Number.isFinite(Date.parse(birthDate))) {
+    throw new HttpError(400, "invalid_birthDate", "birthDate is not a valid date");
+  }
 
   assertNotLastAdmin(user, { role: newRole, status: newStatus });
+
+  const changed = [];
+  if (role && role !== user.role) changed.push(`role:${user.role}->${role}`);
+  if (status && status !== user.status) changed.push(`status:${user.status}->${status}`);
+  if (birthDate !== undefined && birthDate !== user.birthDate) changed.push("birthDate");
+
+  const updateExpression = newBirthDate !== user.birthDate
+    ? "SET #r = :role, #s = :status, GSI2PK = :gpk, GSI2SK = :gsk, #birthDate = :bd, #age = :age, #consentEligible = :ce, #updatedAt = :at"
+    : "SET #r = :role, #s = :status, GSI2PK = :gpk, GSI2SK = :gsk, #updatedAt = :at";
+
+  const exprAttrNames = { "#r": "role", "#s": "status", "#updatedAt": "updatedAt" };
+  const exprAttrValues = {
+    ":role": { S: newRole },
+    ":status": { S: newStatus },
+    ":gpk": { S: `USER#ROLE#${newRole}` },
+    ":gsk": { S: `USER#${userId}#${newStatus}` },
+    ":at": { S: new Date().toISOString() },
+  };
+  if (newBirthDate !== user.birthDate) {
+    const age = computeAge(newBirthDate);
+    exprAttrNames["#birthDate"] = "birthDate";
+    exprAttrNames["#age"] = "age";
+    exprAttrNames["#consentEligible"] = "consentEligible";
+    exprAttrValues[":bd"] = { S: newBirthDate };
+    exprAttrValues[":age"] = { N: String(age) };
+    exprAttrValues[":ce"] = { BOOL: age >= MIN_SELF_CONSENT_AGE };
+  }
 
   await client.send(
     new CMD.update({
       TableName: TABLE,
       Key: { PK: { S: `USER#${userId}` }, SK: { S: "META" } },
-      UpdateExpression: "SET #r = :role, #s = :status, GSI2PK = :gpk, GSI2SK = :gsk",
-      ExpressionAttributeNames: { "#r": "role", "#s": "status" },
-      ExpressionAttributeValues: {
-        ":role": { S: newRole },
-        ":status": { S: newStatus },
-        ":gpk": { S: `USER#ROLE#${newRole}` },
-        ":gsk": { S: `USER#${userId}#${newStatus}` },
-      },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeNames: exprAttrNames,
+      ExpressionAttributeValues: exprAttrValues,
     }),
   );
-
-  const changed = [];
-  if (role && role !== user.role) changed.push(`role:${user.role}->${role}`);
-  if (status && status !== user.status) changed.push(`status:${user.status}->${status}`);
 
   await writeAudit({
     subjectType: "USER",
@@ -111,7 +140,7 @@ const applyChanges = async (userId, actorId, actorRole, ip, { role, status }) =>
     ip,
   });
 
-  return { ...publicUser(user), role: newRole, status: newStatus };
+  return { ...publicUser(user), role: newRole, status: newStatus, birthDate: newBirthDate };
 };
 
 const assertNotLastAdmin = async (target, next) => {
@@ -138,8 +167,9 @@ const updateUser = async (event, ctx) => {
   const changes = {};
   if (body.status !== undefined) changes.status = body.status;
   if (body.role !== undefined) changes.role = body.role;
+  if (body.birthDate !== undefined) changes.birthDate = body.birthDate;
   if (Object.keys(changes).length === 0) {
-    throw new HttpError(400, "no_changes", "Provide status and/or role");
+    throw new HttpError(400, "no_changes", "Provide status, role and/or birthDate");
   }
   if (userId === ctx.userId && changes.role && changes.role !== "admin") {
     throw new HttpError(400, "cannot_demote_self", "You cannot demote yourself");
@@ -154,6 +184,7 @@ const updateUser = async (event, ctx) => {
       throw new HttpError(403, "forbidden", "Educators can only approve responsable and student accounts");
     }
     if (changes.role !== undefined) throw new HttpError(403, "forbidden", "Educators cannot change roles");
+    if (changes.birthDate !== undefined) throw new HttpError(403, "forbidden", "Educators cannot edit birth date");
     if (changes.status !== undefined && !["active", "denied"].includes(changes.status)) {
       throw new HttpError(400, "invalid_status", "Educators can only approve or deny an account");
     }

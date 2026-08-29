@@ -15,20 +15,20 @@ requiredBy: []
 
 **As of:** 2026-08-29 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented and documented. The **frontend RBAC rework** is done (admin approval/promotion screens, role-conditional actions, status-aware login); the SPA **remains un-deployed** (S3 + CloudFront) pending `make frontend`.
+Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 123/0). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the `frontend.md` spec remains `evolving` and the S3/CloudFront deploy is no longer applicable until/unless the SPA is reintroduced.
 
 | Layer | Status | Notes |
 |---|---|---|
-| Specs (`specs/`) | 🔄 Evolving | Index (`specs/README.md`) with dependency graph + 11 layer specs; **student self-registration + educator-link + age-based consent** reworked across `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd`/`frontend` (all `status: evolving`, code pending) |
+| Specs (`specs/`) | ✅ Done | Index (`specs/README.md`) with dependency graph + layer specs; **student self-registration + educator-link + age-based consent** implemented and verified — `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md` stays `evolving` (SPA removed) |
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
-| Terraform frontend infra (`terraform/aws-frontend`) | ✅ Done | S3 + CloudFront + `/api/*` origin; validated, mirrors 0shared |
-| Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~46 routes), RBAC (admin bootstrap + approval gating) + scoping; **AdminFunction** added |
+| Terraform frontend infra (`terraform/aws-frontend`) | ✅ Done | S3 + CloudFront + `/api/*` origin; validated, mirrors 0shared (unused while the SPA is absent) |
+| Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~46 routes), RBAC (admin bootstrap + approval gating) + scoping; **student self-register + educator-link + age-based consent** implemented (link `/students/:id/accounts/:userId/link`) |
 | Forms engine | ✅ Done | Code-defined forms; guardian-assisted submissions |
-| Binary student self-service | 🔄 Reworking | **Spec reworked**: student **self-registers** (`role: student`, pending) and is **linked by an educator** to a single student entity (approves + attributes); adult students (≥18) `self_consent`, minors (<18) need guardian/institution. Code + SPA not yet updated |
+| Binary student self-service | ✅ Done | Student **self-registers** (`role: student`, pending) and is **linked by an educator** to a single student entity (approves + attributes); adult students (≥18) `self_consent`, minors (<18) need guardian/institution — e2e verified |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
-| Tests (`sam-app/tests/`) | In progress | 23 unit passing; e2e rewritten for the new RBAC flow, still to be run against the real stack after data cleanup + deploy |
-| Frontend SPA (`frontend/`) | ✅ Reworked | Tailwind v4 + Radix + Vite; RBAC rework complete — `/admin/users` (approval/promotion/password/delete), role-conditional creation/assignment/consent, status-aware pending/denied login; build + lint green |
+| Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; **e2e 123/0 passing** against the real stack (admin bootstrap + new student flow) |
+| Frontend SPA (`frontend/`) | ⛔ Removed | SPA directory deleted by the owner (not tracked in git); `frontend.md` kept `evolving`; no S3/CloudFront deploy until reintroduced |
 
 ---
 
@@ -37,28 +37,29 @@ Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented 
 Everything below is implemented, tested, and documented in its own layer spec (`specs/`, navigable from the [spec index](./README.md) dependency graph):
 
 - **Infra**: Terraform stateful stack (DynamoDB single table, S3 files/data buckets, SQS report queue, async Lambdas) + SAM app with API-triggered functions.
-- **Backend API**: auth/sessions (admin bootstrap, approval gating), students & guardianship (educator/admin-only creation & assignment), versioned consent, binary student self-service, new **admin user management** (`/admin/users` — approve/deny, promote/demote, reset password, delete), forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
+- **Backend API**: auth/sessions (admin bootstrap, approval gating), students & guardianship (educator/admin-only creation & assignment), versioned consent, new **admin user management** (`/admin/users` — approve/deny, promote/demote, reset password, delete), forms engine (4 curated forms), observations, recommendations lifecycle, reports (presigned download), audit trail.
+- **Student self-registration + educator-link + age-based consent**: students self-register (`role: student`, `pending`, `birthDate` recorded as age verification); an educator (followed) or admin **links** the account to a single student entity via `POST /students/:id/accounts/:userId/link` (approves `pending→active`, attributes the entity, at-most-one both directions). Consent gates the link: an **adult (≥ `MIN_SELF_CONSENT_AGE=18`)** self-consents (`self_consent`) on their own entity; a **minor (< 18)** requires guardian/institution consent already granted. Pending students sign in to a restricted self-service area (`me` returns `studentId: null`); once linked they get the full self-view of their own entity. `admin.mjs` can correct `birthDate`/`age`. Implemented across `auth.mjs`, `guardianship.mjs`, `consent.mjs`, `students.mjs`, `session.mjs`, `admin.mjs`, `lib/age.mjs`; verified by e2e scenarios `02`/`06`/`08`/`09`.
 - **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/model/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); it scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `specs/ml-pipeline.md`).
 - **Security tooling**: gitleaks + pre-commit + CI secret scan; packaged-model commit exception documented.
 - **Dev loop**: `make sync` (`sam sync --watch`) pushes handler code changes straight to the live Lambdas in seconds — no CloudFormation wait; `template.yaml` changes still take the full `make deploy` path, which remains the source of truth.
-- **Frontend SPA** (`frontend/`): React + Vite + Tailwind v4 + Radix, pt-BR, accessible. Full persona slice: auth (login/register), dashboards, student overview + consent (LGPD), generic form engine renderer, dedicated VARK wizard (stepper), V/A/R/K profile view, recommendations, reports (generate/download), observations (educator), per-student + global audit, `/admin` audit trail, and the reduced **student self-view** mode (larger type, own-data only). Simple `apiFetch` client (token + 401 handler, no React Query yet). `npm run build` + `npm run lint` green.
-- **Frontend infra** (`terraform/aws-frontend`): S3 + CloudFront distribution serving the built `dist/` for SPA routes and proxying `/api/*` to the API Gateway origin (reads the `learning-profile-api-ApiEndpoint` export). OAC + bucket policy, SPA fallback (`403/404 → index.html`), `null_resource` upload + invalidation. `terraform validate` passes. Root `make frontend` builds then deploys.
+- **Frontend SPA** (`frontend/`): **removed by the owner** (React + Vite + Tailwind v4 + Radix app that implemented auth, dashboards, forms renderer, VARK wizard, V/A/R/K profile, recommendations, reports, observations, audit, and a student self-view mode — plus the RBAC-rework screens `/admin/users`, role-conditional actions and status-aware login — was deleted along with its `npm run build`/`npm run lint` setup). Not tracked in git; `frontend.md` kept `evolving`.
+- **Frontend infra** (`terraform/aws-frontend`): S3 + CloudFront distribution + `/api/*` origin (OAC, SPA fallback, upload + invalidation) remain validated but are **unused/un-deployed while the SPA is absent**; root `make frontend` no longer applies until a SPA is reintroduced.
 
 ---
 
 ## Pending work
 
-1. **Clean data + deploy + validate e2e (RBAC rework)** — clear the DynamoDB table (e2e assumes a clean table: the first educator must bootstrap as admin), `sam build && sam deploy` (template gained `AdminFunction`), then run `npm run test:e2e` against the real API (e2e rewritten for the admin-pending-approval flow). *(Done: deployed + 117/0 e2e passing — see [frontend rework below].)*
-2. **Rework the frontend for the new RBAC** — new admin screens (user management: approval/promotion/password/delete), make creation/assignment/actions conditional by `role`, and handle login of a pending/denied account (status-aware messaging). ✅ **Done** — `frontend.md` mirrors the new role/status rules; `/admin/users` (admin full, educator scoped to guardian/student approvals), creation/assignment gated to `educator`/`admin`, consent to `guardian`/`educator`/`admin`, status-aware login; `npm run build` + `npm run lint` green.
-3. **Deploy the frontend** — run `make frontend` (requires AWS creds): builds the SPA, `terraform apply`s `terraform/aws-frontend` (S3 + CloudFront), and prints the `cloudfront_domain_name`. Confirm the app loads at the CloudFront URL and `/api/*` reaches the API Gateway origin.
+1. **Clean data + deploy + validate e2e (RBAC rework)** — clear the DynamoDB table (e2e assumes a clean table: the first educator must bootstrap as admin), `sam build && sam deploy` (template gained `AdminFunction`), then run `npm run test:e2e` against the real API. ✅ **Done** — deployed; still needs a clean table before each full e2e run.
+2. **Frontend RBAC rework** — ✅ **Done** at the time (admin screens, role-conditional actions, status-aware login); **obsolete** — the SPA was removed by the owner.
+3. ~~**Deploy the frontend**~~ — **superseded**: the SPA was removed; `make frontend`/S3/CloudFront deploy no longer applies until a SPA is reintroduced.
 4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
-5. **Implement the student self-registration + educator-link + age-based consent flow** — specs reworked (`auth`, `architecture`, `backend`, `dynamodb-schema`, `lgpd`, `frontend`): student `role: student` self-registers (`pending`, `birthDate`), educator links it to a student entity via `POST /students/:id/accounts/:userId/link` (approves + attributes, at-most-one), adult (≥18) self-consents (`MIN_SELF_CONSENT_AGE=18`); code + SPA not yet updated. Touchpoints: `auth.mjs` (register accepts student + birthDate; `me`/`getOwnStudentId` for pending), `guardianship.mjs` (replace account-creation with link endpoint), `consent.mjs` (allow adult student on own entity), `students.mjs` (PATCH own profile), `session.mjs` (allow pending student restricted access), `admin.mjs` (edit birthDate), `resources.env` (`MIN_SELF_CONSENT_AGE`), plus e2e `06-student-self-view.mjs`. Flip the five specs back to `stable` once implemented and verified.
+5. ~~**Implement the student self-registration + educator-link + age-based consent flow**~~ — ✅ **Done and verified**: self-register (`pending`, `birthDate`), link via `POST /students/:id/accounts/:userId/link` (approves + attributes, at-most-one), adult (≥18) `self_consent` / minor needs guardian/institution (`MIN_SELF_CONSENT_AGE=18`). Implemented across `auth.mjs`, `guardianship.mjs`, `consent.mjs`, `session.mjs`, `admin.mjs`, `lib/age.mjs`, `resources.env`, `template.yaml`; e2e **123/0**. `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md` stays `evolving` (SPA removed).
 
 ---
 
 ## Suggested next steps (in order)
 
-1. ✅ Cleaned, deployed, e2e validated (117/0) — admin bootstrap + approval flow verified live.
-2. ✅ Frontend RBAC rework — `/admin/users` + role-conditional actions + status-aware login (build/lint green).
-3. Deploy the SPA: run `make frontend` with AWS credentials (build + S3 + CloudFront), then smoke-test the app + API under the single CloudFront domain.
-4. **Implement the student self-registration + link + age-based consent flow** (specs done, code pending — see Pending work #5).
+1. ✅ Cleaned, deployed, e2e validated — admin bootstrap + approval flow verified live.
+2. ✅ Student self-registration + educator-link + age-based consent — implemented and verified live (e2e **123/0**); backend specs flipped to `stable`.
+3. ⛔ Frontend SPA removed — no deploy pending; `frontend.md` kept `evolving` until a SPA is reintroduced (if ever).
+4. Report generator Lambda (PDF export) — still a future-work stub by scope decision.

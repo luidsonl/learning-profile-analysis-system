@@ -73,7 +73,7 @@ graph LR
 | [lgpd.md](./lgpd.md) (`lgpd`) | stable | 2026-08-29 | `architecture`, `dynamodb-schema`, `auth`, `ml-pipeline` |
 | [security.md](./security.md) (`security`) | stable | 2026-08-29 | `architecture`, `auth`, `ml-pipeline`, `lgpd` |
 | [design-system.md](./design-system.md) (`design-system`) | stable | 2026-08-29 | `architecture` |
-| [frontend.md](./frontend.md) (`frontend`) | stable | 2026-08-29 | `architecture`, `backend`, `auth`, `design-system` |
+| [frontend.md](./frontend.md) (`frontend`) | evolving | 2026-08-29 | `architecture`, `backend`, `auth`, `design-system` |
 | [student-data-features.md](./student-data-features.md) (`student-data-features`) | proposed | 2026-08-29 | `architecture`, `dynamodb-schema`, `ml-pipeline`, `lgpd` |
 | [progress.md](./progress.md) (`progress`) | evolving | 2026-08-29 | — (report) |
 

@@ -2,7 +2,7 @@
 id: lgpd
 title: LGPD Compliance
 type: spec
-status: evolving
+status: stable
 since: 2026-08-27
 lastReviewed: 2026-08-29
 dependsOn:
