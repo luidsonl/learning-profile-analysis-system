@@ -2,7 +2,7 @@
 id: dynamodb-schema
 title: DynamoDB Schema
 type: spec
-status: stable
+status: evolving
 since: 2026-08-27
 lastReviewed: 2026-08-29
 dependsOn:
@@ -51,7 +51,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 **Profile item**
 | PK | SK | Attributes |
 |----|----|-----------|
-| `USER#<userId>` | `META` | `userId`, `email` (normalized), `name`, `role` (`guardian|educator|student|admin`), `status` (`active|pending|denied`; `createdBy` on student accounts), `createdAt`, `updatedAt` |
+| `USER#<userId>` | `META` | `userId`, `email` (normalized), `name`, `role` (`guardian|educator|student|admin`), `status` (`active|pending|denied`), `birthDate` (optional — age verification / LGPD), `age` (derived), `consentEligible` (age-based: `self_consent` allowed only if ≥ `MIN_SELF_CONSENT_AGE`), `createdAt`, `updatedAt` |
 | `USER#<userId>` | `META` | GSI2PK `ROLE#<role>`, GSI2SK `USER#<userId>#<status>` |
 
 > **Approval flow**: registration writes `USER#ROLE#<role>` on GSI2. `hasAdmin()` (register bootstrap + delete/last-admin guards) scans `USER#ROLE#admin`; `admin` lists users by role/status via GSI2. Setting status `pending|active|denied` rewrites `GSI2PK`/`GSI2SK` atomically.
@@ -101,7 +101,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 > Pattern: "list students a guardian/educator can see" → Query the user partition SK begins_with `GUARD#` / `FOLLOW#`. Reverse edges (student partition) serve consent display and scope checks ("who has access to this student"). Edges are written **bidirectionally in one transaction** + an `AUDIT#` item.
 
-> **`STUDENT#` is a record, not a login.** A student exists independently of any user account and relates to users through independent, cumulative edges: **guardians** (`GUARD#`/`GUARDIAN#` — a single guardian user can guard **many** students, one edge per student), **educators** (`FOLLOW#`/`EDUCATOR#`), and **a self-account** (`USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>` — **at most one** per student, enforced by the single-valued `studentUserId`). These links are not mutually exclusive: a student may have a guardian **and** its own account at the same time (account creation only adds the login edges; guardian/educator edges are untouched), only a guardian (forms filled by the responsible adult), or only a self-account (students without a guardian).
+> **`STUDENT#` is a record, not a login.** A student's data entity exists (created by an educator/admin) independently of any user account and relates to users through independent, cumulative edges: **guardians** (`GUARD#`/`GUARDIAN#` — a single guardian user can guard **many** students, one edge per student), **educators** (`FOLLOW#`/`EDUCATOR#`), and **a self-account** (`USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>`). The **self-account is self-registered** (`USER#/META`, `role: student`, starts `pending`) and is **linked to this entity by an educator/admin** (see [transactions](#transactions-atomic-invariants)), which approves the account and attributes the entity. **At most one in both directions**: one entity holds at most one `studentUserId` (single-valued on `STUDENT#<c>/META`), and a student self-account links to at most one entity (`getOwnStudentId` is single). These relations are **not mutually exclusive**: an entity may have a guardian **and** a linked self-account at the same time (the link only adds the self edges; guardian/educator edges are untouched), only a guardian (forms filled by the responsible adult), or only a self-account (students without a guardian).
 
 ### SUBMISSION (per-student form responses)
 
@@ -198,7 +198,8 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Update user status/role (admin) | `USER#<id>/META` (SET `role`/`status` + `GSI2PK`/`GSI2SK`) + `AUDIT#USER#<id>` |
 | Grant guardianship | `USER#<g>/GUARD#<c>` + `STUDENT#<c>/GUARDIAN#<g>` + `AUDIT#STUDENT#<c>` |
 | Educator follow | `USER#<e>/FOLLOW#<c>` + `STUDENT#<c>/EDUCATOR#<e>` + `AUDIT#STUDENT#<c>` |
-| Create student account | `USER#<s>/META` + `EMAIL#` reservation + `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/STUDENT#<s>` + `STUDENT#<c>/META` (set `studentUserId`) + `AUDIT#STUDENT#<c>` |
+| Self-register student account | `USER#<s>/META` (`role: student`, `status: pending`, `birthDate`) + `EMAIL#<s>` reservation + `AUDIT#USER#<s>` |
+| Link student account (educator/admin) | `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>` + `STUDENT#<c>/META` (set `studentUserId`) + `USER#<s>/META` (set `status: active`) + `AUDIT#STUDENT#<c>` |
 | Consent grant / revoke | `STUDENT#<c>/CONSENT#<v>#<ts>` + `STUDENT#<c>/META` (consent attrs incl. legal basis, conditional) + `AUDIT#STUDENT#<c>` |
 | Submit form (idempotent) | `STUDENT#<c>/SUBMISSION#…` (conditional write, no classification side-effect) |
 | Classify submission → assessment | `ASSESS#<c>/VARK#<ts>` + `STUDENT#<c>/META` (profile attrs) |

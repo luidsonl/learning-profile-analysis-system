@@ -2,7 +2,7 @@
 id: frontend
 title: Frontend
 type: spec
-status: stable
+status: evolving
 since: 2026-08-27
 lastReviewed: 2026-08-29
 dependsOn:
@@ -42,6 +42,8 @@ requiredBy: []
 | Path | Persona | Page |
 |------|---------|------|
 | `/login` | public | Login |
+| `/register` | public | Register guardian/educator or **self-register as student** (informs `birthDate` for LGPD eligibility) |
+| `/pending` | student (pending, unlinked) | Restricted self-service area: "awaiting link — an educator will connect your account" + LGPD status |
 | `/` | guardian/educator/admin | Dashboard (students in scope) |
 | `/students/:id` | scoped | Student profile + consent status |
 | `/students/:id/forms` | scoped | Available forms for the student |
@@ -54,14 +56,14 @@ requiredBy: []
 | `/admin/users` | admin + educator | User management: approve/deny, promote/demote, reset password, delete (educators: approve/deny guardian + student accounts only) |
 | `/me` | any | Own account (guardian/educator) |
 
-Student persona sees a **simplified self-view**: own profile, recommendations, approved reports, and the forms they can fill — never observations or raw ML output.
+Student persona sees a **simplified self-view**: own single profile, recommendations, approved reports, and the forms they can fill — never observations or raw ML output. A **pending/unlinked** student lands in a restricted area (`/pending`) with no student entity until an educator links them. The educator's UI includes a **link/approve** action to connect a self-registered student account to a student entity (see [Backend](./backend.md)).
 
 ## Auth & Role Guarding
 
 - `<RequireRole roles={...}>` wraps routes; unauthenticated → `/login`.
 - Scope is enforced server-side (see [Authentication](./auth.md)); the UI only *hides* what the backend already denies.
-- Student mode: after login as `student`, the app enters a simplified visual mode (larger type, fewer nav items, playful but non-childish copy — LGPD-friendly wording).
-- **RBAC rework implemented**: the SPA now matches the approval/admin-bootstrap backend ([auth](./auth.md)). `/admin/users` gives admins full user management (approve/deny, promote/demote `educator↔admin`, reset password, delete) and educators a scoped approval view (approve/deny responsable + student accounts only, no role/password/delete). Creation/assignment/consent actions are role-conditional: student creation and responsable/self-account assignment appear only for `educator`/`admin` (guardians never register students), consent grant/revoke for `guardian`/`educator`/`admin` (never `student`). Login surfaces status-aware messaging for `pending`/`denied` accounts instead of a generic failure.
+- Student mode: after login as `student`, the app enters a simplified visual mode (larger type, fewer nav items, playful but non-childish copy — LGPD-friendly wording). A **pending/unlinked** student gets the restricted `/pending` flow (awaiting educator link); a **linked** student gets the full self-view of their own entity.
+- **RBAC rework implemented**: the SPA matches the approval/admin-bootstrap backend ([auth](./auth.md)). `/admin/users` gives admins full user management (approve/deny, promote/demote `educator↔admin`, reset password, **edit birth date/age**, delete) and educators a scoped approval view (approve/deny responsable + student accounts only, no role/password/delete). Creation/assignment/consent actions are role-conditional: **student self-registration** appears publicly; student **entity creation and link/approve** appear only for `educator`/`admin` (guardians never register/link students); consent grant/revoke for `guardian`/`educator`/`admin` **and for a linked adult student (≥18) on their own entity** (never a minor). Login surfaces status-aware messaging for `pending`/`denied` accounts instead of a generic failure.
 
 ## Feature Areas
 

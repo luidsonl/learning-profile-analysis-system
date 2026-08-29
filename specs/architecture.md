@@ -2,7 +2,7 @@
 id: architecture
 title: Architecture
 type: spec
-status: stable
+status: evolving
 since: 2026-08-27
 lastReviewed: 2026-08-29
 dependsOn: []
@@ -24,7 +24,7 @@ requiredBy:
 
 The Learning Profile Analysis System is a serverless platform that personalizes education for gifted students and students with specific needs. It ingests data supplied by guardians, educators, and the students themselves through structured **forms** (academic history, learning preferences, observed behaviors, socioemotional indicators), runs machine learning analysis, and produces adapted pedagogical strategies and visual reports shared between families and educators.
 
-Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (usually a minor, with a full self-view of own data), and **admin**. Access control is role- and scope-based: guardians see only the students **assigned** to them; educators see only the students they follow; students see only their own profile, submissions, predictions, observations, and reports; administrators manage users and the institution's data. Educator/guardian accounts are **approval-gated** (they register `pending` and must be approved before signing in) and the **first educator to register bootstraps as `admin`**; students are created by educators/admins and assigned to a responsable, a student self-account, or **both** (the two are independent — see [Authentication](./auth.md)).
+Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (usually a minor, but can be an adult; self-registers and owns a full self-view of a single student entity), and **admin**. Access control is role- and scope-based: guardians see only the students **assigned** to them; educators see only the students they follow; students see only their **own single entity** (profile, submissions, predictions, observations, reports); administrators manage users and the institution's data. Educator/guardian accounts are **approval-gated** (they register `pending` and must be approved before signing in) and the **first educator to register bootstraps as `admin`**. **Students self-register** their account (`role: student`, starts `pending`) and are granted a single student entity when an **educator links** their account to a `STUDENT#` entity they follow (the link approves the account and attributes the entity). A student's entity can also have a **guardian assigned** — the two relations (guardian-managed and self-owned) are independent and cumulative — see [Authentication](./auth.md).
 
 The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for a React+Vite SPA, and **DynamoDB single-table** design. It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
 
@@ -257,10 +257,10 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 
 ## Security & LGPD
 
-- **RBAC:** roles `guardian | educator | student | admin` enforced by `requireRole` middleware on top of Bearer-token sessions (0shared auth flow). Educator/guardian accounts register `pending` and require approval; the first educator bootstraps as `admin`. Only `educator`/`admin` create students and assign them (to a responsable or a student self-account).
-- **Scope enforcement:** guardians query students via their `USER#` partition (guardianship edges); educators via `FOLLOW#` edges; students access only their own profile through a dedicated student link. No cross-tenant enumeration.
-- **Binary student self-service:** there are no autonomy levels — access is binary. A user either has an account or does not; a form is filled either by its intended audience or by the responsible adult acting for them. A student account holder gets the full self-view of own data (submissions, predictions with scores, observations, reports) and can only edit their own name. Enforcement lives in `src/api/lib/scope.mjs`.
-- **Explicit consent:** consent (versioned, with **legal basis** `guardian | institution_authorization | self_consent` and `grantedByRole`) is required before a student's data is processed. Creating a student account is initiated by an **educator following the student or an admin** (institution-led onboarding) and gated by consent. Consent revocation blocks new processing.
+- **RBAC:** roles `guardian | educator | student | admin` enforced by `requireRole` middleware on top of Bearer-token sessions (0shared auth flow). Educator/guardian accounts register `pending` and require approval; the first educator bootstraps as `admin`. Only `educator`/`admin` create student **entities** (`STUDENT#`) and assign/link them — and **students self-register** their own account (`role: student`), which an educator links to a single entity (see [Authentication](./auth.md)).
+- **Scope enforcement:** guardians query students via their `USER#` partition (guardianship edges); educators via `FOLLOW#` edges; students access only their own single linked entity through the `USER#<s>/STUDENT#<c>` edge (none while pending/unlinked). No cross-tenant enumeration.
+- **Binary student self-service:** there are no autonomy levels — for an active, linked student access is binary. A student self-registers; a form is filled either by its intended audience or by the responsible adult acting for them (or the own adult student). A linked student gets the full self-view of their single entity and **fills in/edits their own profile** (not just their name). While `pending`/unlinked, a student signs in only to a restricted self-service area and holds no student entity. Enforcement lives in `src/api/lib/scope.mjs`.
+- **Explicit consent:** consent (versioned, with **legal basis** `guardian | institution_authorization | self_consent` and `grantedByRole`) is required before a student's data is processed. **`self_consent` is allowed only for adult students (≥ 18)**; minors (< 18) are consented by a guardian or the institution. Linking a student's self-account is initiated by an **educator following the entity or an admin** and is gated by consent. Consent revocation blocks new processing.
 - **Audit log:** every access/action on a student's data writes a `AUDIT#` item (who, what, when).
 - **Data minimization & retention:** students' records are kept minimal; retention/erasure policy is documented in `lgpd.md`.
 - **Encryption:** S3 buckets use SSE; DynamoDB uses AWS KMS; in-transit TLS via CloudFront/API Gateway.
@@ -312,7 +312,7 @@ Cleanup happens in reverse order.
 | Split Terraform / SAM | Stateful infra is protected and centralized; stateless compute benefits from `sam local start-api` |
 | Single CloudFront domain with `/api` prefix | No CORS; one domain for app + API + future mobile consumption |
 | DynamoDB single-table | Follows 0shared; disciplined access-pattern design with entity prefixes and GSIs |
-| Student as a restricted persona | Minors exercise LGPD rights; scoped self-view without exposing educator observations |
+| Student as a self-registered, self-owned persona | Students self-register and own a single student entity (self-view without exposing educator observations); institution keeps data via educator-created entities; LGPD exercised per age |
 | Hybrid forms engine (generic engine + curated library) | One mechanism for all data collection (VARK, anamnese, socioemotional, behavior) with code-versioned definitions |
 | Profiles traced from forms | A profile is the interpretation of a filled form (VARK in the MVP); new forms → new profiles additively |
 | ML fully decoupled — offline training only | System never trains; standalone `ml-pipeline.md` spec keeps dataset + training evolvable independently |

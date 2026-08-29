@@ -2,7 +2,7 @@
 id: backend
 title: Backend
 type: spec
-status: stable
+status: evolving
 since: 2026-08-27
 lastReviewed: 2026-08-29
 dependsOn:
@@ -44,7 +44,7 @@ requiredBy:
 ### Auth
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `POST /api/auth/register` | public | Create guardian/educator account (role is `guardian` or `educator`; first educator → `admin` bootstrap; others `pending`) | `USER#` + `EMAIL#` reservation + `AUDIT#USER#` (txn) |
+| `POST /api/auth/register` | public | Create guardian/educator account (first educator → admin bootstrap; others `pending`) **or self-register a student account** (`role: "student"`, starts `pending`, `birthDate` recorded for age-based LGPD) | `USER#` + `EMAIL#` reservation + `AUDIT#USER#` (txn) |
 | `POST /api/auth/login` | public | Issue session token | `SESSION#` (GSI1 lookup) |
 | `POST /api/auth/logout` | any | Revoke current session | delete `SESSION#` |
 | `GET /api/auth/me` | any | Current user + role + scoped student count | `USER#<id>/META` |
@@ -55,12 +55,13 @@ requiredBy:
 | `POST /api/students` | educator, admin | Create student profile (educator auto-`FOLLOW#`; guardian **cannot**) | `STUDENT#<id>/META` + `FOLLOW#`/`EDUCATOR#` (txn) when educator |
 | `GET /api/students` | guardian, educator, admin | List students in scope (guardian `GUARD#` / educator `FOLLOW#`; admin all) | Query user partition `GUARD#`/`FOLLOW#` prefix |
 | `GET /api/students/:id` | scoped | Student profile | `STUDENT#<c>/META` |
-| `PATCH /api/students/:id` | scoped, admin | Update profile (non-destructive) | `STUDENT#<c>/META` |
+| `PATCH /api/students/:id` | scoped, admin (linked student may edit their own profile fields) | Update profile (non-destructive); a linked student edits their own entity's profile | `STUDENT#<c>/META` |
 | `POST /api/students/:id/guardians` | educator (scoped), admin | Grant guardianship to a guardian | `GUARD#` + `GUARDIAN#` + `AUDIT#` (txn) |
 | `DELETE /api/students/:id/guardians/:userId` | educator (scoped), admin | Revoke guardianship | reverse txn |
 | `POST /api/students/:id/follow` | educator | Follow a student | `FOLLOW#` + `EDUCATOR#` + `AUDIT#` (txn) |
 | `DELETE /api/students/:id/follow` | educator | Unfollow | reverse txn |
-| `POST /api/students/:id/student-account` | educator (followed), admin | Create the student (minor) account — **consent-gated** (requires active consent; **not** by guardian) | `USER#`+`EMAIL#`+`STUDENT#`+`STUDENT#` edge (txn) |
+| `POST /api/students/:id/student-account` | — | **Removed** — student accounts are **self-registered** via `POST /api/auth/register` (`role: "student"`); educators no longer create them | — |
+| `POST /api/students/:id/accounts/:userId/link` | educator (followed), admin | **Link** an existing self-registered student account to this student entity: approves it (`pending → active`) and attributes the entity (`studentUserId`, edges) — consent-gated (adult ≥18 self-consents; minor needs guardian/institution); `at most one` account per entity and entity per account | `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>` + `STUDENT#<c>/META` (set `studentUserId`) + flip `USER#<s>/META.status` + `AUDIT#STUDENT#<c>` (txn) |
 | `GET /api/students/:id/guardians` | scoped | Guardians of this student | `STUDENT#<c>/GUARDIAN#` prefix |
 | `GET /api/students/:id/educators` | scoped | Educators following this student | `STUDENT#<c>/EDUCATOR#` prefix |
 
@@ -68,7 +69,7 @@ requiredBy:
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
 | `GET /api/students/:id/consent` | scoped, admin | Current consent + history (incl. `legalBasis`, `grantedByRole`) | `CONSENT#` prefix |
-| `POST /api/students/:id/consent` | guardian (of the student, via `GUARD#`), educator (followed), admin | Grant/revoke versioned consent; `legalBasis: guardian|institution_authorization|self_consent` | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
+| `POST /api/students/:id/consent` | guardian (of the student, via `GUARD#`), educator (followed), admin, **linked adult student (≥18, `self_consent`, own entity)** | Grant/revoke versioned consent; `legalBasis: guardian|institution_authorization|self_consent`; minors (<18) never self-consent | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
 
 ### Forms
 | Method & Path | Roles | Description | Schema items |
@@ -121,7 +122,7 @@ requiredBy:
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
 | `GET /api/admin/users` | admin (all roles), educator (guardian/student only) | List users by optional `role`/`status` filter | GSI2 `RoleStatus` query per role |
-| `PATCH /api/admin/users/:id` | admin, educator | Change `status` (approve/deny) and `role` (promote/demote, admin only); guards: no self-demote, no last-admin removal | `USER#<id>/META` + `AUDIT#USER#` |
+| `PATCH /api/admin/users/:id` | admin, educator | Change `status` (approve/deny), `role` (promote/demote, admin only), and **`birthDate`/`age`** (adjust LGPD eligibility); guards: no self-demote, no last-admin removal | `USER#<id>/META` + `AUDIT#USER#` |
 | `POST /api/admin/users/:id/password` | admin | Reset a user's password | update `USER#<id>/META` `passwordHash` |
 | `DELETE /api/admin/users/:id` | admin | Hard-delete account: user items + `EMAIL#` + sessions + reverse edges | deletes across partitions |
 
@@ -141,12 +142,12 @@ requiredBy:
 | Endpoint group | guardian | educator | student | admin |
 |----------------|:--------:|:--------:|:-------:|:-----:|
 | Auth (login/logout/me) | ✓ (pending must be approved) | ✓ | ✓ | ✓ |
-| Students CRUD | assigned (read/edit; **no create**) | followed (create/edit) | own profile (read; edit name) | ✓ |
+| Students CRUD | assigned (read/edit; **no create**) | followed (create/edit) | own (read; **edit own profile**, linked ⇒ active) | ✓ |
 | Guardianship | view assigned | assign (scoped)/✓ | ✗ | ✓ |
 | Follow | ✗ | ✓ | ✗ | ✗ |
-| Student account | ✗ | followed (institution onboarding) | ✗ | ✓ |
-| User management (approval/RBAC) | ✗ | approve guardian/student (status only) | ✗ | ✓ (full) |
-| Consent | assigned students | followed (grant/revoke, institution basis) | ✗ | ✓ |
+| Student account (self-register / link) | ✗ | link + approve (scoped) | self-register (pending self-service); linked ⇒ own | ✓ |
+| User management (approval/RBAC) | ✗ | approve guardian/student (status only) | ✗ | ✓ (full, incl. edit birthDate) |
+| Consent | assigned students | followed (grant/revoke, institution basis) | own (self_consent, **only if ≥18**) | ✓ |
 | Forms (fill) | anamnesis, vark (assistido) | socioemotional, behavior-checklist, vark (assistido) | vark | ✓ all |
 | Observations | ✗ | ✓ | own (read-only) | ✓ |
 | Assessments / Predict | assigned students | followed | own (full payload) | ✓ |

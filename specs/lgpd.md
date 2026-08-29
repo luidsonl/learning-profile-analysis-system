@@ -2,7 +2,7 @@
 id: lgpd
 title: LGPD Compliance
 type: spec
-status: stable
+status: evolving
 since: 2026-08-27
 lastReviewed: 2026-08-29
 dependsOn:
@@ -24,21 +24,29 @@ requiredBy:
 | Processing | Legal basis (LGPD art. 7) | Notes |
 |-----------|----------------------------|-------|
 | Registration of guardian/educator/admin | Consent + legitimate interest of the institution (accounts are `pending` until an educator/admin approves) | Adult users |
-| Registration of the student (minor) | **Consent of the guardian** (art. 14 — children's data); for students without a guardian, **institution authorization** (`legalBasis=institution_authorization`) granted by the responsible educator/admin, documented on the consent record. Students are registered by an **educator/admin** (a guardian is assigned later) | Educator-/institution-led |
+| Registration of the student | The **student self-registers** (`role: student`); the legal basis depends on age, decided from the **birth date** recorded at sign-up: **adult (≥ `MIN_SELF_CONSENT_AGE`)** may consent for themselves (`self_consent`); **minor (< 18)** requires **guardian consent** (art. 14 — children's data) or, without a guardian, **institution authorization** (`legalBasis=institution_authorization`) granted by the responsible educator/admin. An educator links the account to a single student entity (consent-gated) | Faculty-led data entity; age-based consent |
 | Filling forms, observations, assessments | Guardian consent or institution authorization (per student, versioned) | `vark`, `anamnesis`, `socioemotional`, `behavior-checklist` |
 | ML prediction & recommendations | Same consent basis; anonymized training outside scope | See data minimization below |
 | Reports (PDF) | Same consent basis; sharing per `sharedWith` | Presigned URLs |
 | Audit log | Legitimate interest + legal compliance (art. 37) | Kept separately from analytics |
 
-> Every consent record stores its **legal basis** (`legalBasis`: `guardian | institution_authorization | self_consent`) and the **role that granted it** (`grantedByRole`), satisfying LGPD accountability (art. 37). Consent is always required — the legal basis only documents *who* authorized the processing, never replaces it. Minors never consent for themselves (`self_consent` is reserved for adults in future self-service flows).
+> Every consent record stores its **legal basis** (`legalBasis`: `guardian | institution_authorization | self_consent`) and the **role that granted it** (`grantedByRole`), satisfying LGPD accountability (art. 37). Consent is always required — the legal basis only documents *who* authorized the processing, never replaces it. **Age-based self-consent**: `self_consent` is permitted only when the student is **≥ `MIN_SELF_CONSENT_AGE` (18)**; minors (< 18) are consented by a **guardian** or by **institution authorization**. The student's **birth date is collected as an age-verification data point** (LGPD art. 14 §5º + ECA Digital — Lei 15.211/2025, in force since March 2026) and used strictly for this purpose, never for profiling/commercial use.
 
 > Sensitive data: the model treats family income, disability, and socioemotional signals as **sensitive** even when LGPD categories don't formally cover all — stricter handling by default.
+
+### Age-based consent & age verification
+
+- **`MIN_SELF_CONSENT_AGE` (default 18)** — the only incontrovertible threshold for autonomous consent under Brazilian law. `self_consent` is allowed only for students **≥ 18**.
+- **Minors (< 18)** are consented by a **guardian** (art. 14 §1º) or by **institution authorization** (guardian-less). This is deliberately conservative: LGPD art. 14 leaves adolescents (12–18) largely unregulated, and both the Código Civil (arts. 3º/4º: absolute incapacity < 16, relative incapacity 16–18) and ANPD/MPCE guidance treat sub-16 autonomous consent as contestable.
+- **Age verification (LGPD art. 14 §5º + ECA Digital, Lei 15.211/2025, in force since March 2026):** the controller must make *reasonable efforts* to verify that consent comes from the right party — not a child self-declaring as an adult. Practical controls: collect `birthDate` at sign-up (never mere majority self-declaration), state its purpose as age verification only, and allow admins to correct it. `birthDate`/`age`/`consentEligible` are stored on `USER#/META` (see [DynamoDB Schema](./dynamodb-schema.md)).
+- **Best-interest filter (Enunciado CD/ANPD nº 1/2023):** student-entity processing may also rest on the art. 7º/11 bases (e.g. legitimate interest of the educational institution) with the child's best interest prevailing — this grounds the restricted pre-link (`pending`) self-service without relying solely on the minor's own consent.
+- **Privacy by default & adapted transparency** (art. 14 §2º, ECA Digital): minor-facing screens use accessible language; collect only the minimum; no behavioral or manipulative design.
 
 ## Data Inventory (MVP)
 
 | Item | Entities (`dynamodb-schema.md`) | Purpose |
 |------|--------------------------------|---------|
-| Identity & contacts | `USER#` | Accounts, login, roles |
+| Identity & contacts (incl. age-verification birth date) | `USER#` | Accounts, login, roles; `birthDate` used strictly for consent eligibility (LGPD art. 14 §5º / ECA Digital), never for profiling |
 | Student profile | `STUDENT#/META` | Guardianship, consent, personalization |
 | Form responses | `SUBMISSION#` | Profile tracing (VARK scoring) |
 | Observations | `OBS#` | Educator feedback, features for future models |
@@ -51,14 +59,14 @@ requiredBy:
 ## Consent Lifecycle
 
 - **Versioned**: each consent record has `consentVersion` (the terms version accepted) + timestamp; stored as `STUDENT#<c>/CONSENT#<version>#<ts>` and denormalized on `STUDENT#/META` (`consentVersion`, `consentAt`, `consentBy`) together with `consentLegalBasis` and `consentGrantedByRole`.
-- **Grant**: guardian, educator (institution authorization, student followed), or admin calls `POST /api/students/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
+- **Grant**: a guardian, educator (institution authorization, student followed), linked adult student (≥18, `self_consent`, own entity), or admin calls `POST /api/students/:id/consent` → transaction writes the consent item + updates `META` + `AUDIT#`.
 - **Erasure-adjacent control**: self-service is independent of consent — a student account never bypasses consent; revoking consent blocks processing regardless of who holds the account.
 - **Revocation**: writes a new `CONSENT#` item with `status=revoked` and updates `META`. After revocation:
   - new submissions, assessments, predictions, observations are rejected (403);
   - read access is limited to what's needed for the rights (access, erasure) and legal obligations;
   - nightly export excludes the student.
 - **Re-consent**: a new consent version is accepted explicitly; old version history retained for proof.
-- **Student account gating**: creating a student account requires an active consent for the student; a minor can never consent themselves.
+- **Student account gating**: linking a self-registered student account to its entity requires an active consent for the student; **a minor (< 18) never consents themselves** — only an adult (≥18) may `self_consent`.
 
 ## Audit Log
 
@@ -106,9 +114,10 @@ Erasure is a **documented script/runbook** (admin-triggered Lambda or CLI) with 
 | Actor | Responsibility |
 |-------|----------------|
 | Institution (controller) | Consent texts, retention policy, DPO contact, erasure requests |
-| Guardians | Consent for minors, exercise of rights |
-| Educators | Data minimization when writing observations |
-| System | Audit trail, scope enforcement, anonymized export |
+| Guardians | Consent for minors (< 18 or < `MIN_SELF_CONSENT_AGE`), exercise of rights |
+| Adult students (≥ 18, linked) | Self-consent (`self_consent`) for their own entity; exercise of rights |
+| Educators | Grant institution authorization for guardian-less minors; data minimization when writing observations |
+| System | Audit trail, scope enforcement, age-verification of consent, anonymized export |
 
 ---
 
