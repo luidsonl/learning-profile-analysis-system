@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { CircleUserRound, LogOut, UserRound } from "lucide-react";
+import { CircleUserRound, LogOut, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
 import { roleLabel } from "../../lib/format";
 import {
@@ -45,6 +45,18 @@ export default function UserMenu() {
           <DropdownMenuItem onSelect={() => navigate("/me")}>
             <UserRound className="size-4" aria-hidden="true" />
             Minha conta
+          </DropdownMenuItem>
+        )}
+        {(user.role === "admin" || user.role === "educator") && (
+          <DropdownMenuItem onSelect={() => navigate("/admin/users")}>
+            <UsersRound className="size-4" aria-hidden="true" />
+            {user.role === "admin" ? "Gestão de usuários" : "Aprovações"}
+          </DropdownMenuItem>
+        )}
+        {user.role === "admin" && (
+          <DropdownMenuItem onSelect={() => navigate("/admin")}>
+            <ShieldCheck className="size-4" aria-hidden="true" />
+            Auditoria
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={handleLogout}>

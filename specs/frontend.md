@@ -50,7 +50,8 @@ requiredBy: []
 | `/students/:id/recommendations` | scoped | Adapted pedagogical strategies |
 | `/students/:id/reports` | scoped | Report list + download |
 | `/students/:id/observations` | educator | Observations (educator-only; hidden from student persona) |
-| `/admin/*` | admin | Users, forms definitions, audit |
+| `/admin` | admin | Global audit trail |
+| `/admin/users` | admin + educator | User management: approve/deny, promote/demote, reset password, delete (educators: approve/deny guardian + student accounts only) |
 | `/me` | any | Own account (guardian/educator) |
 
 Student persona sees a **simplified self-view**: own profile, recommendations, approved reports, and the forms they can fill — never observations or raw ML output.
@@ -60,8 +61,7 @@ Student persona sees a **simplified self-view**: own profile, recommendations, a
 - `<RequireRole roles={...}>` wraps routes; unauthenticated → `/login`.
 - Scope is enforced server-side (see [Authentication](./auth.md)); the UI only *hides* what the backend already denies.
 - Student mode: after login as `student`, the app enters a simplified visual mode (larger type, fewer nav items, playful but non-childish copy — LGPD-friendly wording).
-
-> **Not yet reworked for the new RBAC:** the SPA predates the approval/admin-bootstrap backend. Pending work (see [progress](./progress.md)): admin user-approval/promotion/password/delete screens under `/admin/*`, making creation/assignment/consent actions conditional on `role` (only educator/admin create students and assign responsables/self-accounts), and handling login of a `pending`/`denied` account with status-aware messaging instead of a generic failure.
+- **RBAC rework implemented**: the SPA now matches the approval/admin-bootstrap backend ([auth](./auth.md)). `/admin/users` gives admins full user management (approve/deny, promote/demote `educator↔admin`, reset password, delete) and educators a scoped approval view (approve/deny responsable + student accounts only, no role/password/delete). Creation/assignment/consent actions are role-conditional: student creation and responsable/self-account assignment appear only for `educator`/`admin` (guardians never register students), consent grant/revoke for `guardian`/`educator`/`admin` (never `student`). Login surfaces status-aware messaging for `pending`/`denied` accounts instead of a generic failure.
 
 ## Feature Areas
 

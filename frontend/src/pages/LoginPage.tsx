@@ -8,6 +8,17 @@ import Field from "../components/atoms/Field";
 import ErrorText from "../components/atoms/ErrorText";
 import { ApiError } from "../api/client";
 
+function loginErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) return "Falha ao entrar. Tente novamente.";
+  if (err.code === "pending_approval") {
+    return "Sua conta está aguardando aprovação. Assim que for aprovada, você poderá entrar.";
+  }
+  if (err.code === "account_denied") {
+    return "Sua conta não foi aprovada. Para mais informações, contate o encarregado de dados: encarregado@instituicao.edu.br";
+  }
+  return err.message;
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -19,6 +30,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+  const registered = (location.state as { registered?: boolean } | null)?.registered;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +40,7 @@ export default function LoginPage() {
       await login(email, password);
       navigate(from || "/", { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Falha ao entrar. Tente novamente.");
+      setError(loginErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -65,6 +77,12 @@ export default function LoginPage() {
               />
             </Field>
             {error && <ErrorText message={error} />}
+            {registered && !error && (
+              <div role="status" className="rounded-md border border-primary/30 bg-primary-soft px-4 py-3 text-sm text-primary-strong">
+                Conta criada com sucesso. Responsáveis e educadores precisam de aprovação antes do
+                primeiro acesso.
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Entrando…" : "Entrar"}
             </Button>

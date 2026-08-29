@@ -19,6 +19,7 @@ import ReportsPage from "./pages/ReportsPage";
 import ObservationsPage from "./pages/ObservationsPage";
 import AuditPage from "./pages/AuditPage";
 import AdminPage from "./pages/AdminPage";
+import AdminUsersPage from "./pages/AdminUsersPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
 // Students land on their own profile instead of the (management) overview.
@@ -57,7 +58,7 @@ export default function App() {
         <Route
           path="/students/new"
           element={
-            <RequireRole roles={["guardian", "educator"]}>
+            <RequireRole roles={["educator", "admin"]}>
               <CreateStudentPage />
             </RequireRole>
           }
@@ -80,6 +81,15 @@ export default function App() {
           element={
             <RequireRole roles={["admin"]}>
               <AdminPage />
+            </RequireRole>
+          }
+        />
+
+        <Route
+          path="/admin/users"
+          element={
+            <RequireRole roles={["admin", "educator"]}>
+              <AdminUsersPage />
             </RequireRole>
           }
         />

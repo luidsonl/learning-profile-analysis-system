@@ -15,7 +15,7 @@ requiredBy: []
 
 **As of:** 2026-08-27 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented and documented. **RBAC rework** (admin bootstrap + approval flow, educator-only student creation/assignment) is implemented in the backend and specs; the **frontend is not yet reworked to the new role/status rules** (deferred) and remains un-deployed (S3 + CloudFront) pending AWS creds.
+Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented and documented. The **frontend RBAC rework** is done (admin approval/promotion screens, role-conditional actions, status-aware login); the SPA **remains un-deployed** (S3 + CloudFront) pending `make frontend`.
 
 | Layer | Status | Notes |
 |---|---|---|
@@ -28,7 +28,7 @@ Backend vertical slice + offline ML pipeline + **frontend SPA** are implemented 
 | Binary student self-service | ✅ Done | student account = full self-view (no autonomy levels) |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
 | Tests (`sam-app/tests/`) | In progress | 23 unit passing; e2e rewritten for the new RBAC flow, still to be run against the real stack after data cleanup + deploy |
-| Frontend SPA (`frontend/`) | Partial (code) | Tailwind v4 + Radix + Vite; **not yet reworked for the new RBAC** (admin approval/promotion UI, role-conditional actions, pending-login handling); build + lint green |
+| Frontend SPA (`frontend/`) | ✅ Reworked | Tailwind v4 + Radix + Vite; RBAC rework complete — `/admin/users` (approval/promotion/password/delete), role-conditional creation/assignment/consent, status-aware pending/denied login; build + lint green |
 
 ---
 
@@ -48,8 +48,8 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 
 ## Pending work
 
-1. **Clean data + deploy + validate e2e (RBAC rework)** — clear the DynamoDB table (e2e assumes a clean table: the first educator must bootstrap as admin), `sam build && sam deploy` (template gained `AdminFunction`), then run `npm run test:e2e` against the real API (e2e rewritten for the admin-pending-approval flow).
-2. **Rework the frontend for the new RBAC** — new admin screens (user management: approval/promotion/password/delete), make creation/assignment/actions conditional by `role`, and handle login of a pending/denied account (status-aware messaging).
+1. **Clean data + deploy + validate e2e (RBAC rework)** — clear the DynamoDB table (e2e assumes a clean table: the first educator must bootstrap as admin), `sam build && sam deploy` (template gained `AdminFunction`), then run `npm run test:e2e` against the real API (e2e rewritten for the admin-pending-approval flow). *(Done: deployed + 117/0 e2e passing — see [frontend rework below].)*
+2. **Rework the frontend for the new RBAC** — new admin screens (user management: approval/promotion/password/delete), make creation/assignment/actions conditional by `role`, and handle login of a pending/denied account (status-aware messaging). ✅ **Done** — `frontend.md` mirrors the new role/status rules; `/admin/users` (admin full, educator scoped to guardian/student approvals), creation/assignment gated to `educator`/`admin`, consent to `guardian`/`educator`/`admin`, status-aware login; `npm run build` + `npm run lint` green.
 3. **Deploy the frontend** — run `make frontend` (requires AWS creds): builds the SPA, `terraform apply`s `terraform/aws-frontend` (S3 + CloudFront), and prints the `cloudfront_domain_name`. Confirm the app loads at the CloudFront URL and `/api/*` reaches the API Gateway origin.
 4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
 
@@ -57,6 +57,6 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 
 ## Suggested next steps (in order)
 
-1. Clean the DynamoDB data, deploy the updated backend, and run the rewritten e2e suite (validates the admin bootstrap + approval flow end-to-end).
-2. Rework the frontend to the new role/status rules (admin screens, conditional actions, pending-login handling).
-3. Run `make frontend` with AWS credentials to deploy the SPA and CloudFront distribution; smoke-test the app + API under the single CloudFront domain.
+1. ✅ Cleaned, deployed, e2e validated (117/0) — admin bootstrap + approval flow verified live.
+2. ✅ Frontend RBAC rework — `/admin/users` + role-conditional actions + status-aware login (build/lint green).
+3. Deploy the SPA: run `make frontend` with AWS credentials (build + S3 + CloudFront), then smoke-test the app + API under the single CloudFront domain.

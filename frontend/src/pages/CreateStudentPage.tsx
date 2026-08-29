@@ -64,9 +64,10 @@ export default function CreateStudentPage() {
           note: "Cadastro inicial com consentimento",
         },
       });
-      // Register consent right after creation.
+      // Register consent right after creation (legal basis is chosen by the
+      // backend: institution_authorization for educator/admin).
       await studentsApi
-        .setConsent(res.studentId, { consentVersion, status: "active", legalBasis: "explicit_consent" })
+        .setConsent(res.studentId, { consentVersion, status: "active" })
         .catch(() => undefined);
       toast.success("Estudante criado com consentimento registrado.");
       navigate(`/students/${res.studentId}`, { replace: true });

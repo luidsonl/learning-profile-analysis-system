@@ -68,7 +68,22 @@ export const BADGE_TONES: Record<string, "success" | "warning" | "danger" | "neu
   published: "success",
   proposed: "warning",
   rejected: "danger",
+  pending: "warning",
+  denied: "danger",
 };
+
+export function accountStatusLabel(status?: string): string {
+  switch (status) {
+    case "pending":
+      return "Aguardando aprovação";
+    case "active":
+      return "Aprovado";
+    case "denied":
+      return "Negado";
+    default:
+      return status ?? "—";
+  }
+}
 
 export function roleLabel(role?: string | null): string {
   switch (role) {

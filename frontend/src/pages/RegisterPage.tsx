@@ -42,7 +42,7 @@ export default function RegisterPage() {
           <h1 className="mb-1 text-2xl font-bold text-text">Criar conta</h1>
           <p className="mb-5 text-text-muted">
             Responsáveis e educadores podem criar uma conta. Estudantes são cadastrados por um
-            responsável ou educador.
+            responsável ou educador. Sua conta passa por aprovação antes do primeiro acesso.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <Field label="Nome completo" htmlFor="name" required>

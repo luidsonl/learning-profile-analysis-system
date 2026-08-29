@@ -17,7 +17,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { data, loading, error } = useApi(() => studentsApi.list(), "students-list");
 
-  const canManage = user?.role === "guardian" || user?.role === "educator";
+  const canManage = user?.role === "educator" || user?.role === "admin";
 
   return (
     <div>
@@ -26,7 +26,9 @@ export default function DashboardPage() {
         subtitle={
           user?.role === "guardian"
             ? "Seus filhos e estudantes sob sua responsabilidade."
-            : "Estudantes que você acompanha."
+            : user?.role === "admin"
+              ? "Todos os estudantes deste ambiente."
+              : "Estudantes que você acompanha."
         }
         actions={
           canManage && (
@@ -47,7 +49,11 @@ export default function DashboardPage() {
         <EmptyState
           icon={<Users className="size-10" aria-hidden="true" />}
           title="Nenhum estudante ainda"
-          description="Adicione um estudante para começar a avaliar o perfil de aprendizado."
+          description={
+            user?.role === "guardian"
+              ? "Assim que um responsável legal ou educador vincular um estudante à sua conta, ele aparecerá aqui."
+              : "Adicione um estudante para começar a avaliar o perfil de aprendizado."
+          }
           action={
             canManage && (
               <Link to="/students/new">

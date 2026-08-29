@@ -20,6 +20,8 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  /** Account status: pending | active | denied (approval-gated accounts). */
+  status?: "pending" | "active" | "denied";
   createdAt: string;
 }
 
@@ -296,6 +298,23 @@ export interface AuditEvent {
   detail: Record<string, unknown> | null;
   ip: string | null;
   createdAt: string;
+}
+
+// ── Admin / user management ──────────────────────────────────────────────────
+export type AccountStatus = "pending" | "active" | "denied";
+
+export interface AdminUser {
+  userId: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: AccountStatus;
+  createdAt: string;
+}
+
+export interface AdminUserUpdateRequest {
+  role?: Role;
+  status?: AccountStatus;
 }
 
 // ── Students scope lists ─────────────────────────────────────────────────────

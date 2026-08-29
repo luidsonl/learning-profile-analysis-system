@@ -54,17 +54,20 @@ function SelectContent({ children }: SelectContentProps) {
 interface SelectItemProps {
   value: string;
   className?: string;
+  disabled?: boolean;
   children: ReactNode;
 }
 
-function SelectItem({ value, className = "", children }: SelectItemProps) {
+function SelectItem({ value, className = "", disabled, children }: SelectItemProps) {
   return (
     <SelectPrimitive.Item
       value={value}
+      disabled={disabled}
       className={cn(
         "flex cursor-pointer items-center justify-between gap-4 rounded px-3 py-2 text-sm text-text",
         "focus:bg-surface-muted focus:outline-none",
         "data-[state=checked]:text-primary",
+        disabled && "cursor-not-allowed text-text-muted/60",
         className,
       )}
     >

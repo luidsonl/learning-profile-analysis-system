@@ -1,6 +1,8 @@
 import { apiFetch } from "./client";
 import type {
   AuditEvent,
+  AdminUser,
+  AdminUserUpdateRequest,
   ConsentResponse,
   CreateObservationRequest,
   CreateRecommendationRequest,
@@ -136,6 +138,26 @@ export const observationsApi = {
     ),
   remove: (studentId: string, timestamp: string) =>
     apiFetch<void>(`/api/students/${studentId}/observations/${timestamp}`, { method: "DELETE" }),
+};
+
+// ── Admin / user management ──────────────────────────────────────────────────
+export const adminApi = {
+  listUsers: (query?: { role?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    if (query?.role) params.set("role", query.role);
+    if (query?.status) params.set("status", query.status);
+    const qs = params.toString();
+    return apiFetch<ListResponse<AdminUser>>(`/api/admin/users${qs ? `?${qs}` : ""}`);
+  },
+  updateUser: (id: string, body: AdminUserUpdateRequest) =>
+    apiFetch<{ user: AdminUser }>(`/api/admin/users/${id}`, { method: "PATCH", body }),
+  resetPassword: (id: string, password: string) =>
+    apiFetch<{ message: string }>(`/api/admin/users/${id}/password`, {
+      method: "POST",
+      body: { password },
+    }),
+  deleteUser: (id: string) =>
+    apiFetch<{ message: string }>(`/api/admin/users/${id}`, { method: "DELETE" }),
 };
 
 // ── Audit ────────────────────────────────────────────────────────────────────
