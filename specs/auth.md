@@ -86,6 +86,14 @@ Access is **binary** — there are no autonomy levels. A user either has an acco
 
 ## Student (Minor) Accounts
 
+> **`STUDENT#` is a record, not a user.** A student exists whether or not anyone can log in as them. The two relations are **independent and cumulative**, not mutually exclusive:
+>
+> - **Guardian-managed only** — a guardian (or educator) holds the edges and the student has no account; the responsible adult fills forms and manages the data on the student's behalf.
+> - **Guardian + self-account** — the student also has an account (created by educator/admin under active consent). The guardian **keeps full management** of the student's data (all guardian rows in the [RBAC matrix](./backend.md#rbac-matrix) continue to apply), and the student additionally gets the self-view.
+> - **Self-account only** — students without a guardian (see [Students Without a Guardian](#students-without-a-guardian)).
+>
+> A guardian can be responsible for **any number** of students (one `GUARD#` edge per student); a student has **at most one** self-account (`studentUserId` is single-valued). Creating an account for a student never removes or replaces the guardian/educator edges.
+
 - Created via `POST /api/students/:id/student-account` by an **educator following the student** (institution-led onboarding) or an **admin** — **not** by a guardian (guardians manage only assigned students, not account creation) — gated by the student's current consent (409 if no active consent).
 - A minor **cannot** register directly, can only edit their own name, and never sees the audit trail, other students' data, or raw model internals.
 - The student identity is linked through `STUDENT#<c>/STUDENT#<userId>` + `USER#<s>/STUDENT#<c>` edges, written in the same transaction as the user creation.

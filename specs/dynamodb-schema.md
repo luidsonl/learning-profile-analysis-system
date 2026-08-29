@@ -101,6 +101,8 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 > Pattern: "list students a guardian/educator can see" → Query the user partition SK begins_with `GUARD#` / `FOLLOW#`. Reverse edges (student partition) serve consent display and scope checks ("who has access to this student"). Edges are written **bidirectionally in one transaction** + an `AUDIT#` item.
 
+> **`STUDENT#` is a record, not a login.** A student exists independently of any user account and relates to users through independent, cumulative edges: **guardians** (`GUARD#`/`GUARDIAN#` — a single guardian user can guard **many** students, one edge per student), **educators** (`FOLLOW#`/`EDUCATOR#`), and **a self-account** (`USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>` — **at most one** per student, enforced by the single-valued `studentUserId`). These links are not mutually exclusive: a student may have a guardian **and** its own account at the same time (account creation only adds the login edges; guardian/educator edges are untouched), only a guardian (forms filled by the responsible adult), or only a self-account (students without a guardian).
+
 ### SUBMISSION (per-student form responses)
 
 > Form definitions are **not stored in the database** — they live in code (`sam-app/src/forms/definitions/*.mjs`) and are served read-only by the API. Only the answers are persisted; each submission records the static `formVersion` exported by the definition module, so future question changes keep old submissions interpretable.

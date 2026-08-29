@@ -9,9 +9,13 @@ import { getStudent } from "./students.mjs";
 const LEGAL_BASES = ["guardian", "institution_authorization", "self_consent"];
 
 const canSetConsent = async (studentId, ctx) => {
-  // Admin, educator (FOLLOW#), guardian (GUARD#) and self-student (STUDENT#)
-  // with access to the student may set/revoke consent.
+  // Admin, educator (FOLLOW#) and guardian (GUARD#) with access to the student
+  // may set/revoke consent. A minor (role=student) never consents for
+  // themselves — self_consent is reserved for adult self-service flows
+  // (specs/lgpd.md). assertScopeStudent would also resolve the student's own
+  // edge, so the student role is excluded explicitly.
   if (ctx.role === "admin") return true;
+  if (ctx.role === "student") return false;
   await assertScopeStudent(studentId, ctx);
   return true;
 };
