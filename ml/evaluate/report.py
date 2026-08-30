@@ -42,8 +42,14 @@ def evaluate(pipeline, X, y, folds: int = 5) -> dict:
 
 
 if __name__ == "__main__":
+    import argparse
+
     from features.prepare import load_dataset
     from sklearn.dummy import DummyClassifier
 
-    X, y = load_dataset()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default="vark")
+    args = parser.parse_args()
+
+    X, y = load_dataset(args.model)
     print(json.dumps(evaluate(DummyClassifier(strategy="prior"), X, y), indent=2))

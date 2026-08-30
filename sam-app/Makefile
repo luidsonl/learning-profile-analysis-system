@@ -31,7 +31,7 @@ validate:
 
 # --cached skips the heavy pip install (numpy/scikit-learn) unless
 # src/inference/requirements.txt actually changes. Model training NEVER runs
-# here: the artifact is a static file under src/inference/model/.
+# here: the artifacts are static files under src/inference/models/<formId>/.
 build:
 	sam build --cached
 

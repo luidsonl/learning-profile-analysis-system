@@ -1,7 +1,8 @@
 PYTHON ?= .venv/bin/python
-VERSION ?= 2.0.0
+MODEL ?= vark
+VERSION ?= 1.0.0
 
-.PHONY: setup train package sanity clean
+.PHONY: setup train package package-all sanity smoke-lambda clean
 
 setup:
 	python3 -m venv .venv
@@ -9,13 +10,19 @@ setup:
 
 train:
 	$(PYTHON) -m features.prepare
-	$(PYTHON) -m train.train
+	$(PYTHON) -m train.train --model $(MODEL)
 
 package:
-	$(PYTHON) -m serve.package --version $(VERSION)
+	$(PYTHON) -m serve.package --model $(MODEL) --version $(VERSION)
+
+package-all:
+	@for model in $$($(PYTHON) -c "from features.prepare import MODELS; print(' '.join(MODELS))"); do \
+		echo "==> packaging $$model"; \
+		$(PYTHON) -m serve.package --model $$model --version $(VERSION); \
+	done
 
 sanity:
-	$(PYTHON) -m serve.sanity
+	$(PYTHON) -m serve.sanity --model $(MODEL)
 
 smoke-lambda:
 	$(PYTHON) tests/inference_smoke.py

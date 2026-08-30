@@ -143,6 +143,9 @@ const shapePrediction = (i, full) => {
     modelVersion: i.modelVersion.S,
     method: i.method.S,
     label: i.label.S,
+    form: i.form?.S || null,
+    submission: i.submission?.S || null,
+    formVersion: i.formVersion?.S != null ? Number(i.formVersion.S) : null,
     createdAt: i.createdAt.S,
   };
   if (full) {
@@ -304,6 +307,7 @@ const listAssessments = async (event, ctx) => {
 
 const listPredictions = async (event, ctx) => {
   const studentId = param(event, "id");
+  const formId = qparam(event, "form");
   await assertScopeStudent(studentId, ctx);
   const res = await client.send(
     new CMD.query({
@@ -313,7 +317,9 @@ const listPredictions = async (event, ctx) => {
       ExpressionAttributeValues: { ":pk": { S: `PRED#${studentId}` }, ":sk": { S: "PRED#" } },
     }),
   );
-  const data = (res.Items || []).map((i) => shapePrediction(i, true));
+  const data = (res.Items || [])
+    .filter((i) => !formId || i.form?.S === formId)
+    .map((i) => shapePrediction(i, true));
   return ok({ data, count: data.length });
 };
 

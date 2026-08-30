@@ -4,7 +4,7 @@ title: Backend
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-29
+lastReviewed: 2026-08-30
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -94,11 +94,11 @@ requiredBy:
 |---------------|-------|-------------|--------------|
 | `POST /api/students/:id/assessments` | student (own), guardian, educator | Classify the student's latest stored submission | `ASSESS#<c>/VARK#<ts>` + `STUDENT#<c>/META` profile fields |
 | `GET /api/students/:id/assessments?profile=vark` | scoped | Assessment history | `ASSESS#<c>` partition, SK `VARK#` prefix desc |
-| `GET /api/students/:id/predictions?profile=vark` | scoped | Prediction history with confidence | `PRED#<c>` partition, SK `PRED#` prefix desc |
+| `GET /api/students/:id/predictions?form=` | scoped | Prediction history with confidence, filtered by form when given | `PRED#<c>` partition, SK `PRED#` prefix desc |
 
 **Automatic predictions**: storing a *new* form submission triggers the Python inference Lambda asynchronously (`InvocationType: "Event"` — no SQS); it scores the bundled model and writes the `PRED#` item itself. The API never waits on inference and there is no synchronous predict endpoint. If inference fails, no prediction is created; the submission stands.
 
-> Any viewer scoped to the student receives the full prediction payload (label + scores + confidence). Raw model internals are never exposed.
+> Any viewer scoped to the student receives the full prediction payload (label + scores + confidence + originating `form`/`submission`). Raw model internals are never exposed.
 
 ### Recommendations
 | Method & Path | Roles | Description | Schema items |

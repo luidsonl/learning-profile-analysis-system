@@ -4,7 +4,7 @@ title: ML Pipeline
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-29
+lastReviewed: 2026-08-30
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -51,7 +51,7 @@ This separation is intentional and is the contract that makes future models poss
   │                     │  4. package → model.joblib + meta.json copied INTO the Lambda source
   └─────────┬───────────┘
             ▼
-  sam-app/src/inference/ (model bundled in deployment package)
+  sam-app/src/inference/models/<formId>/ (one model dir per triggering form)
             │
             ▼  sam build && sam deploy
 
@@ -108,18 +108,19 @@ This separation is intentional and is the contract that makes future models poss
 - Frameworks: scikit-learn. v0 baseline = **Logistic Regression** (multinomial, `class_weight="balanced"` to counter the K-heavy imbalance, standardized features).
 - Validation: stratified k-fold cross-validation.
 - Metrics: accuracy, **macro-F1**, per-class precision/recall/F1 and confusion matrix; a written evaluation report (`metrics.json`) is stored next to the artifact and registered with the model.
-- Output: `model.joblib` + `meta.json` (model name, version, feature order + question-id mapping, label map `{A→R, V→A, K→K}`, metrics, trained_at, sklearn/joblib versions, dataset sha256). `make package` copies both into `sam-app/src/inference/model/`, which is **committed to git as a static serving artifact** (owner decision; see [Security](./security.md#4-datasets--ml-artifacts)).
+- Output: `model.joblib` + `meta.json` (model name, `modelId`, `formId`, version, feature order + question-id mapping, label map `{A→R, V→A, K→K}`, metrics, trained_at, sklearn/joblib versions, dataset sha256). `make package` copies both into `sam-app/src/inference/models/<formId>/`, which is **committed to git as a static serving artifact** (owner decision; see [Security](./security.md#4-datasets--ml-artifacts)). `make package-all` packages every registered model (see `ml/features/prepare.py` `MODELS`).
 - Multi-label approaches (Binary Relevance / MLkNN) remain a documented future upgrade, not v0.
 
 ---
 
 ## Inference
 
-- The inference function (`InferenceFunction` in `sam-app/template.yaml`) is a **Python 3.12 Lambda** deployed with the SAM app; its deployment package bundles `model.joblib` + `meta.json`. It is **never invoked synchronously by the API**.
+- The inference function (`InferenceFunction` in `sam-app/template.yaml`) is a **Python 3.12 Lambda** deployed with the SAM app; its deployment package bundles one model directory per triggering form (`models/<formId>/model.joblib` + `meta.json`). It is **never invoked synchronously by the API**.
 - **Trigger**: after the Forms Lambda stores a *new* (non-idempotent-duplicate) submission, it fires an asynchronous invoke — `InvocationType: "Event"`, best-effort; an invoke failure never fails the submission.
-- **Contract** (payload from Forms Lambda): `{ studentId, formId, formVersion, answers }`.
-- **Behavior**: builds the feature vector per `meta.json`'s positional mapping, scores with the bundled model, remaps labels (`{A→R, V→A, K→K}`), computes confidence = max class probability, and writes the `PRED#` item itself (`createdBy: "system:inference"`, `method: "ml"`). On any error it logs and exits — **no prediction is created and the submission stands**.
-- **Read path**: `GET /api/students/:id/predictions` (existing handler) serves the full payload — label + scores + confidence — to any viewer scoped to the student.
+- **Contract** (payload from Forms Lambda): `{ studentId, formId, formVersion, submissionId, answers }`.
+- **Routing**: the handler loads the model for the event's `formId` (lazy per-form cache); an event whose form has no bundled model is rejected (`404`) and no prediction is written.
+- **Behavior**: builds the feature vector per `meta.json`'s positional mapping, scores with the bundled model, remaps labels via the model's `labelMap` (vark: `{A→R, V→A, K→K}`), computes confidence = max class probability, and writes the `PRED#` item itself (`createdBy: "system:inference"`, `method: "ml"`, `form` + `submission` recorded). On any error it logs and exits — **no prediction is created and the submission stands**.
+- **Read path**: `GET /api/students/:id/predictions` (existing handler) serves the full payload — label + scores + confidence + `form`/`submission` — to any viewer scoped to the student; an optional `?form=<formId>` filters the history to one form.
 - **Traceability**: there is **no model registry** — each `PRED#` item records `model` + `modelVersion` from `meta.json`, so every prediction is traceable to exactly what produced it. The model itself is invisible to admins and end users.
 - Heuristic indicators (`giftedness-indicator`, `difficulty-indicator`) remain rule-based companions, not trained models. The former heuristic predict path is retired together with `POST /api/students/:id/predict`.
 
@@ -128,9 +129,9 @@ This separation is intentional and is the contract that makes future models poss
 ## Retraining loop
 
 ```
-  1. Offline (engineer): run ml/ pipeline locally → make train (prepare → train → evaluate)
-  2. make package → new model.joblib + meta.json copied into sam-app/src/inference/model/
-  3. sam build && sam deploy → inference function now produces predictions with the new version
+  1. Offline (engineer): run ml/ pipeline locally → make train MODEL=<model-id> (prepare → train → evaluate)
+  2. make package MODEL=<model-id> (or make package-all) → model.joblib + meta.json copied into sam-app/src/inference/models/<formId>/
+  3. sam build && sam deploy → the inference function now produces predictions with the new version
 ```
 
 Retraining is **never scheduled inside AWS** — it is a deliberate human step on a local machine. There are no queues, schedulers, or event-driven triggers anywhere in this loop beyond the submission-triggered inference itself.
@@ -139,11 +140,11 @@ Retraining is **never scheduled inside AWS** — it is a deliberate human step o
 
 ## Extending with future models
 
-The pipeline is designed so new classifications are additive:
+The pipeline is designed so new classifications are additive. Only models that change need retraining — adding a model never retrains the others (existing packaged artifacts are reused at package time):
 
-1. **New form → new profile:** add a curated form (see Architecture — Forms Engine); submissions are stored by the generic engine.
-2. **New model:** add a model under `ml/` (features + train + evaluate), train offline (on exported snapshots once the export phase exists).
-3. **Deploy:** package and redeploy the inference Lambda with the new artifact — predictions for that form's submissions start flowing automatically through the same async invoke; no new endpoint is required.
+1. **New form → new profile:** add a curated form (see Architecture — Forms Engine); submissions are stored by the generic engine; add its `formId` to `INFERENCE_FORMS` in `resources.env`.
+2. **New model:** register it in `ml/features/prepare.py` (`MODELS` — dataset layout, feature order, label map) and train offline (`make train MODEL=<id>`, on exported snapshots once the export phase exists). Existing models are left untouched.
+3. **Deploy:** `make package-all` + redeploy the inference Lambda — predictions for that form's submissions start flowing automatically through the same async invoke (routed by `formId`); no new endpoint is required.
 4. No changes to the running system's data model are required — the submission contract already carries the data.
 
 Examples of future models: giftedness indicator, learning-difficulty indicator, socioemotional profile — all driven by the same form→train→bundle→serve loop.

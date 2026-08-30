@@ -1,5 +1,7 @@
 {
   "name": "vark-predictor",
+  "modelId": "vark",
+  "formId": "vark",
   "version": "2.0.0",
   "features": [
     {

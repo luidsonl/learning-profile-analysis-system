@@ -4,7 +4,7 @@ title: Architecture
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-29
+lastReviewed: 2026-08-30
 dependsOn: []
 requiredBy:
   - dynamodb-schema
@@ -121,7 +121,7 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
   (future phase) VARK submissions + observations ──► nightly EventBridge ──► feature-export Lambda
                                                                     │ (S3 snapshot + manifest)
   v0: ml/ pipeline trains locally on datasets/vark/data.csv
-      → make package bundles model.joblib into sam-app/src/inference/model/
+      → make package bundles model.joblib into sam-app/src/inference/models/<formId>/
       → sam build && sam deploy → predictions now carry the new version
 ```
 
@@ -247,7 +247,7 @@ The core idea: **a profile is traced from a filled form.** Forms collect structu
 Machine learning is a *separate, offline* layer that classifies those profiles:
 
 - The running system **never trains**. It stores submissions and serves machine-generated predictions from the artifact bundled into the inference function (details in [ML Pipeline](./ml-pipeline.md)).
-- Training runs offline (local machine) on the committed public dataset (`datasets/vark/data.csv`); the packaged `model.joblib` + `meta.json` are **copied into** `sam-app/src/inference/model/` and deployed with SAM — no S3 fetch at runtime; each `PRED#` item records the `model` + `modelVersion` that produced it (traceability without a registry).
+- Training runs offline (local machine) on the committed public dataset (`datasets/vark/data.csv`); the packaged `model.joblib` + `meta.json` are **copied into** `sam-app/src/inference/models/<formId>/` (one directory per triggering form — the handler routes by `formId`) and deployed with SAM — no S3 fetch at runtime; each `PRED#` item records the `model` + `modelVersion` + `form` that produced it (traceability without a registry).
 - Inference runs asynchronously: storing a new submission fires a fire-and-forget invoke (`InvocationType: "Event"`, **no SQS**) at the Python inference Lambda, which scores and persists the `PRED#` item itself. There is no synchronous predict endpoint.
 - MVP model: `vark-predictor` (offline-trained Logistic Regression; dataset labels are remapped at serving via `{A→R, V→A, K→K}` — see [ML Pipeline](./ml-pipeline.md)). Heuristic `giftedness-indicator` and `difficulty-indicator` remain rule-based companions.
 
