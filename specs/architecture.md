@@ -316,7 +316,7 @@ Cleanup happens in reverse order.
 | Small packaged model in Lambda over SageMaker | Cheapest for the MVP; SageMaker remains a documented upgrade path |
 | Heuristic giftedness/difficulty indicators in MVP | No public dataset exists; heuristic rules are honest and explainable while data is collected |
 | LGPD in-scope for MVP | Students' data is sensitive (minors especially); consent + audit are foundational, not retrofits |
-| VARK questionnaire | Closes the domain gap with the public dataset (students aged 10-18+); serves every persona |
+| VARK questionnaire | Aligns the form's per-modality scoring with the public dataset's item structure (the dataset is predominantly young adults 18–21, mean ≈ 18.6 — see `ml-pipeline.md`); serves every persona |
 
 ---
 
