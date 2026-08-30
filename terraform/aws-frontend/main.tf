@@ -5,19 +5,22 @@ data "aws_caller_identity" "current" {}
 
 # The API URL is exported by SAM after the backend stack is deployed.
 data "aws_cloudformation_export" "api_url" {
-  name = "${var.sam_stack_name}-ApiEndpoint"
+  count = var.frontend_enabled ? 1 : 0
+  name  = "${var.sam_stack_name}-ApiEndpoint"
 }
 
 # ---------------------------------------------------------------------------
 # S3 bucket for static frontend assets
 # ---------------------------------------------------------------------------
 resource "aws_s3_bucket" "frontend" {
+  count         = var.frontend_enabled ? 1 : 0
   bucket        = local.bucket_name
   force_destroy = true
 }
 
 resource "aws_s3_bucket_public_access_block" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
+  count  = var.frontend_enabled ? 1 : 0
+  bucket = aws_s3_bucket.frontend[0].id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -29,6 +32,7 @@ resource "aws_s3_bucket_public_access_block" "frontend" {
 # CloudFront Origin Access Control (OAC)
 # ---------------------------------------------------------------------------
 resource "aws_cloudfront_origin_access_control" "main" {
+  count                             = var.frontend_enabled ? 1 : 0
   name                              = local.oac_name
   description                       = "OAC for ${local.name_prefix} frontend"
   origin_access_control_origin_type = "s3"
@@ -40,9 +44,11 @@ resource "aws_cloudfront_origin_access_control" "main" {
 # Bucket policy — only the CloudFront distribution can read objects
 # ---------------------------------------------------------------------------
 data "aws_iam_policy_document" "cloudfront_s3" {
+  count = var.frontend_enabled ? 1 : 0
+
   statement {
     actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.frontend.arn}/*"]
+    resources = ["${aws_s3_bucket.frontend[0].arn}/*"]
 
     principals {
       type        = "Service"
@@ -52,20 +58,22 @@ data "aws_iam_policy_document" "cloudfront_s3" {
     condition {
       test     = "StringEquals"
       variable = "AWS:SourceArn"
-      values   = ["arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${aws_cloudfront_distribution.main.id}"]
+      values   = ["arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${aws_cloudfront_distribution.main[0].id}"]
     }
   }
 }
 
 resource "aws_s3_bucket_policy" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-  policy = data.aws_iam_policy_document.cloudfront_s3.json
+  count  = var.frontend_enabled ? 1 : 0
+  bucket = aws_s3_bucket.frontend[0].id
+  policy = data.aws_iam_policy_document.cloudfront_s3[0].json
 }
 
 # ---------------------------------------------------------------------------
 # CloudFront origin request policy for the API Gateway origin
 # ---------------------------------------------------------------------------
 resource "aws_cloudfront_origin_request_policy" "api" {
+  count   = var.frontend_enabled ? 1 : 0
   name    = "${local.name_prefix}-api-origin-request"
   comment = "Forward all viewer headers except Host to API Gateway"
 
@@ -87,18 +95,19 @@ resource "aws_cloudfront_origin_request_policy" "api" {
 # CloudFront distribution — S3 (static) + API Gateway (/api/*)
 # ---------------------------------------------------------------------------
 resource "aws_cloudfront_distribution" "main" {
+  count               = var.frontend_enabled ? 1 : 0
   enabled             = true
   default_root_object = "index.html"
 
   origin {
-    domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
+    domain_name              = aws_s3_bucket.frontend[0].bucket_regional_domain_name
     origin_id                = local.s3_origin_id
-    origin_access_control_id = aws_cloudfront_origin_access_control.main.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.main[0].id
   }
 
   origin {
-    domain_name = regex("https://([^/]+)", data.aws_cloudformation_export.api_url.value)[0]
-    origin_path = regex("https://[^/]+(/.*)", data.aws_cloudformation_export.api_url.value)[0]
+    domain_name = regex("https://([^/]+)", data.aws_cloudformation_export.api_url[0].value)[0]
+    origin_path = regex("https://[^/]+(/.*)", data.aws_cloudformation_export.api_url[0].value)[0]
     origin_id   = local.api_origin_id
 
     custom_origin_config {
@@ -133,7 +142,7 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = true
     cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # CachingDisabled
 
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.api.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.api[0].id
   }
 
   price_class = "PriceClass_100"
@@ -166,40 +175,5 @@ resource "aws_cloudfront_distribution" "main" {
 
   tags = {
     Name = "${local.name_prefix}-distribution"
-  }
-}
-
-# ---------------------------------------------------------------------------
-# Frontend build + upload + invalidation
-# ---------------------------------------------------------------------------
-# Build must run first (root Makefile `make frontend` does `npm run build`),
-# then Terraform uploads the pre-built dist/ and invalidates CloudFront.
-resource "null_resource" "frontend_deploy" {
-  depends_on = [aws_s3_bucket.frontend, aws_cloudfront_distribution.main]
-
-  triggers = {
-    build_hash = sha1(join("|", concat(
-      [for f in fileset("${path.module}/../../frontend/src", "**/*") : filemd5("${path.module}/../../frontend/src/${f}")],
-      [for f in fileset("${path.module}/../../frontend/public", "**/*") : filemd5("${path.module}/../../frontend/public/${f}")],
-      [for f in fileset("${path.module}/../../frontend/dist", "**/*") : filemd5("${path.module}/../../frontend/dist/${f}")],
-      [
-        filemd5("${path.module}/../../frontend/package.json"),
-        filemd5("${path.module}/../../frontend/vite.config.ts"),
-        filemd5("${path.module}/../../frontend/index.html"),
-      ]
-    )))
-  }
-
-  provisioner "local-exec" {
-    command = <<CMD
-      set -e
-      echo "--> Uploading to S3..."
-      aws s3 sync "${path.module}/../../frontend/dist/" "s3://${aws_s3_bucket.frontend.bucket}/" --delete
-      echo "--> Invalidating CloudFront..."
-      aws cloudfront create-invalidation \
-        --distribution-id "${aws_cloudfront_distribution.main.id}" \
-        --paths "/*"
-      echo "--> Done!"
-    CMD
   }
 }

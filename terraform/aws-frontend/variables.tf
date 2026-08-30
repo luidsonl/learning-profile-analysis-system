@@ -41,3 +41,9 @@ variable "sam_stack_name" {
   type        = string
   description = "SAM CloudFormation stack name (used to look up the ApiEndpoint export)"
 }
+
+variable "frontend_enabled" {
+  type        = bool
+  description = "Deploy the SPA infra (S3 + CloudFront + upload). False while the SPA is absent — the module then creates nothing."
+  default     = false
+}

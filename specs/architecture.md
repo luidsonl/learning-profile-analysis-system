@@ -282,7 +282,7 @@ The API is exercised via the deployed stack; the future SPA (Angular) will proxy
  1. terraform/aws-bootstrap/   (one-time S3 state bucket)
  2. terraform/aws-app/        (DynamoDB + S3 files/data + SQS report queue + async Lambdas + EventBridge)
  3. sam-app/                  (API-triggered Lambdas + API Gateway, exports ApiEndpoint)
- 4. terraform/aws-frontend/   (S3 static + CloudFront + SPA build & upload — **unused while the SPA is absent**)
+ 4. terraform/aws-frontend/   (S3 static + CloudFront infra; build+upload+invalidation via `make frontend` — **unused while the SPA is absent**)
 ```
 
 The root `Makefile` orchestrates the whole chain, mirroring 0shared:
