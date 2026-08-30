@@ -4,7 +4,7 @@ title: Authentication & Authorization
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-29
+lastReviewed: 2026-08-30
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -12,7 +12,6 @@ requiredBy:
   - backend
   - lgpd
   - security
-  - frontend
 ---
 
 # Authentication & Authorization — Learning Profile Analysis System
@@ -94,7 +93,6 @@ Access for an **active, linked** student is **binary** — there are no autonomy
 - **Linking (by educator)**: an **educator who follows the student's entity (or an admin)** links the self-account to that `STUDENT#` entity via `POST /api/students/:id/accounts/:userId/link`. The link **approves the account** (`pending → active`) and attributes the entity (writes `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>` and sets `studentUserId` on the entity META) in one transaction. Consent (see [LGPD](./lgpd.md)) gates the link: an **adult (≥ 18) self-consents**; a **minor (< 18)** requires guardian or institution consent already granted on the entity.
 - Guardianships still **don't** register students and **don't** create/link student accounts — that is educator/admin-led.
 - The linked student identity is carried by the `USER#<s>/STUDENT#<c>` edge; `getOwnStudentId` resolves it for the self-view and is `null` while pending/unlinked.
-- UI: the student persona renders the self-view once linked (see [Frontend](./frontend.md)).
 
 ## Students Without a Guardian
 
@@ -120,7 +118,7 @@ Access for an **active, linked** student is **binary** — there are no autonomy
 ## Dependencies
 
 - **Depends on**: [architecture](./architecture.md) (personas, scope model), [dynamodb-schema](./dynamodb-schema.md) (`USER#`/`SESSION#`, edges, consent items).
-- **Required by** (specs that presume this one): [backend](./backend.md) (middleware wiring per endpoint), [lgpd](./lgpd.md) (consent gates, minor accounts), [security](./security.md) (credential handling), [frontend](./frontend.md) (role guarding, student mode).
+- **Required by** (specs that presume this one): [backend](./backend.md) (middleware wiring per endpoint), [lgpd](./lgpd.md) (consent gates, minor accounts), [security](./security.md) (credential handling).
 
 ## See Also
 

@@ -11,7 +11,6 @@ dependsOn:
   - auth
 requiredBy:
   - ml-pipeline
-  - frontend
 ---
 
 # Backend — Learning Profile Analysis System
@@ -20,7 +19,7 @@ requiredBy:
 
 ## Conventions
 
-- **Base path**: everything is prefixed `/api` (e.g. `POST /api/auth/login`). CloudFront routes `/*` → SPA, `/api/*` → API Gateway.
+- **Base path**: everything is prefixed `/api` (e.g. `POST /api/auth/login`). CloudFront routes `/*` → SPA (when reintroduced), `/api/*` → API Gateway.
 - **Auth**: `Authorization: Bearer <token>` on all authenticated routes (see [Authentication](./auth.md)).
 - **Responses**: `200/201` JSON body for data; empty `204` for deletes.
 - **Errors**: uniform envelope
@@ -179,11 +178,10 @@ The API is exercised via the deployed stack (`make e2e-test` runs the e2e suite 
 ## Dependencies
 
 - **Depends on**: [architecture](./architecture.md) (flows, deployment), [dynamodb-schema](./dynamodb-schema.md) (access patterns consumed 1:1), [auth](./auth.md) (`requireAuth`/`requireRole`, scope edges, RBAC).
-- **Required by** (specs that presume this one): [ml-pipeline](./ml-pipeline.md) (inference trigger + `GET /predictions` read path), [frontend](./frontend.md) (endpoints consumed under `/api`).
+- **Required by** (specs that presume this one): [ml-pipeline](./ml-pipeline.md) (inference trigger + `GET /predictions` read path).
 
 ## See Also
 
 - [Authentication](./auth.md) — `requireAuth`/`requireRole`, scope checks over edges
 - [DynamoDB Schema](./dynamodb-schema.md) — the access patterns each endpoint uses
 - [Architecture](./architecture.md) — flows, deployment order
-- [Frontend](./frontend.md) — SPA consuming these endpoints under `/api`

@@ -4,7 +4,7 @@ title: LGPD Compliance
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-29
+lastReviewed: 2026-08-30
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -106,7 +106,7 @@ Erasure is a **documented script/runbook** (admin-triggered Lambda or CLI) with 
 - Encryption at rest: DynamoDB (KMS), S3 SSE; in transit: TLS via CloudFront/API Gateway.
 - S3 buckets block public access; files served only via presigned URLs.
 - RBAC + scope enforcement via edges (see [Authentication](./auth.md)); students get a full self-view of their own data.
-- No third-party analytics/tracking on the SPA; no data leaves AWS boundaries except user-initiated presigned downloads.
+- No third-party analytics/tracking in the SPA or API; no data leaves AWS boundaries except user-initiated presigned downloads.
 - Vendor/dataset note: the public training dataset (Armand, Eboue 2021, DOI: 10.17632/bwrr6zypcj.1) is CC BY 4.0, adult-subject data used only for model weights — not personal data processing of system users.
 
 ## Roles & Responsibilities

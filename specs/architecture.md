@@ -13,8 +13,6 @@ requiredBy:
   - ml-pipeline
   - lgpd
   - security
-  - design-system
-  - frontend
   - student-data-features
 ---
 
@@ -26,9 +24,9 @@ The Learning Profile Analysis System is a serverless platform that personalizes 
 
 Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (usually a minor, but can be an adult; self-registers and owns a full self-view of a single student entity), and **admin**. Access control is role- and scope-based: guardians see only the students **assigned** to them; educators see only the students they follow; students see only their **own single entity** (profile, submissions, predictions, observations, reports); administrators manage users and the institution's data. Educator/guardian accounts are **approval-gated** (they register `pending` and must be approved before signing in) and the **first educator to register bootstraps as `admin`**. **Students self-register** their account (`role: student`, starts `pending`) and are granted a single student entity when an **educator links** their account to a `STUDENT#` entity they follow (the link approves the account and attributes the entity). A student's entity can also have a **guardian assigned** — the two relations (guardian-managed and self-owned) are independent and cumulative — see [Authentication](./auth.md).
 
-The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for a React+Vite SPA, and **DynamoDB single-table** design. It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
+The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for the SPA, and **DynamoDB single-table** design. The SPA is **not currently implemented** — the previous React+Vite frontend was removed; it is planned to be rebuilt (in Angular) with fresh specs when started (see [progress](./progress.md)). It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
 
-The backend API is served under the `/api` path prefix so a single CloudFront distribution serves both the static frontend (`/*`) and the API (`/api/*`) from one domain, without CORS.
+The backend API is served under the `/api` path prefix so a single CloudFront distribution serves both the static SPA (`/*`) and the API (`/api/*`) from one domain, without CORS.
 
 ---
 
@@ -136,8 +134,8 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   ├── aws-bootstrap/     # S3 bucket for Terraform state (one-time)
 │   ├── aws-app/           # DynamoDB + S3 buckets (files/data) + SQS + async Lambdas
 │   │   └── src/           # feature-export.mjs, report-generator.mjs
-│   └── aws-frontend/      # S3 static bucket + CloudFront + OAC + deploy
-├── frontend/              # React + Vite SPA (pt-BR, accessible)
+│   └── aws-frontend/      # S3 static bucket + CloudFront + OAC + deploy (unused while the SPA is absent)
+├── frontend/              # (futuro) SPA — a ser refeita em Angular (não implementada ainda)
 ├── sam-app/               # API Gateway + API-triggered Lambdas (stateless compute)
 │   ├── template.yaml      # SAM template (health, auth, students, guardianship,
 │   │                      #   observations, forms, assessment,
@@ -146,7 +144,7 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   ├── resources.env      # Central resource names (source of truth)
 │   ├── Makefile           # deploy, redeploy-api, unit/e2e tests, db-clean/db-wipe, clean
 │   ├── src/api/           # Lambda code — Node.js handlers, forms engine, lib
-│   └── src/inference/      # Lambda code — Python + bundled model.joblib
+│   └── src/inference/      # Lambda code — Python + bundled models (models/<formId>/model.joblib)
 │       ├── health.mjs, auth.mjs, students.mjs, guardianship.mjs,
 │       ├── observations.mjs, forms.mjs (submissions, assessments,
 │       │                  predictions),
@@ -160,7 +158,7 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   ├── evaluate/          # Metrics (accuracy, F1, Hamming loss) + reports
 │   └── serve/             # Package model for Lambda (artifact bundle + sanity checks)
 ├── specs/                 # architecture, backend, auth, dynamodb-schema, ml-pipeline,
-│                          #   student-data, lgpd, frontend, design-system (README = graph hub)
+│                          #   student-data, lgpd, security (README = graph hub)
 ├── agents.md
 └── Makefile
 ```
@@ -272,10 +270,9 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 
 ```
 Terminal 1:  (sam-app/)  make e2e-test      # e2e suite against the deployed API
-Terminal 2:  npm run dev                    # Vite on :5173, proxies /api → deployed API
 ```
 
-`frontend/vite.config.ts` proxies `/api` in dev; production uses relative paths routed by CloudFront — no environment-specific config in app code.
+The API is exercised via the deployed stack; the future SPA (Angular) will proxy `/api` in dev and use relative paths in prod — no environment-specific config in app code.
 
 ---
 
@@ -285,7 +282,7 @@ Terminal 2:  npm run dev                    # Vite on :5173, proxies /api → de
  1. terraform/aws-bootstrap/   (one-time S3 state bucket)
  2. terraform/aws-app/        (DynamoDB + S3 files/data + SQS report queue + async Lambdas + EventBridge)
  3. sam-app/                  (API-triggered Lambdas + API Gateway, exports ApiEndpoint)
- 4. terraform/aws-frontend/   (S3 static + CloudFront + frontend build & upload)
+ 4. terraform/aws-frontend/   (S3 static + CloudFront + SPA build & upload — **unused while the SPA is absent**)
 ```
 
 The root `Makefile` orchestrates the whole chain, mirroring 0shared:
@@ -336,7 +333,7 @@ Cleanup happens in reverse order.
 ## Dependencies
 
 - **Root spec** — no prerequisites; read this first. Everything else builds on it (see the [spec dependency graph](./README.md#dependency-graph)).
-- **Required by** (specs that presume this one): [dynamodb-schema](./dynamodb-schema.md), [auth](./auth.md), [backend](./backend.md), [ml-pipeline](./ml-pipeline.md), [lgpd](./lgpd.md), [security](./security.md), [design-system](./design-system.md), [frontend](./frontend.md), [student-data-features](./student-data-features.md).
+- **Required by** (specs that presume this one): [dynamodb-schema](./dynamodb-schema.md), [auth](./auth.md), [backend](./backend.md), [ml-pipeline](./ml-pipeline.md), [lgpd](./lgpd.md), [security](./security.md), [student-data-features](./student-data-features.md).
 
 ## See Also
 
@@ -346,5 +343,3 @@ Cleanup happens in reverse order.
 - [ML Pipeline](./ml-pipeline.md) — features, training, inference
 - [Student Data Features](./student-data-features.md) — structured data for student categorization (future direction)
 - [LGPD](./lgpd.md) — consent, audit, retention
-- [Frontend](./frontend.md) — SPA, routes, build & deploy
-- [Design System](./design-system.md) — tokens, components, accessibility

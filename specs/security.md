@@ -62,7 +62,7 @@ requiredBy: []
 | Pre-commit | **gitleaks** (secrets) + trailing-whitespace hook | `.pre-commit-config.yaml` |
 | CI | **gitleaks-action** on push/PR | `.github/workflows/secret-scan.yml` |
 | CI | `terraform validate` + `tfsec`/`checkov` (infra scan) | to be added with `aws-app` |
-| CI | `npm audit`/dependabot for frontend + Lambda deps | enable on GitHub |
+| CI | `npm audit`/dependabot for Lambda deps (frontend deps when the SPA is reintroduced) | enable on GitHub |
 | GitHub | **Secret scanning** + **Dependabot** + branch protection on `main` | repository settings |
 
 - `gitleaks` config lives in `.gitleaks.toml` at repo root; extend it when new secret formats appear.

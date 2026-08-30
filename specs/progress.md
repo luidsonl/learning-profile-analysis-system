@@ -13,13 +13,13 @@ requiredBy: []
 
 ## Status snapshot
 
-**As of:** 2026-08-29 · **Branch:** `main`
+**As of:** 2026-08-30 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 123/0). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the `frontend.md` spec remains `evolving` and the S3/CloudFront deploy is no longer applicable until/unless the SPA is reintroduced.
+Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 123/0). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the `frontend.md`/`design-system.md` docs were **removed along with the SPA**, and the S3/CloudFront deploy is no longer applicable until/unless the SPA is reintroduced — planned as a **future rebuild in Angular** with fresh specs.
 
 | Layer | Status | Notes |
 |---|---|---|
-| Specs (`specs/`) | ✅ Done | Index (`specs/README.md`) with dependency graph + layer specs; **student self-registration + educator-link + age-based consent** implemented and verified — `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md` stays `evolving` (SPA removed) |
+| Specs (`specs/`) | ✅ Done | Index (`specs/README.md`) with dependency graph + layer specs; **student self-registration + educator-link + age-based consent** implemented and verified — `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md`/`design-system.md` specs removed (SPA deleted, future rebuild in Angular) |
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ✅ Done | S3 + CloudFront + `/api/*` origin; validated, mirrors 0shared (unused while the SPA is absent) |
@@ -28,7 +28,7 @@ Backend vertical slice + offline ML pipeline are implemented and documented. The
 | Binary student self-service | ✅ Done | Student **self-registers** (`role: student`, pending) and is **linked by an educator** to a single student entity (approves + attributes); adult students (≥18) `self_consent`, minors (<18) need guardian/institution — e2e verified |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
 | Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; **e2e 123/0 passing** against the real stack (admin bootstrap + new student flow) |
-| Frontend SPA (`frontend/`) | ⛔ Removed | SPA directory deleted by the owner (not tracked in git); `frontend.md` kept `evolving`; no S3/CloudFront deploy until reintroduced |
+| Frontend SPA (`frontend/`) | ⛔ Removed | SPA directory deleted by the owner (not tracked in git); `frontend.md`/`design-system.md` specs removed; no S3/CloudFront deploy until reintroduced (future: Angular) |
 
 ---
 
@@ -42,8 +42,8 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 - **ML integration**: `ml/` trains a Logistic Regression offline on the committed public dataset (`datasets/vark/data.csv`, macro-F1 ≈ 0.93); artifact is committed as a static serving file at `sam-app/src/inference/models/vark/`; submissions trigger the Python `InferenceFunction` asynchronously (`InvocationType: "Event"`); the inference Lambda is now **multi-model**: it routes the event's `formId` to its bundled model dir (`models/<formId>/`), so new inferences are additive (register in `ml/features/prepare.py` `MODELS`, `make package-all`, redeploy) and `GET /predictions` exposes `form`/`submission` with a `?form=` filter. It scores and writes its own `PRED#` item linked to the submission; predictions ride along in `GET /responses`. Legacy heuristic predict path removed. Dataset label quirk handled via `{A→R, V→A, K→K}` remap (see `specs/ml-pipeline.md`).
 - **Security tooling**: gitleaks + pre-commit + CI secret scan; packaged-model commit exception documented.
 - **Dev loop**: `make sync` (`sam sync --watch`) pushes handler code changes straight to the live Lambdas in seconds — no CloudFormation wait; `template.yaml` changes still take the full `make deploy` path, which remains the source of truth.
-- **Frontend SPA** (`frontend/`): **removed by the owner** (React + Vite + Tailwind v4 + Radix app that implemented auth, dashboards, forms renderer, VARK wizard, V/A/R/K profile, recommendations, reports, observations, audit, and a student self-view mode — plus the RBAC-rework screens `/admin/users`, role-conditional actions and status-aware login — was deleted along with its `npm run build`/`npm run lint` setup). Not tracked in git; `frontend.md` kept `evolving`.
-- **Frontend infra** (`terraform/aws-frontend`): S3 + CloudFront distribution + `/api/*` origin (OAC, SPA fallback, upload + invalidation) remain validated but are **unused/un-deployed while the SPA is absent**; root `make frontend` no longer applies until a SPA is reintroduced.
+- **Frontend SPA** (`frontend/`): **removed by the owner** (React + Vite + Tailwind v4 + Radix app that implemented auth, dashboards, forms renderer, VARK wizard, V/A/R/K profile, recommendations, reports, observations, audit, and a student self-view mode — plus the RBAC-rework screens `/admin/users`, role-conditional actions and status-aware login — was deleted along with its `npm run build`/`npm run lint` setup). Not tracked in git. The `frontend.md` and `design-system.md` specs were **deleted too** — the SPA is planned to be **rebuilt in Angular** with fresh specs (`frontend.md`, `design-system.md`) when started.
+- **Frontend infra** (`terraform/aws-frontend`): S3 + CloudFront distribution + `/api/*` origin (OAC, SPA fallback, upload + invalidation) remain validated but are **unused/un-deployed while the SPA is absent**; root `make frontend` no longer applies until a SPA is reintroduced (planned Angular rebuild).
 
 ---
 
@@ -53,7 +53,7 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 2. **Frontend RBAC rework** — ✅ **Done** at the time (admin screens, role-conditional actions, status-aware login); **obsolete** — the SPA was removed by the owner.
 3. ~~**Deploy the frontend**~~ — **superseded**: the SPA was removed; `make frontend`/S3/CloudFront deploy no longer applies until a SPA is reintroduced.
 4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
-5. ~~**Implement the student self-registration + educator-link + age-based consent flow**~~ — ✅ **Done and verified**: self-register (`pending`, `birthDate`), link via `POST /students/:id/accounts/:userId/link` (approves + attributes, at-most-one), adult (≥18) `self_consent` / minor needs guardian/institution (`MIN_SELF_CONSENT_AGE=18`). Implemented across `auth.mjs`, `guardianship.mjs`, `consent.mjs`, `session.mjs`, `admin.mjs`, `lib/age.mjs`, `resources.env`, `template.yaml`; e2e **123/0**. `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md` stays `evolving` (SPA removed).
+5. ~~**Implement the student self-registration + educator-link + age-based consent flow**~~ — ✅ **Done and verified**: self-register (`pending`, `birthDate`), link via `POST /students/:id/accounts/:userId/link` (approves + attributes, at-most-one), adult (≥18) `self_consent` / minor needs guardian/institution (`MIN_SELF_CONSENT_AGE=18`). Implemented across `auth.mjs`, `guardianship.mjs`, `consent.mjs`, `session.mjs`, `admin.mjs`, `lib/age.mjs`, `resources.env`, `template.yaml`; e2e **123/0**. `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md`/`design-system.md` specs later removed (SPA deleted, Angular rebuild planned).
 
 ---
 
@@ -61,5 +61,5 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 
 1. ✅ Cleaned, deployed, e2e validated — admin bootstrap + approval flow verified live.
 2. ✅ Student self-registration + educator-link + age-based consent — implemented and verified live (e2e **123/0**); backend specs flipped to `stable`.
-3. ⛔ Frontend SPA removed — no deploy pending; `frontend.md` kept `evolving` until a SPA is reintroduced (if ever).
+3. ⛔ Frontend SPA removed — no deploy pending; `frontend.md`/`design-system.md` specs deleted. **Next frontend effort: rebuild the SPA in Angular** (fresh `specs/frontend.md` + `specs/design-system.md`), then deploy via `terraform/aws-frontend`.
 4. Report generator Lambda (PDF export) — still a future-work stub by scope decision.

@@ -13,8 +13,6 @@ This index is the contract between the codebase and the tools — a coding agent
 | Add/change a DynamoDB access pattern, entity, GSI, transaction | [dynamodb-schema.md](./dynamodb-schema.md) |
 | Change sessions, roles, statuses, scope enforcement, consent gates | [auth.md](./auth.md) |
 | Retrain/add an ML model, datasets, inference behavior | [ml-pipeline.md](./ml-pipeline.md) |
-| Change the SPA routes, API client, build/deploy | [frontend.md](./frontend.md) |
-| Change tokens, components, accessibility baseline | [design-system.md](./design-system.md) |
 | Consent lifecycle, retention, erasure, LGPD rights | [lgpd.md](./lgpd.md) |
 | Commit-safety / public-repo security rules | [security.md](./security.md) |
 | Design future models from general student data | [student-data-features.md](./student-data-features.md) |
@@ -42,11 +40,6 @@ graph LR
     AU --> SE
     ML --> SE
     LG --> SE
-    A --> FE[frontend.md]
-    BE --> FE
-    AU --> FE
-    A --> DS[design-system.md]
-    DS --> FE
     A --> SD[student-data-features.md]
     S --> SD
     ML --> SD
@@ -55,7 +48,7 @@ graph LR
 
     classDef spec fill:#EEF2FF,stroke:#4F46E5,stroke-width:1px;
     classDef report fill:#F0FDF4,stroke:#15803D,stroke-width:1px;
-    class A,S,AU,BE,ML,LG,SE,DS,FE,SD spec;
+    class A,S,AU,BE,ML,LG,SE,SD spec;
     class PROG report;
 ```
 
@@ -67,13 +60,11 @@ graph LR
 |-------------|--------|---------------|------------|
 | [architecture.md](./architecture.md) (`architecture`) | stable | 2026-08-30 | — |
 | [dynamodb-schema.md](./dynamodb-schema.md) (`dynamodb-schema`) | stable | 2026-08-29 | `architecture` |
-| [auth.md](./auth.md) (`auth`) | stable | 2026-08-29 | `architecture`, `dynamodb-schema` |
+| [auth.md](./auth.md) (`auth`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema` |
 | [backend.md](./backend.md) (`backend`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `auth` |
 | [ml-pipeline.md](./ml-pipeline.md) (`ml-pipeline`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `backend` |
-| [lgpd.md](./lgpd.md) (`lgpd`) | stable | 2026-08-29 | `architecture`, `dynamodb-schema`, `auth`, `ml-pipeline` |
+| [lgpd.md](./lgpd.md) (`lgpd`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `auth`, `ml-pipeline` |
 | [security.md](./security.md) (`security`) | stable | 2026-08-30 | `architecture`, `auth`, `ml-pipeline`, `lgpd` |
-| [design-system.md](./design-system.md) (`design-system`) | stable | 2026-08-29 | `architecture` |
-| [frontend.md](./frontend.md) (`frontend`) | evolving | 2026-08-29 | `architecture`, `backend`, `auth`, `design-system` |
 | [student-data-features.md](./student-data-features.md) (`student-data-features`) | proposed | 2026-08-29 | `architecture`, `dynamodb-schema`, `ml-pipeline`, `lgpd` |
 | [progress.md](./progress.md) (`progress`) | evolving | 2026-08-30 | — (report) |
 

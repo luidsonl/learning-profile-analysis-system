@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Project: **Sistema de Análise de Perfil de Aprendizado**. Personalizes teaching for gifted students and students with specific needs — children or adults (educators, parents/guardians, students are the personas). Backend vertical slice (Terraform infra, SAM API, forms engine, offline ML + inference Lambda, tests) and the frontend SPA are implemented; **frontend RBAC rework and the S3/CloudFront deploy are pending** — current status and next steps: see `specs/progress.md`; documentation hub: `specs/README.md`.
+Project: **Sistema de Análise de Perfil de Aprendizado**. Personalizes teaching for gifted students and students with specific needs — children or adults (educators, parents/guardians, students are the personas). Backend vertical slice (Terraform infra, SAM API, forms engine, offline ML + inference Lambda, tests) is implemented; **the frontend SPA was removed by the owner and is planned to be rebuilt in Angular** (fresh `specs/frontend.md`/`design-system.md` when started) — current status and next steps: see `specs/progress.md`; documentation hub: `specs/README.md`.
 
 ## Architecture (agreed — mirror https://github.com/luidsonl/0shared)
 
-- AWS serverless: **Terraform** for stateful infra (DynamoDB, S3, SQS, async Lambdas, EventBridge), **AWS SAM** for API-triggered Lambdas, **CloudFront + S3** for a React+Vite SPA. Backend API served under `/api/*` prefix so one CloudFront domain serves app + API (no CORS).
+- AWS serverless: **Terraform** for stateful infra (DynamoDB, S3, SQS, async Lambdas, EventBridge), **AWS SAM** for API-triggered Lambdas, **CloudFront + S3** for the SPA (**currently removed by the owner — planned rebuild in Angular**). Backend API served under `/api/*` prefix so one CloudFront domain serves app + API (no CORS).
 - **DynamoDB single-table design** (like 0shared): entity-prefixed PK/SK (`USER#`, `STUDENT#`, `EMAIL#`, `SESSION#`, `AUDIT#`), GSIs per access pattern, transactions with uniqueness reservations.
 - **ML is fully decoupled**: training is **100% offline** in `ml/` (scikit-learn, runs locally on the committed dataset — never in AWS); the trained artifact (`model.joblib` + `meta.json`) is **bundled into a Python inference Lambda** deployed with SAM. Storing a new form submission triggers that Lambda via **asynchronous invoke** (`InvocationType: "Event"`, fire-and-forget, **no SQS anywhere in the ML path**); the inference Lambda scores and writes the `PRED#` item itself (each item carries `model` + `modelVersion` from `meta.json` — that's the traceability, no registry). Submissions are human input; predictions are machine-generated data. Retraining is a manual local step (`make train` → package → `sam deploy`). Designed to be extended with future forms/models.
 - **Forms engine (code-defined)**: curated definitions in code (`vark` by any persona — student, or guardian/educator/admin acting for them; `anamnesis` by guardian; `socioemotional` + `behavior-checklist` by educator), served read-only by the API — **no business rules in the database**; only per-student submissions are stored. A `vark` submission is stored immediately and, asynchronously, the bundled ML model scores it automatically, producing a `PRED#` prediction that appears afterwards. **A profile is traced from a filled form** (VARK): the deterministic processor writes `ASSESS#`, and the bundled ML model scores every `vark` submission automatically (`PRED#`).
@@ -16,10 +16,10 @@ Project: **Sistema de Análise de Perfil de Aprendizado**. Personalizes teaching
 ```
 terraform/   aws-bootstrap (state bucket) · aws-app (stateful) · aws-frontend (S3+CloudFront)
 sam-app/     API Gateway + Lambda handlers, inference Lambda (Python), template.yaml, resources.env
-frontend/    React + Vite SPA (pt-BR, accessible)
+frontend/    (futuro) SPA — planned rebuild in Angular (pt-BR, accessible)
 ml/          features/ · train/ · evaluate/ · serve/ (offline training; packages model into sam-app)
 datasets/    public training datasets (vark/data.csv + citation.txt — committed by owner decision)
-specs/       architecture, backend, auth, dynamodb-schema, ml-pipeline, lgpd, frontend, design-system (README.md = dependency-graph hub)
+specs/       architecture, backend, auth, dynamodb-schema, ml-pipeline, lgpd, security, student-data-features (README.md = dependency-graph hub)
 ```
 
 ## Agreed decisions to respect
