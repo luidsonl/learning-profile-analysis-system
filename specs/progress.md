@@ -52,7 +52,7 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 1. **Clean data + deploy + validate e2e (RBAC rework)** — clear the DynamoDB table (e2e assumes a clean table: the first educator must bootstrap as admin), `sam build && sam deploy` (template gained `AdminFunction`), then run `npm run test:e2e` against the real API. ✅ **Done** — deployed; still needs a clean table before each full e2e run.
 2. **Frontend RBAC rework** — ✅ **Done** at the time (admin screens, role-conditional actions, status-aware login); **obsolete** — the SPA was removed by the owner.
 3. ~~**Deploy the frontend**~~ — **superseded**: the SPA was removed; `make frontend`/S3/CloudFront deploy no longer applies until a SPA is reintroduced.
-4. **Report generator Lambda** — still a stub by scope decision; PDF export is future work.
+4. **Report generator Lambda** — still a stub by scope decision.
 5. ~~**Implement the student self-registration + educator-link + age-based consent flow**~~ — ✅ **Done and verified**: self-register (`pending`, `birthDate`), link via `POST /students/:id/accounts/:userId/link` (approves + attributes, at-most-one), adult (≥18) `self_consent` / minor needs guardian/institution (`MIN_SELF_CONSENT_AGE=18`). Implemented across `auth.mjs`, `guardianship.mjs`, `consent.mjs`, `session.mjs`, `admin.mjs`, `lib/age.mjs`, `resources.env`, `template.yaml`; e2e **123/0**. `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md`/`design-system.md` specs later removed (SPA deleted, Angular rebuild planned).
 
 ---
@@ -62,4 +62,4 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 1. ✅ Cleaned, deployed, e2e validated — admin bootstrap + approval flow verified live.
 2. ✅ Student self-registration + educator-link + age-based consent — implemented and verified live (e2e **123/0**); backend specs flipped to `stable`.
 3. ⛔ Frontend SPA removed — no deploy pending; `frontend.md`/`design-system.md` specs deleted. **Next frontend effort: rebuild the SPA in Angular** (fresh `specs/frontend.md` + `specs/design-system.md`), then deploy via `terraform/aws-frontend`.
-4. Report generator Lambda (PDF export) — still a future-work stub by scope decision.
+4. Report generator Lambda — still a future-work stub by scope decision.

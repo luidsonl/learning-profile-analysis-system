@@ -315,7 +315,6 @@ Cleanup happens in reverse order.
 | ML fully decoupled — offline training only | System never trains; standalone `ml-pipeline.md` spec keeps dataset + training evolvable independently |
 | Small packaged model in Lambda over SageMaker | Cheapest for the MVP; SageMaker remains a documented upgrade path |
 | Heuristic giftedness/difficulty indicators in MVP | No public dataset exists; heuristic rules are honest and explainable while data is collected |
-| PDF reports server-side via SQS | Async generation avoids request timeouts; output lands in S3 and is shared by presigned URL |
 | LGPD in-scope for MVP | Students' data is sensitive (minors especially); consent + audit are foundational, not retrofits |
 | VARK questionnaire | Closes the domain gap with the public dataset (students aged 10-18+); serves every persona |
 

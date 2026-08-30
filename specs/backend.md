@@ -114,7 +114,7 @@ requiredBy:
 |---------------|-------|-------------|--------------|
 | `POST /api/students/:id/reports/generate` | scoped | Enqueue report generation | `REPORT#<id>` status `queued` → SQS |
 | `GET /api/students/:id/reports` | scoped | Report metadata list | `REPORT#` prefix desc |
-| `GET /api/reports/:reportId/download` | scoped, sharedWith | Presigned GET URL to the PDF | GSI1 `REPORT#<id>` → S3 presign |
+| `GET /api/reports/:reportId/download` | scoped, sharedWith | Presigned GET URL to the report | GSI1 `REPORT#<id>` → S3 presign |
 | `DELETE /api/reports/:reportId` | scoped (any role except student) | Remove report (and object) | delete `REPORT#` + S3 object |
 
 ### Admin — User Management (approval & RBAC)
@@ -162,7 +162,7 @@ Every data access is additionally **scope-checked** (edges in DynamoDB), not jus
 
 | Lambda | Trigger | Work |
 |--------|---------|------|
-| `report-generator` | SQS `learning-profile_reports` | Generate PDF from student data → `s3://learning-profile-files/reports/<id>.pdf` → set `REPORT#` status `ready` |
+| `report-generator` | SQS `learning-profile_reports` | Generate a report from student data → `s3://learning-profile-files/reports/<id>` → set `REPORT#` status `ready` |
 | `feature-export` | EventBridge nightly | Export labeled assessments + observations to versioned snapshots on `-data` bucket (decoupling contract, see [ML Pipeline](./ml-pipeline.md)) |
 
 Both are stateful-adjacent and therefore live in `terraform/aws-app`, not SAM.

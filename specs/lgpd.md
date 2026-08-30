@@ -27,7 +27,7 @@ requiredBy:
 | Registration of the student | The **student self-registers** (`role: student`); the legal basis depends on age, decided from the **birth date** recorded at sign-up: **adult (≥ `MIN_SELF_CONSENT_AGE`)** may consent for themselves (`self_consent`); **minor (< 18)** requires **guardian consent** (art. 14 — children's data) or, without a guardian, **institution authorization** (`legalBasis=institution_authorization`) granted by the responsible educator/admin. An educator links the account to a single student entity (consent-gated) | Faculty-led data entity; age-based consent |
 | Filling forms, observations, assessments | Guardian consent or institution authorization (per student, versioned) | `vark`, `anamnesis`, `socioemotional`, `behavior-checklist` |
 | ML prediction & recommendations | Same consent basis; anonymized training outside scope | See data minimization below |
-| Reports (PDF) | Same consent basis; sharing per `sharedWith` | Presigned URLs |
+| Reports | Same consent basis; sharing per `sharedWith` | Presigned URLs |
 | Audit log | Legitimate interest + legal compliance (art. 37) | Kept separately from analytics |
 
 > Every consent record stores its **legal basis** (`legalBasis`: `guardian | institution_authorization | self_consent`) and the **role that granted it** (`grantedByRole`), satisfying LGPD accountability (art. 37). Consent is always required — the legal basis only documents *who* authorized the processing, never replaces it. **Age-based self-consent**: `self_consent` is permitted only when the student is **≥ `MIN_SELF_CONSENT_AGE` (18)**; minors (< 18) are consented by a **guardian** or by **institution authorization**. The student's **birth date is collected as an age-verification data point** (LGPD art. 14 §5º + ECA Digital — Lei 15.211/2025, in force since March 2026) and used strictly for this purpose, never for profiling/commercial use.
@@ -52,7 +52,7 @@ requiredBy:
 | Observations | `OBS#` | Educator feedback, features for future models |
 | Scores & labels | `ASSESS#` | Profile interpretation (V/A/R/K + multimodal) |
 | Predictions & recommendations | `PRED#`, `REC#` | Personalized strategies |
-| Reports | `REPORT#` + S3 PDFs | Documents shared with families/educators |
+| Reports | `REPORT#` | Documents shared with families/educators |
 | Audit events | `AUDIT#` | Traceability, LGPD art. 37 |
 | ML artifacts (anonymized) | `-data` bucket snapshots | Offline training — see [ML Pipeline](./ml-pipeline.md) |
 
@@ -81,7 +81,7 @@ requiredBy:
   | Data | Default retention |
   |------|-------------------|
   | Sessions | 7 days (TTL) |
-  | Reports (PDF + `REPORT#`) | 90 days or per institution policy (TTL + object lifecycle) |
+  | Reports (`REPORT#`) | 90 days or per institution policy (TTL + object lifecycle) |
   | Submissions / assessments / predictions | Kept while consent active; erasure on revocation request or at the end of the institution's term (configurable) |
   | Audit log | 2 years (configurable), never TTL'd by default |
   | Export snapshots (`-data`) | Anonymized → retained for ML retraining per policy |
@@ -94,7 +94,7 @@ requiredBy:
 |----------------------|-----------------|
 | Access | `GET /api/students/:id` (guardian) / `GET /api/students/:id/...` data download; admin export |
 | Correction | `PATCH /api/students/:id` (non-destructive, versioned) |
-| Erasure (apagamento) | **Erasure flow** (admin/DPO): delete `STUDENT#` partition items (submissions, assess, pred, rec, obs, reports + S3 PDFs, consent history), `GUARD#`/`FOLLOW#`/`STUDENT#` edges, student `USER#` + `EMAIL#` reservation; keep only anonymized snapshots + audit record of the deletion |
+| Erasure (apagamento) | **Erasure flow** (admin/DPO): delete `STUDENT#` partition items (submissions, assess, pred, rec, obs, reports + report artifacts, consent history), `GUARD#`/`FOLLOW#`/`STUDENT#` edges, student `USER#` + `EMAIL#` reservation; keep only anonymized snapshots + audit record of the deletion |
 | Consent revocation | `POST /api/students/:id/consent` with `status=revoked` |
 | Portability | Structured export (JSON) of the student's `SUBMISSION#`, `ASSESS#`, `PRED#`, `REC#` for the guardian |
 | Anonymous review / complaints | Institution DPO contact surfaced in the UI (footer) |
