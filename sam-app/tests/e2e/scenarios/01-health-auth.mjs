@@ -49,7 +49,7 @@ export default async (ctx) => {
     // Pending educator accounts list (admin sees all roles).
     const pendingEducators = await api("GET", "/admin/users?role=educator&status=pending", { token: ctx.adminToken });
     expect("admin lists pending educators", pendingEducators.status === 200 && pendingEducators.data.count === 1, JSON.stringify(pendingEducators.data));
-    expect("admin list includes the pending educator", pendingEducators.data.data[0]?.userId === ctx.educatorId, JSON.stringify(pendingEducators.data.data));
+    expect("admin list includes the pending educator", pendingEducators.data?.data?.[0]?.userId === ctx.educatorId, JSON.stringify(pendingEducators.data?.data));
 
     const approveE = await api("PATCH", `/admin/users/${ctx.educatorId}`, { token: ctx.adminToken, body: { status: "active" } });
     expect("admin approves educator", approveE.status === 200 && approveE.data.user.status === "active", JSON.stringify(approveE.data));

@@ -76,11 +76,24 @@ unit-test:
 	node --test tests/unit/*.test.mjs
 
 # e2e requires the API deployed to AWS. API_BASE is resolved from the deployed
-# stack output; the suite deletes only the fixtures it inserts.
+# stack output; the suite deletes only the fixtures it inserts. Scenarios run in
+# order and share ctx, so only a contiguous prefix runs in isolation; FILTER is
+# an optional filter that picks the LAST scenario to run, by id ("04") or by
+# name ("inference") — everything after it is skipped. Examples:
+#   make e2e-test                # no filter → full suite (01 → 09)
+#   make e2e-test FILTER=04      # bootstrap → ML inference only (01 → 04)
+#   make e2e-test FILTER=inference # same, by scenario label
+#   make e2e-inference           # shorthand (via the e2e-% rule below)
+# NOTE: the first educator must become admin, so the suite assumes a clean table
+# (run `make db-wipe CONFIRM=yes` if a leftover admin breaks the bootstrap).
 e2e-test:
 	API_BASE=$$(aws cloudformation describe-stacks --stack-name $(STACK_NAME) \
 		--query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
-		--output text) node tests/e2e/api.test.mjs
+		--output text) FILTER="$(FILTER)" node tests/e2e/api.test.mjs
+
+# Shorthand: make e2e-inference  ≡  make e2e-test FILTER=inference
+e2e-%:
+	$(MAKE) e2e-test FILTER="$*"
 
 test:
 	@if [ -n "$(FILTER)" ]; then npm test -- --test-name-pattern="$(FILTER)"; else npm test; fi

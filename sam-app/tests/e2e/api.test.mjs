@@ -1,4 +1,4 @@
-import { purgeOrphanSessions } from "./aws-cleanup.mjs";
+import { findAdmins, purgeOrphanSessions } from "./aws-cleanup.mjs";
 import { api, summary } from "./helpers.mjs";
 import { TEST_FIXTURES, purgeFixtures } from "./fixtures.mjs";
 import s01 from "./scenarios/01-health-auth.mjs";
@@ -21,16 +21,73 @@ const TABLE = process.env.TABLE_NAME || "learning-profile";
 
 // Scenarios run in order and share fixture state through ctx
 // (tokens, student ids, submission ids created along the way).
-const scenarios = [s01, s02, s03, s04, s05, s06, s07, s08, s09];
+const ALL_SCENARIOS = [
+  ["01", "health-auth", s01],
+  ["02", "students-consent", s02],
+  ["03", "forms-submissions", s03],
+  ["04", "ml-inference", s04],
+  ["05", "guardianship-observations-recommendations", s05],
+  ["06", "student-self-view", s06],
+  ["07", "reports-audit", s07],
+  ["08", "vark-form-classification", s08],
+  ["09", "student-record-rules", s09],
+];
+
+// FILTER is an optional filter that limits the run to a contiguous prefix of
+// the suite. It accepts either the two-digit id ("04") or a case-insensitive
+// substring of the label ("inference", "ml"). Later scenarios reuse ctx state
+// seeded by earlier ones, so only a contiguous prefix is safely runnable in
+// isolation; everything after the matched scenario is skipped. An empty FILTER
+// runs the full suite.
+const FILTER_ALIASES = { inferencia: "ml-inference", inferncia: "ml-inference" };
+const FILTER = process.env.FILTER ? process.env.FILTER.trim().toLowerCase() : "";
+const normalized = FILTER_ALIASES[FILTER] || FILTER;
+
+const selectScenarios = (filter) => {
+  if (!filter) return ALL_SCENARIOS;
+  const byId = ALL_SCENARIOS.find(([id]) => id === filter);
+  const byLabel = ALL_SCENARIOS.filter(([, label]) => label.includes(filter));
+  if (byId) return ALL_SCENARIOS.slice(0, ALL_SCENARIOS.indexOf(byId) + 1);
+  if (byLabel.length === 1) return ALL_SCENARIOS.slice(0, ALL_SCENARIOS.indexOf(byLabel[0]) + 1);
+  const labels = ALL_SCENARIOS.map(([id, label]) => `${id} (${label})`).join(", ");
+  const hint = byLabel.length > 1 ? ` matches several: ${byLabel.map(([, l]) => l).join(", ")}` : ".";
+  console.error(`Unknown FILTER "${FILTER}"${hint} Valid values: ${labels} (or omit to run the full suite).`);
+  process.exit(2);
+};
+
+const selected = selectScenarios(normalized);
+const scenarios = selected.map(([, , fn]) => fn);
+if (FILTER) {
+  console.log(`Running scenarios up to ${selected.at(-1)[0]} (${selected.at(-1)[1]}): ${selected.map(([id]) => id).join(" → ")}`);
+}
+
 const ctx = {};
 
 const cleanupErrors = [];
+
+// The suite assumes a clean table: the FIRST educator to register must become
+// the initial admin (auth.mjs hasAdmin bootstrap). If a leftover admin (not one
+// of our fixture emails) already exists, that bootstrap never fires and the
+// whole run fails in cascade. Fail fast with an actionable message instead.
+const assertCleanBootstrap = async () => {
+  const fixtureEmails = new Set(TEST_FIXTURES.map((f) => f.email.toLowerCase()));
+  const stray = (await findAdmins()).find((a) => !fixtureEmails.has(a.email.toLowerCase()));
+  if (stray) {
+    console.error(
+      `\nERROR[preflight]: admin "${stray.email}" exists but is not an e2e fixture. ` +
+        `The suite requires a clean table (first educator -> initial admin). ` +
+        `Remove it manually or wipe the dev table: make db-wipe CONFIRM=yes\n`,
+    );
+    process.exit(2);
+  }
+};
 
 try {
   // Purge only the fixture identities these tests create (incl. leftovers of a
   // previous crashed run). Students are removed only when their creator is a
   // fixture user — anything else in the table is left untouched.
   await purgeFixtures();
+  await assertCleanBootstrap();
   for (const scenario of scenarios) {
     await scenario(ctx);
   }

@@ -269,8 +269,12 @@ The dataset (Armand, Eboue 2021, Mendeley Data, V1, DOI: 10.17632/bwrr6zypcj.1),
 ## Local Development Workflow
 
 ```
-Terminal 1:  (sam-app/)  make e2e-test      # e2e suite against the deployed API
+Terminal 1:  (sam-app/)  make e2e-test                  # full e2e suite against the deployed API
+Terminal 2:  (sam-app/)  make e2e-test FILTER=04        # prefix 01→04: bootstrap → ML inference
+Terminal 3:  (sam-app/)  make e2e-inference             # shorthand for FILTER=inference
 ```
+
+Scenario filtering (`FILTER=<id>` or a name substring) runs the contiguous prefix `01 → <matched scenario>` of the suite, since scenarios run in order and share `ctx` state — see [backend.md](./backend.md) → Local Development. The suite assumes a clean table (first educator becomes admin); a preflight check fails fast when a leftover admin blocks that bootstrap.
 
 The API is exercised via the deployed stack; the future SPA (Angular) will proxy `/api` in dev and use relative paths in prod — no environment-specific config in app code.
 

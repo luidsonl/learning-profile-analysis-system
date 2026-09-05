@@ -42,6 +42,30 @@ export async function findUserByEmail(email) {
   return res.Item?.userId?.S || null;
 }
 
+// Lists every active admin account (GSI2 `RoleStatus`). The e2e suite
+// bootstraps "first educator → initial admin", so it requires a table where no
+// admin exists before it starts; leftover admins break that assumption.
+export async function findAdmins() {
+  const found = [];
+  let last = undefined;
+  do {
+    const res = await client.send(
+      new QueryCommand({
+        TableName: TABLE,
+        IndexName: "RoleStatus",
+        KeyConditionExpression: "GSI2PK = :pk",
+        ExpressionAttributeValues: { ":pk": { S: "USER#ROLE#admin" } },
+        ExclusiveStartKey: last,
+      }),
+    );
+    for (const item of res.Items || []) {
+      if (item.email?.S) found.push({ email: item.email.S, userId: item.userId?.S });
+    }
+    last = res.LastEvaluatedKey;
+  } while (last);
+  return found;
+}
+
 export async function findStudentsByCreator(userId) {
   const found = [];
   let last = undefined;
