@@ -17,5 +17,11 @@ export default async (ctx) => {
 
     const studentDenied = await api("GET", `/audit/students/${ctx.studentId}`, { token: ctx.studentToken });
     expect("student cannot read audit trail", studentDenied.status === 403, JSON.stringify(studentDenied.data));
+
+    const byActor = await api("GET", `/audit?actor=${ctx.guardianId}`, { token: ctx.adminToken });
+    expect("admin reads actor audit trail", byActor.status === 200 && byActor.data.count > 0, JSON.stringify(byActor.data));
+
+    const nonAdmin = await api("GET", `/audit?actor=${ctx.guardianId}`, { token: ctx.guardianToken });
+    expect("guardian cannot read actor audit trail", nonAdmin.status === 403, JSON.stringify(nonAdmin.data));
   }
 };

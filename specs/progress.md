@@ -15,7 +15,7 @@ requiredBy: []
 
 **As of:** 2026-08-30 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 123/0). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the `frontend.md`/`design-system.md` docs were **removed along with the SPA**, and the S3/CloudFront deploy is no longer applicable until/unless the SPA is reintroduced — planned as a **future rebuild in Angular** with fresh specs.
+Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 125/0). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the `frontend.md`/`design-system.md` docs were **removed along with the SPA**, and the S3/CloudFront deploy is no longer applicable until/unless the SPA is reintroduced — planned as a **future rebuild in Angular** with fresh specs.
 
 | Layer | Status | Notes |
 |---|---|---|
@@ -27,7 +27,7 @@ Backend vertical slice + offline ML pipeline are implemented and documented. The
 | Forms engine | ✅ Done | Code-defined forms; guardian-assisted submissions |
 | Binary student self-service | ✅ Done | Student **self-registers** (`role: student`, pending) and is **linked by an educator** to a single student entity (approves + attributes); adult students (≥18) `self_consent`, minors (<18) need guardian/institution — e2e verified |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
-| Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; **e2e 123/0 passing** against the real stack (admin bootstrap + new student flow) |
+| Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; **e2e 125/0 passing** against the real stack (admin bootstrap + new student flow) |
 | Frontend SPA (`frontend/`) | ⛔ Removed | SPA directory deleted by the owner (not tracked in git); `frontend.md`/`design-system.md` specs removed; no S3/CloudFront deploy until reintroduced (future: Angular) |
 
 ---
@@ -53,13 +53,13 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 2. **Frontend RBAC rework** — ✅ **Done** at the time (admin screens, role-conditional actions, status-aware login); **obsolete** — the SPA was removed by the owner.
 3. ~~**Deploy the frontend**~~ — **superseded**: the SPA was removed; `make frontend`/S3/CloudFront deploy no longer applies until a SPA is reintroduced.
 4. **Report generator Lambda** — still a stub by scope decision.
-5. ~~**Implement the student self-registration + educator-link + age-based consent flow**~~ — ✅ **Done and verified**: self-register (`pending`, `birthDate`), link via `POST /students/:id/accounts/:userId/link` (approves + attributes, at-most-one), adult (≥18) `self_consent` / minor needs guardian/institution (`MIN_SELF_CONSENT_AGE=18`). Implemented across `auth.mjs`, `guardianship.mjs`, `consent.mjs`, `session.mjs`, `admin.mjs`, `lib/age.mjs`, `resources.env`, `template.yaml`; e2e **123/0**. `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md`/`design-system.md` specs later removed (SPA deleted, Angular rebuild planned).
+5. ~~**Implement the student self-registration + educator-link + age-based consent flow**~~ — ✅ **Done and verified**: self-register (`pending`, `birthDate`), link via `POST /students/:id/accounts/:userId/link` (approves + attributes, at-most-one), adult (≥18) `self_consent` / minor needs guardian/institution (`MIN_SELF_CONSENT_AGE=18`). Implemented across `auth.mjs`, `guardianship.mjs`, `consent.mjs`, `session.mjs`, `admin.mjs`, `lib/age.mjs`, `resources.env`, `template.yaml`; e2e **125/0**. `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md`/`design-system.md` specs later removed (SPA deleted, Angular rebuild planned).
 
 ---
 
 ## Suggested next steps (in order)
 
 1. ✅ Cleaned, deployed, e2e validated — admin bootstrap + approval flow verified live.
-2. ✅ Student self-registration + educator-link + age-based consent — implemented and verified live (e2e **123/0**); backend specs flipped to `stable`.
+2. ✅ Student self-registration + educator-link + age-based consent — implemented and verified live (e2e **125/0**); backend specs flipped to `stable`.
 3. ⛔ Frontend SPA removed — no deploy pending; `frontend.md`/`design-system.md` specs deleted. **Next frontend effort: rebuild the SPA in Angular** (fresh `specs/frontend.md` + `specs/design-system.md`), then deploy via `terraform/aws-frontend`.
 4. Report generator Lambda — still a future-work stub by scope decision.

@@ -2,6 +2,7 @@ import { CMD, client, TABLE } from "../lib/db.mjs";
 import { ok, errorResponse, param, qparam, HttpError } from "../lib/http.mjs";
 import { requireAuth } from "../lib/session.mjs";
 import { assertScopeStudent } from "../lib/scope.mjs";
+import { assert } from "../lib/validate.mjs";
 
 const asEvent = (i) => ({
   subject: i.PK.S.replace("AUDIT#", ""),
