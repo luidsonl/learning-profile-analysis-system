@@ -1,0 +1,2153 @@
+openapi: 3.0.3
+
+info:
+  title: Learning Profile Analysis System — API
+  description: |
+    HTTP contract for the Learning Profile Analysis System (personalized learning
+    profiles for gifted students and students with specific needs).
+
+    - Auth: `Authorization: Bearer <token>` on every protected route.
+    - Error envelope: `{ "error": { "code": "...", "message": "..." } }`.
+    - List envelope: `{ "data": [ ... ], "count": n }`.
+    - Data responses: `200`/`201` JSON; `204` (empty) on deletes.
+    - Forms and models are kept in code and served read-only.
+
+    This file is the **single source of truth** for HTTP contracts. The endpoint
+    list and conventions are mirrored in `specs/backend.md`, which keeps the
+    per-persona RBAC, async flows and DynamoDB transactions (do not duplicate
+    them here).
+  version: "1.0.0"
+  contact:
+    name: Learning Profile
+    url: https://github.com/luidsonl/learning-profile-analysis-system
+
+servers:
+  - url: https://{apiId}.execute-api.{region}.amazonaws.com/prod
+    description: API Gateway (production), served under `/api/*` via CloudFront.
+    variables:
+      apiId:
+        default: api-id
+      region:
+        default: us-east-1
+
+tags:
+  - name: Auth
+    description: Registration, login, logout and current-session info.
+  - name: Students
+    description: Student profiles and listing.
+  - name: Guardianship
+    description: Legal guardians, educator follows and student-account linking.
+  - name: Consent
+    description: Versioned LGPD consent per student.
+  - name: Forms
+    description: Form definitions and response submissions.
+  - name: Submissions
+    description: Submission history per form and across forms.
+  - name: Assessments
+    description: Deterministic classification (processor) of the latest submission.
+  - name: Predictions
+    description: ML model predictions (async).
+  - name: Observations
+    description: Pedagogical observations for a student.
+  - name: Recommendations
+    description: Recommendations proposed/approved by educators.
+  - name: Reports
+    description: Async generated reports and presigned download.
+  - name: Admin
+    description: User management, approvals and RBAC.
+  - name: Audit
+    description: Audit trail.
+  - name: Health
+    description: Service liveness.
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Service liveness
+      security: []
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Create an account (guardian, educator or student)
+      description: |
+        Creates an account. The first educator to register (when no admin exists)
+        becomes the initial `admin`+`active`. All other accounts start `pending`
+        until approved/linked. Students self-register with `role: student` and
+        `birthDate` (age verification for LGPD).
+      security: []
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and obtain a session token
+      description: |
+        Validates credentials and issues a session token (Bearer, 7-day TTL).
+        Student accounts `pending` (self-registered, not yet linked) may sign in
+        to the restricted self-service area.
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current session
+      security:
+        - bearerAuth: []
+      operationId: logout
+      responses:
+        "200":
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user + student scope
+      description: |
+        Returns the current user. For students, includes `studentId` (null while
+        `pending`/unlinked) and scoped student counts.
+      security:
+        - bearerAuth: []
+      operationId: getMe
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students:
+    post:
+      tags: [Students]
+      summary: Create a student profile
+      description: |
+        Only educators and admins. When an educator creates the profile, the
+        `FOLLOW#`/`EDUCATOR#` edges are also written (they follow it).
+      security:
+        - bearerAuth: []
+      operationId: createStudent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentCreateRequest"
+      responses:
+        "201":
+          description: Student created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentCreateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    get:
+      tags: [Students]
+      summary: List students in scope
+      description: |
+        Guardians see the students they are responsible for; educators see the
+        students they follow; admins see all. Students cannot list students.
+      security:
+        - bearerAuth: []
+      operationId: listStudents
+      responses:
+        "200":
+          description: List of student profiles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Students]
+      summary: Get a student profile
+      security:
+        - bearerAuth: []
+      operationId: getStudent
+      responses:
+        "200":
+          description: Student profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Students]
+      summary: Update a student profile
+      description: |
+        Non-destructive update. A linked student can only edit their own `name`.
+      security:
+        - bearerAuth: []
+      operationId: updateStudent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentUpdateRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentUpdateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /students/{id}/guardians:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    post:
+      tags: [Guardianship]
+      summary: Grant guardianship of a student to a guardian
+      description: Only educators (in scope) and admins.
+      security:
+        - bearerAuth: []
+      operationId: grantGuardian
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuardianGrantRequest"
+      responses:
+        "201":
+          description: Guardianship granted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuardianGrantResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    get:
+      tags: [Guardianship]
+      summary: List guardians of a student
+      security:
+        - bearerAuth: []
+      operationId: listGuardians
+      responses:
+        "200":
+          description: List of guardians
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuardianListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/guardians/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+      - $ref: "#/components/parameters/UserId"
+    delete:
+      tags: [Guardianship]
+      summary: Revoke guardianship of a student from a guardian
+      description: Only educators (in scope) and admins.
+      security:
+        - bearerAuth: []
+      operationId: revokeGuardian
+      responses:
+        "204":
+          description: Guardianship revoked
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/follow:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    post:
+      tags: [Guardianship]
+      summary: Educator starts following a student
+      description: Writes the `FOLLOW#`/`EDUCATOR#` edges. Educators only.
+      security:
+        - bearerAuth: []
+      operationId: followStudent
+      responses:
+        "201":
+          description: Student followed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Guardianship]
+      summary: Educator stops following a student
+      description: Educators only.
+      security:
+        - bearerAuth: []
+      operationId: unfollowStudent
+      responses:
+        "204":
+          description: Follow removed
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/accounts/{userId}/link:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+      - $ref: "#/components/parameters/UserId"
+    post:
+      tags: [Guardianship]
+      summary: Link a self-registered student account to a student profile
+      description: |
+        Only an educator who follows the student or an admin. Approves the account
+        (`pending → active`), attributes the entity (`studentUserId`) and is
+        consent-gated: an adult (>= 18) self-consents; a minor (< 18) requires
+        guardian/institution consent already granted. At most one account per
+        profile and one profile per account.
+      security:
+        - bearerAuth: []
+      operationId: linkStudentAccount
+      responses:
+        "200":
+          description: Student account linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkStudentAccountResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /students/{id}/educators:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Guardianship]
+      summary: List educators following a student
+      security:
+        - bearerAuth: []
+      operationId: listEducators
+      responses:
+        "200":
+          description: List of educators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EducatorListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/consent:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Consent]
+      summary: Get current consent + history
+      security:
+        - bearerAuth: []
+      operationId: getConsent
+      responses:
+        "200":
+          description: Current consent + history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    post:
+      tags: [Consent]
+      summary: Grant or revoke versioned consent
+      description: |
+        LGPD. `legalBasis`: `guardian`, `institution_authorization` or
+        `self_consent`. Minors (< 18) never self-consent. A linked adult student
+        may `self_consent` on their own profile.
+      security:
+        - bearerAuth: []
+      operationId: setConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentSetRequest"
+      responses:
+        "200":
+          description: Consent updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentSetResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /forms:
+    get:
+      tags: [Forms]
+      summary: List form definitions
+      description: |
+        Filtered by `audience` when given (`guardian`, `educator`, `student`).
+        Students only see forms with `audience: student`.
+      security:
+        - bearerAuth: []
+      operationId: listForms
+      parameters:
+        - name: audience
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Audience"
+      responses:
+        "200":
+          description: List of form definitions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /forms/{formId}:
+    parameters:
+      - $ref: "#/components/parameters/FormId"
+    get:
+      tags: [Forms]
+      summary: Get a form definition (read-only)
+      description: 'Students can only access forms with `audience: student`.'
+      security:
+        - bearerAuth: []
+      operationId: getForm
+      responses:
+        "200":
+          description: Form definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /students/{id}/forms/{formId}/responses:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+      - $ref: "#/components/parameters/FormId"
+    post:
+      tags: [Forms]
+      summary: Submit responses for a form
+      description: |
+        Idempotent via `requestId`. The submission is stored immediately; the
+        deterministic classification (`assessments`) and the ML prediction
+        (async) are separate steps. Requires active consent
+        (`consentStatus: active`).
+      security:
+        - bearerAuth: []
+      operationId: submitForm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FormSubmissionRequest"
+      responses:
+        "201":
+          description: Submission created (or idempotent duplicate)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormSubmissionAccepted"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+    get:
+      tags: [Forms]
+      summary: Response history for a form
+      description: |
+        Each item carries its `assessment` (once run) and ML `prediction` (once
+        available).
+      security:
+        - bearerAuth: []
+      operationId: getFormResponses
+      responses:
+        "200":
+          description: Response history + prediction + assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormResponsesList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /students/{id}/submissions:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Submissions]
+      summary: Submissions across all forms (newest first)
+      security:
+        - bearerAuth: []
+      operationId: listSubmissions
+      responses:
+        "200":
+          description: Aggregated submissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionsList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/assessments:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    post:
+      tags: [Assessments]
+      summary: Classify the latest assessment submission
+      description: |
+        Runs the deterministic processor over the latest stored submission and
+        writes `ASSESS#` + updates the VARK profile fields on the student `META`.
+      security:
+        - bearerAuth: []
+      operationId: runAssessment
+      responses:
+        "201":
+          description: Assessment computed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+    get:
+      tags: [Assessments]
+      summary: Assessment history
+      description: Optional `?profile=vark` filter (the only processor today).
+      security:
+        - bearerAuth: []
+      operationId: listAssessments
+      parameters:
+        - name: profile
+          in: query
+          required: false
+          schema:
+            type: string
+            example: vark
+      responses:
+        "200":
+          description: Assessment history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentsList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/predictions:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Predictions]
+      summary: ML prediction history with scores and confidence
+      description: |
+        Optional `?form=<formId>` filter. Predictions are generated async after a
+        submission; the full payload (scores + confidence) is delivered to any
+        viewer scoped to the student. Raw ML internals are never exposed.
+      security:
+        - bearerAuth: []
+      operationId: listPredictions
+      parameters:
+        - name: form
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Filters predictions by the origin form
+            example: vark
+      responses:
+        "200":
+          description: Prediction history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionsList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/observations:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    post:
+      tags: [Observations]
+      summary: Add a pedagogical observation
+      description: Only educators (in scope). Students read their own observations.
+      security:
+        - bearerAuth: []
+      operationId: addObservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObservationCreateRequest"
+      responses:
+        "201":
+          description: Observation added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObservationCreateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    get:
+      tags: [Observations]
+      summary: List observations for a student (newest first)
+      security:
+        - bearerAuth: []
+      operationId: listObservations
+      responses:
+        "200":
+          description: List of observations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObservationListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/observations/{timestamp}:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+      - $ref: "#/components/parameters/Timestamp"
+    delete:
+      tags: [Observations]
+      summary: Delete an observation
+      description: Only the author (educator, in scope) or an admin can delete.
+      security:
+        - bearerAuth: []
+      operationId: deleteObservation
+      responses:
+        "204":
+          description: Observation deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /students/{id}/recommendations:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Recommendations]
+      summary: List recommendations (visibility-filtered)
+      description: Students only see `approved`/`published` ones.
+      security:
+        - bearerAuth: []
+      operationId: listRecommendations
+      responses:
+        "200":
+          description: List of recommendations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    post:
+      tags: [Recommendations]
+      summary: Propose a manual recommendation
+      description: Only educators or admins, in scope. Starts `proposed`/`private`.
+      security:
+        - bearerAuth: []
+      operationId: proposeRecommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationCreateRequest"
+      responses:
+        "201":
+          description: Recommendation proposed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationCreateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/{id}/recommendations/{recoId}:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+      - $ref: "#/components/parameters/RecoId"
+    patch:
+      tags: [Recommendations]
+      summary: Update a recommendation status/visibility
+      description: Only educators or admins. Approve/publish or reject.
+      security:
+        - bearerAuth: []
+      operationId: updateRecommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationUpdateRequest"
+      responses:
+        "200":
+          description: Recommendation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationUpdateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Recommendations]
+      summary: Delete a recommendation
+      description: Only educators or admins.
+      security:
+        - bearerAuth: []
+      operationId: deleteRecommendation
+      responses:
+        "204":
+          description: Recommendation deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /students/{id}/reports/generate:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    post:
+      tags: [Reports]
+      summary: Request async report generation
+      description: |
+        Enqueues generation (SQS). Status starts `queued`; download becomes
+        available once the status is `generated` (see
+        `GET /reports/{reportId}/download`).
+      security:
+        - bearerAuth: []
+      operationId: generateReport
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportGenerateRequest"
+      responses:
+        "201":
+          description: Report queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportGenerateResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /students/{id}/reports:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Reports]
+      summary: List reports for a student (newest first)
+      security:
+        - bearerAuth: []
+      operationId: listReports
+      responses:
+        "200":
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /reports/{reportId}/download:
+    parameters:
+      - $ref: "#/components/parameters/ReportId"
+    get:
+      tags: [Reports]
+      summary: Get a presigned download URL for a report
+      description: |
+        Status must be `generated`. Returns a presigned S3 URL (expires in 900s).
+      security:
+        - bearerAuth: []
+      operationId: downloadReport
+      responses:
+        "200":
+          description: Presigned URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDownloadResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /reports/{reportId}:
+    parameters:
+      - $ref: "#/components/parameters/ReportId"
+    delete:
+      tags: [Reports]
+      summary: Delete a report (and its S3 object)
+      description: Any role except student, in scope.
+      security:
+        - bearerAuth: []
+      operationId: deleteReport
+      responses:
+        "204":
+          description: Report deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users with filters
+      description: |
+        Admins see all roles; educators only `guardian`/`student`. Optional
+        `?role=` and `?status=` filters.
+      security:
+        - bearerAuth: []
+      operationId: listAdminUsers
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Role"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/UserStatus"
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/AdminUserId"
+    patch:
+      tags: [Admin]
+      summary: Update a user status, role or birth date
+      description: |
+        Admins: full control (incl. `birthDate` to adjust LGPD eligibility).
+        Educators: only approve/deny `guardian`/`student` accounts (status
+        `active`/`denied`). Guards: no self-demotion, no last-admin removal.
+      security:
+        - bearerAuth: []
+      operationId: updateAdminUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserUpdateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+    delete:
+      tags: [Admin]
+      summary: Hard-delete a user account
+      description: |
+        Removes user, email reservation, sessions and reverse edges. Guards:
+        cannot delete yourself nor the last active admin.
+      security:
+        - bearerAuth: []
+      operationId: deleteAdminUser
+      responses:
+        "200":
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /admin/users/{id}/password:
+    parameters:
+      - $ref: "#/components/parameters/AdminUserId"
+    post:
+      tags: [Admin]
+      summary: Reset a user password
+      description: Admins only. The new password must have >= 8 characters.
+      security:
+        - bearerAuth: []
+      operationId: resetAdminUserPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetRequest"
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /audit/students/{id}:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      tags: [Audit]
+      summary: Audit trail for a student
+      description: Only guardians (in scope) or admins.
+      security:
+        - bearerAuth: []
+      operationId: studentAudit
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /audit:
+    get:
+      tags: [Audit]
+      summary: Audit trail by actor
+      description: Admins only. Optional `?actor=<userId>` filter.
+      security:
+        - bearerAuth: []
+      operationId: actorAudit
+      parameters:
+        - name: actor
+          in: query
+          required: false
+          schema:
+            type: string
+            description: User id whose action trail will be listed
+      responses:
+        "200":
+          description: Audit events by actor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Session token issued by `POST /auth/login`. Send as `Authorization: Bearer <token>`.'
+
+  parameters:
+    StudentId:
+      name: id
+      in: path
+      required: true
+      description: 'Student id (not the SK — this is the `studentId` UUID).'
+      schema:
+        type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: 'User id (UUID) of a self-registered student or guardian.'
+      schema:
+        type: string
+    AdminUserId:
+      name: id
+      in: path
+      required: true
+      description: 'User id (UUID) being managed.'
+      schema:
+        type: string
+    FormId:
+      name: formId
+      in: path
+      required: true
+      description: 'Form slug (`vark`, `anamnesis`, `socioemotional`, `behavior-checklist`).'
+      schema:
+        type: string
+    Timestamp:
+      name: timestamp
+      in: path
+      required: true
+      description: 'Observation timestamp ISO string (`OBS#<timestamp>`).'
+      schema:
+        type: string
+    RecoId:
+      name: recoId
+      in: path
+      required: true
+      description: Recommendation id.
+      schema:
+        type: string
+    ReportId:
+      name: reportId
+      in: path
+      required: true
+      description: Report id (UUID).
+      schema:
+        type: string
+
+  responses:
+    ValidationError:
+      description: Validation failed or invalid body
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Role or scope does not allow this
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflict (duplicate email, version, consent, etc.)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Role:
+      type: string
+      enum: [guardian, educator, student, admin]
+    UserStatus:
+      type: string
+      enum: [pending, active, denied]
+    Audience:
+      type: string
+      enum: [guardian, educator, student]
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: 'Stable error code (e.g.: `not_found`, `validation_failed`, `conflict`, `forbidden`).'
+            message:
+              type: string
+              description: Human-readable message.
+
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: learning-profile-api
+        time:
+          type: string
+          format: date-time
+
+    # ── Auth ────────────────────────────────────────────────────────────────
+    RegisterRequest:
+      type: object
+      required: [email, name, password]
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 8
+          description: Minimum 8 characters; stored as a bcrypt hash (12 rounds).
+        role:
+          $ref: "#/components/schemas/RegisterRole"
+        birthDate:
+          type: string
+          format: date
+          description: 'Required when `role: student` (LGPD age verification).'
+      example:
+        email: maria.responsavel@example.com
+        name: Maria da Silva
+        password: senha12345
+        role: guardian
+
+    RegisterRole:
+      type: string
+      enum: [guardian, educator, student]
+      default: guardian
+
+    RegisterResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/PublicUser"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      example:
+        email: maria.responsavel@example.com
+        password: senha12345
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Session token (Bearer, 7-day TTL).
+        user:
+          $ref: "#/components/schemas/PublicUser"
+
+    MeResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/PublicUser"
+        studentId:
+          type: string
+          nullable: true
+          description: 'Linked student entity id (null while `pending`/unlinked).'
+
+    PublicUser:
+      type: object
+      required: [userId, name, email, role, status, createdAt]
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Role"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        createdAt:
+          type: string
+          format: date-time
+        birthDate:
+          type: string
+          format: date
+        age:
+          type: integer
+        consentEligible:
+          type: boolean
+
+    # ── Students ────────────────────────────────────────────────────────────
+    StudentCreateRequest:
+      type: object
+      required: [name, birthDate]
+      properties:
+        name:
+          type: string
+        birthDate:
+          type: string
+          format: date
+        gender:
+          type: string
+        grade:
+          type: string
+        school:
+          type: string
+        specialNeeds:
+          type: array
+          items:
+            type: string
+        accountability:
+          type: object
+          description: Accountability metadata (institution/authorized-by/note).
+
+    StudentCreateResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+
+    Student:
+      type: object
+      properties:
+        studentId:
+          type: string
+        name:
+          type: string
+        birthDate:
+          type: string
+          format: date
+        gender:
+          type: string
+          nullable: true
+        grade:
+          type: string
+          nullable: true
+        school:
+          type: string
+          nullable: true
+        specialNeeds:
+          type: array
+          items:
+            type: string
+        accountability:
+          type: object
+          nullable: true
+        status:
+          type: string
+          enum: [active]
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        studentUserId:
+          type: string
+          nullable: true
+          description: Linked student account id.
+        varkLabel:
+          type: string
+          nullable: true
+        varkScores:
+          type: object
+          additionalProperties:
+            type: number
+          nullable: true
+        varkMultimodal:
+          type: boolean
+          nullable: true
+
+    StudentResponse:
+      type: object
+      properties:
+        student:
+          $ref: "#/components/schemas/Student"
+
+    StudentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Student"
+        count:
+          type: integer
+
+    StudentUpdateRequest:
+      type: object
+      description: 'A linked student can only send `name`.'
+      properties:
+        name:
+          type: string
+        birthDate:
+          type: string
+          format: date
+        gender:
+          type: string
+        grade:
+          type: string
+        school:
+          type: string
+        specialNeeds:
+          type: array
+          items:
+            type: string
+
+    StudentUpdateResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+        updated:
+          type: array
+          items:
+            type: string
+          description: Fields actually updated.
+
+    # ── Guardianship ────────────────────────────────────────────────────────
+    GuardianGrantRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          description: 'Id of a user with `role: guardian`.'
+        relation:
+          type: string
+          default: guardian
+
+    GuardianGrantResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+        guardianUserId:
+          type: string
+
+    GuardianListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuardianEdge"
+
+    GuardianEdge:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        relation:
+          type: string
+        grantedAt:
+          type: string
+          format: date-time
+
+    EducatorListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/EducatorEdge"
+
+    EducatorEdge:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        followedAt:
+          type: string
+          format: date-time
+
+    FollowResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+
+    LinkStudentAccountResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+        userId:
+          type: string
+
+    # ── Consent ─────────────────────────────────────────────────────────────
+    ConsentResponse:
+      type: object
+      properties:
+        current:
+          $ref: "#/components/schemas/ConsentCurrent"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentHistoryEntry"
+
+    ConsentCurrent:
+      type: object
+      properties:
+        version:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [not_granted, active, revoked]
+        consentAt:
+          type: string
+          format: date-time
+          nullable: true
+        consentBy:
+          type: string
+          nullable: true
+        legalBasis:
+          type: string
+          nullable: true
+        grantedByRole:
+          type: string
+          nullable: true
+
+    ConsentHistoryEntry:
+      type: object
+      properties:
+        version:
+          type: string
+        status:
+          type: string
+          enum: [active, revoked]
+        grantedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ConsentSetRequest:
+      type: object
+      required: [consentVersion, status]
+      properties:
+        consentVersion:
+          type: string
+          description: Consent term version.
+        status:
+          type: string
+          enum: [active, revoked]
+        legalBasis:
+          $ref: "#/components/schemas/LegalBasis"
+
+    LegalBasis:
+      type: string
+      enum: [guardian, institution_authorization, self_consent]
+
+    ConsentSetResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+        consentVersion:
+          type: string
+        status:
+          type: string
+          enum: [active, revoked]
+        legalBasis:
+          $ref: "#/components/schemas/LegalBasis"
+
+    # ── Forms ───────────────────────────────────────────────────────────────
+    FormListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormDefinition"
+        count:
+          type: integer
+
+    FormResponse:
+      type: object
+      properties:
+        form:
+          $ref: "#/components/schemas/FormDefinition"
+
+    FormDefinition:
+      type: object
+      properties:
+        formId:
+          type: string
+          example: vark
+        version:
+          type: integer
+        name:
+          type: string
+        audience:
+          $ref: "#/components/schemas/Audience"
+        description:
+          type: string
+        scale:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormSection"
+
+    FormSection:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        group:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormQuestion"
+
+    FormQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          enum: [likert, single, multiple, text, date, number]
+        text:
+          type: string
+        group:
+          type: string
+        options:
+          type: array
+          description: 'Present when `type` is `likert`, `single` or `multiple`.'
+        example:
+          description: 'Optional sample answer (when defined in the form).'
+
+    FormSubmissionRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          additionalProperties:
+            type: number
+          description: 'Question → answer map (e.g.: `{ "q01": 5 }` for likert).'
+        requestId:
+          type: string
+          description: 'Idempotency — if the submission with this id exists, returns 201 with `submittedBy: already_exists`.'
+      example:
+        answers:
+          q01: 5
+          q02: 5
+          q03: 4
+        requestId: sub-abc-123
+
+    FormSubmissionAccepted:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        formId:
+          type: string
+        submittedBy:
+          type: string
+          description: "`already_exists` when the `requestId` was used before (idempotent response)."
+
+    FormResponsesList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormResponseItem"
+        count:
+          type: integer
+
+    FormResponseItem:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        formId:
+          type: string
+        formVersion:
+          type: integer
+        answers:
+          type: object
+          description: 'Answers as in `FormSubmissionRequest.answers`.'
+        submittedBy:
+          type: string
+        submittedByRole:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        prediction:
+          $ref: "#/components/schemas/Prediction"
+        assessment:
+          $ref: "#/components/schemas/Assessment"
+
+    SubmissionsList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionSummary"
+        count:
+          type: integer
+
+    SubmissionSummary:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        formId:
+          type: string
+        formVersion:
+          type: integer
+        answers:
+          type: object
+        submittedBy:
+          type: string
+        submittedByRole:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Assessments ─────────────────────────────────────────────────────────
+    AssessmentResult:
+      type: object
+      properties:
+        studentId:
+          type: string
+        kind:
+          type: string
+          example: vark
+        formId:
+          type: string
+          example: vark
+        formVersion:
+          type: integer
+        scores:
+          type: object
+          additionalProperties:
+            type: number
+          description: 'Scores per dimension (e.g.: `{ "R": 5.0, "A": 1.0, "K": 2.0 }`).'
+        label:
+          type: string
+          nullable: true
+          description: '`R`, `A`, `K` or `multimodal` when ambiguous.'
+        multimodal:
+          type: boolean
+        method:
+          type: string
+          example: flemming
+        submission:
+          type: string
+          description: 'Full submission SK (e.g.: `SUBMISSION#vark#2026-...`).'
+        createdAt:
+          type: string
+          format: date-time
+
+    AssessmentsList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Assessment"
+        count:
+          type: integer
+
+    Assessment:
+      type: object
+      properties:
+        kind:
+          type: string
+          example: vark
+        scores:
+          type: object
+          additionalProperties:
+            type: number
+        label:
+          type: string
+          nullable: true
+        multimodal:
+          type: boolean
+        method:
+          type: string
+        submission:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Predictions ─────────────────────────────────────────────────────────
+    PredictionsList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prediction"
+        count:
+          type: integer
+
+    Prediction:
+      type: object
+      properties:
+        predictionId:
+          type: string
+        model:
+          type: string
+        modelVersion:
+          type: string
+        method:
+          type: string
+          example: ml
+        label:
+          type: string
+          example: R
+          description: 'Predicted dimension (`R`, `A` or `K`).'
+        form:
+          type: string
+          nullable: true
+        submission:
+          type: string
+          nullable: true
+        formVersion:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        scores:
+          type: object
+          additionalProperties:
+            type: number
+          description: 'Probability distribution over dimensions (sum ≈ 1).'
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence of the prediction (0–1).
+
+    # ── Observations ────────────────────────────────────────────────────────
+    ObservationCreateRequest:
+      type: object
+      required: [category, text]
+      properties:
+        category:
+          type: string
+          enum: [academic, behavior, social, emotional, attention, other]
+        text:
+          type: string
+          minLength: 1
+        rating:
+          type: number
+          description: Optional rating/score.
+
+    ObservationCreateResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+        observationTimestamp:
+          type: string
+          format: date-time
+
+    ObservationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Observation"
+        count:
+          type: integer
+
+    Observation:
+      type: object
+      properties:
+        observationTimestamp:
+          type: string
+          format: date-time
+        category:
+          type: string
+        text:
+          type: string
+        rating:
+          type: number
+          nullable: true
+        submittedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Recommendations ─────────────────────────────────────────────────────
+    RecommendationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Recommendation"
+        count:
+          type: integer
+
+    Recommendation:
+      type: object
+      properties:
+        recoId:
+          type: string
+        kind:
+          type: string
+          example: manual
+        title:
+          type: string
+        text:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [proposed, approved, rejected, published]
+        visibility:
+          type: string
+          enum: [private, published]
+        source:
+          type: string
+          nullable: true
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    RecommendationCreateRequest:
+      type: object
+      required: [title, text]
+      properties:
+        title:
+          type: string
+        text:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    RecommendationCreateResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+        recoId:
+          type: string
+
+    RecommendationUpdateRequest:
+      type: object
+      description: At least one of the two fields is required.
+      properties:
+        status:
+          type: string
+          enum: [proposed, approved, rejected, published]
+        visibility:
+          type: string
+          enum: [private, published]
+
+    RecommendationUpdateResponse:
+      type: object
+      properties:
+        studentId:
+          type: string
+        recoId:
+          type: string
+
+    # ── Reports ─────────────────────────────────────────────────────────────
+    ReportGenerateRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          default: profile
+          example: profile
+
+    ReportGenerateResponse:
+      type: object
+      properties:
+        reportId:
+          type: string
+        studentId:
+          type: string
+        kind:
+          type: string
+        status:
+          type: string
+          enum: [queued, generated]
+
+    ReportListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportMetadata"
+        count:
+          type: integer
+
+    ReportMetadata:
+      type: object
+      properties:
+        reportId:
+          type: string
+        studentId:
+          type: string
+        kind:
+          type: string
+        status:
+          type: string
+          enum: [queued, generated]
+        createdAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: string
+
+    ReportDownloadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: 'Presigned S3 URL (expires in 900s).'
+        reportId:
+          type: string
+        s3Key:
+          type: string
+        expiresIn:
+          type: integer
+          example: 900
+
+    # ── Admin ───────────────────────────────────────────────────────────────
+    UserListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicUser"
+        count:
+          type: integer
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        role:
+          $ref: "#/components/schemas/Role"
+        birthDate:
+          type: string
+          format: date
+
+    UserUpdateResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/PublicUser"
+
+    PasswordResetRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+
+    # ── Audit ───────────────────────────────────────────────────────────────
+    AuditList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        count:
+          type: integer
+
+    AuditEvent:
+      type: object
+      properties:
+        subject:
+          type: string
+        actorId:
+          type: string
+          nullable: true
+        actorRole:
+          type: string
+          nullable: true
+        action:
+          type: string
+          nullable: true
+        resource:
+          type: string
+          nullable: true
+        detail:
+          type: object
+          nullable: true
+        ip:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time

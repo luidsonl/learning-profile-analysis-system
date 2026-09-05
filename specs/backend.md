@@ -15,7 +15,7 @@ requiredBy:
 
 # Backend — Learning Profile Analysis System
 
-> API-triggered Lambda handlers (Node.js 22 ESM) on AWS SAM, served under `/api/*` behind one CloudFront domain (no CORS). Data access maps 1:1 to the access patterns in [DynamoDB Schema](./dynamodb-schema.md).
+> API-triggered Lambda handlers (Node.js 22 ESM) on AWS SAM, served under `/api/*` behind one CloudFront domain (no CORS). Data access maps 1:1 to the access patterns in [DynamoDB Schema](./dynamodb-schema.md). **The machine-readable HTTP contract (paths, request/response schemas, security) is [api.yaml](./api.yaml) (OpenAPI 3.0.3) — the SSOT for shapes; this spec keeps roles, flows and transactions.**
 
 ## Conventions
 
@@ -37,6 +37,7 @@ requiredBy:
 - **List responses**: `{ data: [...], count }` (no cursor pagination yet).
 - **Validation**: request bodies validated against the form/type schemas in `src/api/lib/validate.mjs`; reject unknown fields.
 - **Audit**: actions touching a student's data write `AUDIT#STUDENT#<id>` items via the same transaction where possible (see schema).
+- **Contract**: paths and schemas below are summarized in English prose; the authoritative machine-readable version is [api.yaml](./api.yaml).
 
 ## Endpoints
 
@@ -178,10 +179,11 @@ The API is exercised via the deployed stack (`make e2e-test` runs the e2e suite 
 ## Dependencies
 
 - **Depends on**: [architecture](./architecture.md) (flows, deployment), [dynamodb-schema](./dynamodb-schema.md) (access patterns consumed 1:1), [auth](./auth.md) (`requireAuth`/`requireRole`, scope edges, RBAC).
-- **Required by** (specs that presume this one): [ml-pipeline](./ml-pipeline.md) (inference trigger + `GET /predictions` read path).
+- **Required by** (specs that presume this one): [ml-pipeline](./ml-pipeline.md) (inference trigger + `GET /predictions` read path), [api.yaml](./api.yaml) (machine-readable contract).
 
 ## See Also
 
+- [api.yaml](./api.yaml) — OpenAPI 3.0.3 contract (paths, schemas, security) SSOT
 - [Authentication](./auth.md) — `requireAuth`/`requireRole`, scope checks over edges
 - [DynamoDB Schema](./dynamodb-schema.md) — the access patterns each endpoint uses
 - [Architecture](./architecture.md) — flows, deployment order
