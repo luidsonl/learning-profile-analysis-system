@@ -37,6 +37,7 @@ specs/       architecture, backend, auth, dynamodb-schema, ml-pipeline, lgpd, se
 
 The spec set lives in `specs/`, with **`specs/README.md`** as the mandatory entry point: dependency **DAG** (Mermaid graph + per-spec `dependsOn`/`requiredBy` frontmatter), reading guide, status legend (`stable`/`evolving`/`proposed`/`deprecated`), and the change lifecycle. Rules:
 
+- **Language**: all documentation, specs, contracts, comments and commit messages are written in **English**. `pt-BR` is reserved exclusively for end-user-facing UI copy and domain data (e.g. form question text served by the forms engine) — never for specs, API docs (`specs/api.yaml`), code comments or documentation files.
 - **Read bottom-up**: follow `dependsOn` before implementing against a spec; never read specs at random or build on a stale/duplicated fact.
 - **SSOT/DRY**: each cross-cutting fact (resource names, roles, entities, retention, dataset policy) lives in exactly **one** spec — link, don't copy. Duplicated facts have no owner.
 - **Keep the graph honest**: when editing a spec, update its `status`/`lastReviewed` and keep `dependsOn`/`requiredBy` inverse-consistent with the Mermaid graph in `specs/README.md`.

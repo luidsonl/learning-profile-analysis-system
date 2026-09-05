@@ -16,9 +16,13 @@ TF          ?= terraform
 STACK_NAME  ?= learning-profile-api
 REGION      ?= us-east-1
 
-.PHONY: all deploy deploy-full bootstrap infra backend frontend train package sanity smoke destroy destroy-backend
+.PHONY: all deploy deploy-full bootstrap infra backend frontend train package sanity smoke destroy destroy-backend validate-api
 
 all: deploy
+
+# Validate the OpenAPI contract (specs/api.yaml) with Redocly.
+validate-api:
+	npx --yes @redocly/cli@latest lint specs/api.yaml
 
 # Regular deployment (skips the state bucket — already exists).
 # `frontend` is NOT in the chain while the SPA is absent; run it explicitly
