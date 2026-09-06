@@ -28,6 +28,15 @@ export const TEST_FIXTURES = [
   { email: "lia.mendes@example.com", name: "Lia Mendes", password: "lia12345", role: "student", birthDate: "2004-04-20" },
 ];
 
+// Emails created inline by scenarios (not index-accessed fixtures) that must
+// also be purged so the suite stays re-runnable — otherwise a second run hits
+// `email_in_use` on registration.
+export const AUXILIARY_TEST_EMAILS = [
+  "sem.consentimento@example.com", // s02: no-consent minor
+  "ana2@example.com", // s02: at-most-one duplicate account try
+  "rafael.nao@example.com", // s09: guardian-cannot-link account try
+];
+
 // Decisively reading/writing-dominant answers: R=5.0, A=1.0, K=2.0 (R-K=3 > 2,
 // so the Flemming rule labels it R, unambiguous regardless of small tweaks).
 export const answers = {
@@ -37,7 +46,8 @@ export const answers = {
 };
 
 export const purgeFixtures = async () => {
-  for (const { email } of TEST_FIXTURES) {
+  const emails = [...TEST_FIXTURES.map((f) => f.email), ...AUXILIARY_TEST_EMAILS];
+  for (const email of emails) {
     const userId = await findUserByEmail(email);
     if (!userId) continue;
     for (const studentId of await findStudentsByCreator(userId)) {
