@@ -10,6 +10,8 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { map } from 'rxjs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
+import { AuthService } from '../core/auth/auth.service';
+
 @Component({
   selector: 'app-shell',
   imports: [
@@ -28,6 +30,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 })
 export class AppShell {
   private readonly breakpoint = inject(BreakpointObserver);
+  protected readonly auth = inject(AuthService);
   // Handset (< 600 px) opens the nav as an overlay drawer; larger screens use rail/sidebar.
   protected readonly isHandset = toSignal(
     this.breakpoint.observe(Breakpoints.Handset).pipe(map((state) => state.matches)),

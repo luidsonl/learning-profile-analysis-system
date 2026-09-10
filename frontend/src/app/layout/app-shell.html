@@ -29,6 +29,9 @@
       >
         Início
       </a>
+      @if (!auth.isAuthenticated()) {
+        <a mat-list-item routerLink="/login">Entrar</a>
+      }
     </mat-nav-list>
   </mat-sidenav>
 
