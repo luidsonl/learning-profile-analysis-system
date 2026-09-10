@@ -4,15 +4,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { FormsService } from '../../core/forms/forms.service';
 import { PredictionPollingService } from '../../core/predictions/prediction-polling.service';
-import { Prediction } from '../../core/api/types';
-import { VARK_LABELS, VARK_DESCRIPTIONS } from './vark-labels';
+import { PredictionScores } from '../../shared/ui/prediction-scores/prediction-scores';
+import { VARK_LABELS, VARK_DESCRIPTIONS } from '../../core/vark/vark-labels';
 
 @Component({
   selector: 'app-vark-assessment',
@@ -23,7 +22,7 @@ import { VARK_LABELS, VARK_DESCRIPTIONS } from './vark-labels';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatProgressBarModule,
+    PredictionScores,
   ],
   templateUrl: './vark-assessment.html',
   styleUrl: './vark-assessment.scss',
@@ -99,12 +98,5 @@ export class VarkAssessment {
 
   formatLabel(label: string): string {
     return VARK_LABELS[label] ?? label;
-  }
-
-  scoreBars(prediction: Prediction): { label: string; value: number }[] {
-    return Object.entries(prediction.scores).map(([key, value]) => ({
-      label: this.formatLabel(key),
-      value: Math.round(value * 100),
-    }));
   }
 }

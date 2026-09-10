@@ -22,19 +22,7 @@
         <h2>Seu perfil: {{ formatLabel(prediction.label) }}</h2>
         <p>{{ describe(prediction.label) }}</p>
 
-        <mat-list>
-          @for (bar of scoreBars(prediction); track bar.label) {
-            <mat-list-item>
-              <span class="score-label">{{ bar.label }}</span>
-              <mat-progress-bar
-                mode="determinate"
-                [value]="bar.value"
-                aria-label="Pontuação {{ bar.label }}"
-              />
-              <span class="score-value">{{ bar.value }}%</span>
-            </mat-list-item>
-          }
-        </mat-list>
+        <prediction-scores [scores]="prediction.scores" />
 
         <p class="confidence">
           Confiança: {{ (prediction.confidence * 100).toFixed(0) }}% ·

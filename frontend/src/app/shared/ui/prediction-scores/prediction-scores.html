@@ -1,0 +1,13 @@
+<mat-list>
+  @for (bar of bars; track bar.label) {
+    <mat-list-item>
+      <span class="score-label">{{ bar.label }}</span>
+      <mat-progress-bar
+        mode="determinate"
+        [value]="bar.value"
+        aria-label="Pontuação {{ bar.label }}"
+      />
+      <span class="score-value">{{ bar.value }}%</span>
+    </mat-list-item>
+  }
+</mat-list>
