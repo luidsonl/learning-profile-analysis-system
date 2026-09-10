@@ -13,7 +13,7 @@ requiredBy: []
 
 # Design System — Angular SPA
 
-> The shared visual and interaction foundation for the [Angular frontend](./frontend.md). Built on **Angular Material (Material 3 theming) + CDK**, expressed through **design tokens as CSS custom properties**, with **WCAG 2.2 AA** accessibility as the mandatory baseline. UI copy is **pt-BR**; the design system spec itself is English.
+> The shared visual and interaction foundation for the [Angular frontend](./frontend.md). Built on **Angular Material (Material 3 theming) + CDK** as the native source of truth, with design tokens limited to the gaps Material does not cover, and **WCAG 2.2 AA** accessibility as the mandatory baseline. UI copy is **pt-BR**; the design system spec itself is English.
 
 ## Overview & Principles
 
@@ -23,21 +23,28 @@ The design system delivers a consistent, accessible, and inclusive interface for
 2. **Tokens, not hard-coded values.** No color, spacing, type, or motion value lives directly in component styles — everything references a token.
 3. **Primitives over one-off components.** Small composable pieces (buttons, fields, cards) build the complex surfaces (student profile, prediction panel, form wizard).
 4. **Extend Material, don't fight it.** Use Angular Material components and the CDK primitives; override theming through tokens rather than wrapping everything in custom DOM.
-5. **Inclusion as product feature.** Color-blind-safe pairings, dyslexia-friendly reading options, reduced-motion support, and large text up to 200% without breakage.
+5. **Material-native first.** Use what Material provides — including its styling — wherever it covers the need. Custom CSS custom-property tokens exist only for gaps (see *Token Architecture*).
+6. **Inclusion as product feature.** Color-blind-safe pairings, dyslexia-friendly reading options, reduced-motion support, and large text up to 200% without breakage.
+7. **Responsive is first-class.** Mobile and desktop are equally supported; navigation and forms adapt without a separate mobile build (see *Spacing & Layout*).
 
 ## Token Architecture
 
-Tokens are **CSS custom properties** defined in one SCSS file (`styles/tokens.scss`) and consumed as `var(--token-name)` in component styles. This gives runtime theme switching (e.g. light/dark, dyslexia-friendly) with zero rebuild.
+Tokens are organized in **two tiers**:
 
-Token taxonomy (prefix → category):
+1. **Material 3 native tokens** — the baseline and the default for everything Material covers (color roles, typography, shape, state layers). These are configured once through the M3 theming system and always win.
+2. **Custom CSS custom properties** (`--color-*`, `--space-*`, `--motion-*`, `--z-*`, …) — defined in `styles/tokens.scss`, consumed as `var(--token-name)`, and used **only where Material leaves a gap**: layout/spacing scale, cross-component contracts, custom composites (cards, empty states), theme variants. **Never duplicate a Material token** — if the value exists in M3, consume the M3 token.
+
+Custom tokens give runtime theme switching (light/dark, dyslexia-friendly) with zero rebuild.
+
+Custom token taxonomy (prefix → category):
 
 | Prefix | Category | Example |
 |--------|----------|---------|
-| `--color-*` | color roles & scales | `--color-primary`, `--color-surface-alt` |
-| `--font-*` | typography | `--font-family-body`, `--font-size-title` |
+| `--color-*` | custom color roles & scales (only non-M3 roles) | `--color-focus`, `--color-success` |
+| `--font-*` | custom fonts/families | `--font-family-body` |
 | `--space-*` | spacing scale | `--space-2`, `--space-4` (4 px base grid) |
-| `--radius-*` | shape radii | `--radius-sm`, `--radius-full` |
-| `--shadow-*` | elevation | `--shadow-2`, `--shadow-4` |
+| `--radius-*` | shape radii not in M3 | `--radius-sm`, `--radius-full` |
+| `--shadow-*` | elevation beyond M3 | `--shadow-2`, `--shadow-4` |
 | `--motion-*` | duration/easing tokens | `--motion-duration-2`, `--motion-easing-standard` |
 | `--z-*` | z-index scale | `--z-nav`, `--z-overlay` |
 
@@ -46,8 +53,6 @@ Token taxonomy (prefix → category):
 - `light` (default), `dark`.
 - `dyslexia-friendly` variant: high-contrast text pairings, wider letter-spacing and line-height, minimal motion (see *Accessibility*).
 - Every theme must satisfy WCAG AA contrast on all foreground/background pairs it defines; theme QA runs in CI (see *Testing*).
-
-Material 3 theming (primary/secondary/tertiary roles, tonal palettes) maps directly onto the `--color-*` tokens so Material components inherit the design system without per-component overrides.
 
 ## Color
 
@@ -69,6 +74,10 @@ Material 3 theming (primary/secondary/tertiary roles, tonal palettes) maps direc
 - **4 px base spacing grid**: `--space-1` = 4 px … `--space-16` = 64 px.
 - Breakpoints: `sm` 600 px, `md` 905 px, `lg` 1240 px (Material), consumed as tokens for consistent responsive behavior.
 - Content max-width token (`--layout-content-max`) for reading-length containers; target 45–80 characters per line for long-form content (forms, reports, observations).
+- **Responsive is first-class — mobile and desktop are equally supported:**
+  - **Navigation adapts**: mobile → bottom navigation + navigation drawer for overflow; `≥ sm` → compact nav rail; `≥ md` → expanded sidebar. Implemented on the Material navigation primitives (see [frontend](./frontend.md) → *Routing & Navigation*).
+  - **Forms**: single-column on mobile; multi-column grid `≥ md`.
+  - **Touch targets ≥ 44 px**: minimum interactive target on mobile (e.g. Likert scales, checkboxes); desktop dense targets never below 24 px.
 
 ## Shape & Elevation
 
@@ -105,10 +114,12 @@ Implemented as Angular standalone components extending Material primitives, used
 | `Tooltip` | `MatTooltip` | Help text |
 | `Chips`, `Badge`, `Avatar` | Material | Labels, status markers, person identity |
 | `Progress`, `Spinner`, `Skeleton`, `EmptyState`, `ErrorState` | Mat progress + custom | Loading/empty/error surfaces |
-| `Menu`, `NavRail`, `TopAppBar` | CDK menu + custom | App shell |
+| `Menu`, `NavRail`, `TopAppBar` | CDK menu + custom | App shell; responsive — bottom nav on mobile, rail `≥ sm`, sidebar `≥ md` |
 | `FormRenderer` | custom (composites) | Dynamic form from API definitions — maps question types to controls (see [frontend](./frontend.md) → *Forms Renderer*) |
 
 Component contract: every component exposes only its public API, uses tokens (never raw values), supports keyboard operation, and ships with the ARIA roles/wiring required for its pattern (CDK-provided where possible).
+
+**No charting library.** VARK profile totals, multimodal label, and prediction confidence render as semantic components (`ProfileCard`, `PredictionCard`, `StatCard`) with token-based bars/progress indicators. The charts gap is explicitly out of scope; it is not filled with a third-party library unless a concrete screen proves it necessary (see [progress](./progress.md)).
 
 ## Dynamic Form System
 
@@ -145,15 +156,14 @@ frontend/src/app/shared/   # design-system standalone components (re-exported)
 └── components/            # one folder per component in the library table
 ```
 
-- Material theme is configured once (Material 3 provider) wired to the token sets; component style overrides are avoided in favor of token configuration.
-- Token files are the **single source of truth** for visuals; changing a token re-themes the whole app.
+- Material theme is configured once (Material 3 provider); **Material's native styling is the default** — component styles are authoring customs/custom composites only, via tokens. Material component overrides are avoided unless a WCAG AA gap demands one.
+- Custom token files are the source of truth for the gaps Material does not cover; changing a custom token re-themes the affected composites.
 
 ## Testing
 
-- **Token QA**: automated contrast checks on every theme's semantic pairs (AA), atomic in CI.
-- **Component tests** (Vitest): keyboard behavior, ARIA wiring, disabled/loading states, error display.
-- **e2e + a11y** (Playwright): axe scans on key flows; reduced-motion and dyslexia-theme smoke tests; 200% zoom regression pass.
-- Visual regression on token change (snapshot diff) to catch unintended theme breakage.
+- **Current scope: unit tests only** (Vitest), with mocked rendering/mocks for overlay/animation contexts. Coverage: token-backed contrast assumptions on custom composites, keyboard behavior, ARIA wiring, disabled/loading states, error display.
+- **Token QA**: automated contrast checks on every theme's semantic pairs (AA) for custom tokens, atomic in CI (custom tokens only — Material tokens ship their own guarantees).
+- **e2e + a11y scans are deferred** with the frontend e2e program (no e2e framework yet — mirror [frontend](./frontend.md) → *Testing*); visual regression on token change (snapshot diff) stays a CI job from the start.
 
 ## Dependencies
 

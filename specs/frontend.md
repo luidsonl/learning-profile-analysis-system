@@ -24,9 +24,11 @@ The frontend is the interface for all four personas: **guardian**, **educator**,
 The SPA is **not yet implemented**. This spec captures the agreed shape of the planned rebuild (the previous React+Vite frontend was removed; the rebuild is Angular with fresh specs, see [progress](./progress.md)). Its scope:
 
 - Browser application in Angular, standalone components, lazy-loaded feature modules.
+- Static SPA served from S3 + CloudFront; no server-side rendering.
 - Design tokens and component primitives come from the [design system](./design-system.md) spec.
 - One domain serves the SPA (`/*`) and the API (`/api/*`) through CloudFront — see [architecture](./architecture.md) → *Architecture Diagram* and *Deployment Order*.
 - No environment-specific configuration in app code: relative `/api` paths in prod, dev proxy in Angular CLI.
+- **Responsive is first-class, not a bonus**: the app must work well on mobile and desktop (patterns in [design system](./design-system.md)).
 
 ## Serving & Local Development
 
@@ -43,11 +45,11 @@ Deployment artifacts live in `terraform/aws-frontend` (S3 static bucket + CloudF
 |---------|--------|-----------|
 | Framework | Angular (current LTS line at scaffold time) | Owner decision; stable router, DI, signals |
 | UI primitives | Angular Material + CDK (Material 3 theming) | Accessible primitives out of the box; CDK for overlay/a11y patterns — see [design system](./design-system.md) |
-| Styling | SCSS + CSS custom properties (design tokens) | Runtime theme swap, no build-time constraint — see [design system](./design-system.md) |
+| Styling | Angular Material 3 theming + SCSS; custom CSS custom-properties only for gaps | Native Material styling wins by default; custom tokens fill gaps only — see [design system](./design-system.md) |
 | State | Built-in signals + `resource`/`httpResource` | Lean; no third-party state library |
 | HTTP client | Angular `HttpClient` + typed services | Wraps the OpenAPI contract |
 | DTO types | Generated from `specs/api.yaml` | OpenAPI 3.0.3 is the SSOT for shapes (see [backend](./backend.md)) |
-| Unit/e2e tests | Vitest (unit) + Playwright (e2e) | Fast, current Angular CLI defaults |
+| Unit tests | Vitest, API mocked | Deterministic, no AWS dependency; see *Testing* |
 
 ## Application Structure
 
@@ -97,7 +99,7 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 ## Authentication Flow (SPA side)
 
 1. **Login/register** call `POST /api/auth/login` / `POST /api/auth/register` (role support for `student` self-registration with `birthDate`).
-2. **Session token** is returned by the API; the SPA keeps it in memory (Angular service) and mirrors it to `sessionStorage` (survives refresh, cleared on tab close — no long-lived persistence). `logout` revokes via the API and clears local storage.
+2. **Session token** is returned by the API; the SPA keeps it in memory (Angular service) and mirrors it to `sessionStorage` (survives refresh, cleared on tab close — no long-lived persistence). `logout` revokes via the API and clears local storage. **Session policy is deliberately lenient (risk accepted)**: there is **no idle auto-logout**; session lifetime is governed by the server-side `SESSION#` TTL (7 days sliding, see [auth](./auth.md) → *Session Flow*) alone. Re-login is the only required action after a token-expired `401`.
 3. **Interceptor** (`core/`) attaches `Authorization: Bearer <token>` and maps the uniform error envelope `{ error: { code, message } }` to typed errors and **pt-BR user messages** (see [backend](./backend.md) → *Conventions*).
 4. **401 handling**: destroy local session and route to `/login` (approval/demotion takes effect immediately because `requireAuth` re-reads the user from the DB — see [auth](./auth.md) → *Middleware*).
 5. **403 mapping**: `pending_approval`, `account_denied`, `forbidden`, `consent` gates render specific explanation screens instead of a generic error.
@@ -111,7 +113,7 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 ## Async & State Patterns
 
 - **Signals** hold session, current student context, and feature list state.
-- **Predictions are asynchronous**: a `vark` submission is stored immediately; the inference Lambda scores it and writes the `PRED#` item asynchronously ([backend](./backend.md) → *Assessment & Prediction*). The SPA shows an explicit "waiting for prediction" state and refreshes `GET /students/:id/predictions` (and the submissions list) until the prediction lands or a timeout shows the prediction is not available.
+- **Predictions are asynchronous**: a `vark` submission is stored immediately; the inference Lambda scores it and writes the `PRED#` item asynchronously ([backend](./backend.md) → *Assessment & Prediction*). The SPA **polls** with a signal + RxJS `timer` backoff: `1s → 2s → 5s`, hard stop at **15 s total**; each poll calls `GET /students/:id/predictions?form=vark`. Polling stops when: the prediction for the submitted `requestId` lands, the route changes, the user logs out, or the tab becomes hidden (`document.hidden`). On timeout without a prediction, the SPA enters a **terminal "processing" state** ("análise em processamento") with a **manual retry** action — retry restarts the poll only, it never resubmits the form (`requestId` preserved; see [backend](./backend.md) → *Forms*).
 - **`requestId` idempotency**: the SPA generates a `requestId` per submission attempt; a retry reuses the same value so the API deduplicates (see [backend](./backend.md) → *Forms*).
 - **Optimistic UI only where safe** (e.g. local tab state); anything that mutates students' data waits for the API response and refreshes from the server.
 
@@ -161,9 +163,9 @@ Derived from the RBAC matrix — the SPA shows only these actions, each wired to
 
 ## Testing
 
-- **Unit** (Vitest): auth store, guards, error mapping, dynamic form renderer, api clients (mocked `HttpClient`).
-- **E2e** (Playwright): login/register per persona status, pending-student self-service, form fill with `requestId` retry, prediction wait state, role-conditional UI — against the deployed stack, mirroring the backend e2e scenarios in [backend](./backend.md) → *Local Development*.
-- Accessibility checks in e2e (automated axe on key flows) plus manual keyboard/focus audit per milestone.
+- **Current scope: unit tests only** (Vitest, Angular CLI default runner); the API is **always mocked** (`HttpClient` mocks / injector overrides). Coverage: auth store, guards, error mapping, dynamic form renderer, polling service (fake `timer`), api clients.
+- **E2e is deferred** — no Playwright (or any e2e framework) in the current plan. When e2e is introduced it runs **against the real deployed API only, never mocked**, mirroring the backend e2e scenarios in [backend](./backend.md) → *Local Development*.
+- Accessibility regression (axe + manual keyboard/focus audit) rides along with the future e2e work; until then, component-level a11y contracts are asserted in unit tests.
 
 ## Dependencies
 
