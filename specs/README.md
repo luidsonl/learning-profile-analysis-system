@@ -12,6 +12,8 @@ This index is the contract between the codebase and the tools — a coding agent
 | Add/change an API endpoint, error handling, RBAC wiring | Read [backend.md](./backend.md) (depends on `architecture`, `dynamodb-schema`, `auth`); the machine-readable contract is [api.yaml](./api.yaml) (depends on `backend`) |
 | Add/change a DynamoDB access pattern, entity, GSI, transaction | [dynamodb-schema.md](./dynamodb-schema.md) |
 | Change sessions, roles, statuses, scope enforcement, consent gates | [auth.md](./auth.md) |
+| Build/navigate the Angular SPA, routes, forms renderer, API client | [frontend.md](./frontend.md) |
+| Design tokens, component library, accessibility baseline, themes | [design-system.md](./design-system.md) |
 | Retrain/add an ML model, datasets, inference behavior | [ml-pipeline.md](./ml-pipeline.md) |
 | Consent lifecycle, retention, erasure, LGPD rights | [lgpd.md](./lgpd.md) |
 | Commit-safety / public-repo security rules | [security.md](./security.md) |
@@ -29,6 +31,11 @@ graph LR
     A --> BE[backend.md]
     S --> BE
     AU --> BE
+    A --> F[frontend.md]
+    AU --> F
+    BE --> F
+    A --> DS[design-system.md]
+    F --> DS
     A --> ML[ml-pipeline.md]
     S --> ML
     BE --> ML
@@ -50,7 +57,7 @@ graph LR
     classDef spec fill:#EEF2FF,stroke:#4F46E5,stroke-width:1px;
     classDef report fill:#F0FDF4,stroke:#15803D,stroke-width:1px;
     classDef contract fill:#FFF7ED,stroke:#C2410C,stroke-width:1px;
-    class A,S,AU,BE,ML,LG,SE,SD spec;
+    class A,S,AU,BE,F,DS,ML,LG,SE,SD spec;
     class PROG report;
     class API contract;
 ```
@@ -66,6 +73,8 @@ graph LR
 | [auth.md](./auth.md) (`auth`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema` |
 | [backend.md](./backend.md) (`backend`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `auth` |
 | [api.yaml](./api.yaml) (`api`) | stable | 2026-09-05 | `backend` |
+| [frontend.md](./frontend.md) (`frontend`) | proposed | 2026-09-10 | `architecture`, `auth`, `backend` |
+| [design-system.md](./design-system.md) (`design-system`) | proposed | 2026-09-10 | `architecture`, `frontend` |
 | [ml-pipeline.md](./ml-pipeline.md) (`ml-pipeline`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `backend` |
 | [lgpd.md](./lgpd.md) (`lgpd`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `auth`, `ml-pipeline` |
 | [security.md](./security.md) (`security`) | stable | 2026-08-30 | `architecture`, `auth`, `ml-pipeline`, `lgpd` |

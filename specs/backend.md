@@ -11,6 +11,7 @@ dependsOn:
   - auth
 requiredBy:
   - ml-pipeline
+  - frontend
 ---
 
 # Backend — Learning Profile Analysis System

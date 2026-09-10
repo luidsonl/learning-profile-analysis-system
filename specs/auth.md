@@ -10,6 +10,7 @@ dependsOn:
   - dynamodb-schema
 requiredBy:
   - backend
+  - frontend
   - lgpd
   - security
 ---

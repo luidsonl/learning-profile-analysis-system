@@ -10,6 +10,8 @@ requiredBy:
   - dynamodb-schema
   - auth
   - backend
+  - frontend
+  - design-system
   - ml-pipeline
   - lgpd
   - security
@@ -24,7 +26,7 @@ The Learning Profile Analysis System is a serverless platform that personalizes 
 
 Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (usually a minor, but can be an adult; self-registers and owns a full self-view of a single student entity), and **admin**. Access control is role- and scope-based: guardians see only the students **assigned** to them; educators see only the students they follow; students see only their **own single entity** (profile, submissions, predictions, observations, reports); administrators manage users and the institution's data. Educator/guardian accounts are **approval-gated** (they register `pending` and must be approved before signing in) and the **first educator to register bootstraps as `admin`**. **Students self-register** their account (`role: student`, starts `pending`) and are granted a single student entity when an **educator links** their account to a `STUDENT#` entity they follow (the link approves the account and attributes the entity). A student's entity can also have a **guardian assigned** — the two relations (guardian-managed and self-owned) are independent and cumulative — see [Authentication](./auth.md).
 
-The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for the SPA, and **DynamoDB single-table** design. The SPA is **not currently implemented** — the previous React+Vite frontend was removed; it is planned to be rebuilt (in Angular) with fresh specs when started (see [progress](./progress.md)). It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
+The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for the SPA, and **DynamoDB single-table** design. The SPA is **not currently implemented** — the previous React+Vite frontend was removed; it is planned to be rebuilt in Angular under fresh specs ([frontend](./frontend.md) + [design-system](./design-system.md), both `proposed`). It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
 
 The backend API is served under the `/api` path prefix so a single CloudFront distribution serves both the static SPA (`/*`) and the API (`/api/*`) from one domain, without CORS.
 
@@ -135,7 +137,7 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   ├── aws-app/           # DynamoDB + S3 buckets (files/data) + SQS + async Lambdas
 │   │   └── src/           # feature-export.mjs, report-generator.mjs
 │   └── aws-frontend/      # S3 static bucket + CloudFront + OAC + deploy (unused while the SPA is absent)
-├── frontend/              # (futuro) SPA — a ser refeita em Angular (não implementada ainda)
+├── frontend/              # (future) SPA — planned Angular rebuild, not implemented yet (see frontend.md / design-system.md)
 ├── sam-app/               # API Gateway + API-triggered Lambdas (stateless compute)
 │   ├── template.yaml      # SAM template (health, auth, students, guardianship,
 │   │                      #   observations, forms, assessment,

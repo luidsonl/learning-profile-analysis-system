@@ -4,7 +4,7 @@ title: Project Progress
 type: report
 status: evolving
 since: 2026-08-27
-lastReviewed: 2026-08-30
+lastReviewed: 2026-09-10
 dependsOn: []
 requiredBy: []
 ---
@@ -13,13 +13,13 @@ requiredBy: []
 
 ## Status snapshot
 
-**As of:** 2026-08-30 · **Branch:** `main`
+**As of:** 2026-09-10 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 125/0). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the `frontend.md`/`design-system.md` docs were **removed along with the SPA**, and the S3/CloudFront deploy is no longer applicable until/unless the SPA is reintroduced — planned as a **future rebuild in Angular** with fresh specs.
+Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 125/0). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the S3/CloudFront deploy remains unused until/unless the SPA is reintroduced — planned as a **future rebuild in Angular** under fresh specs. **The frontend docs were re-created on 2026-09-10**: `frontend.md` and `design-system.md` are back as `proposed` specs (Angular SPA + Angular Material design system on CSS-variable tokens, WCAG 2.2 AA) — registered in the dependency graph; implementation pending.
 
 | Layer | Status | Notes |
 |---|---|---|
-| Specs (`specs/`) | ✅ Done | Index (`specs/README.md`) with dependency graph + layer specs; **student self-registration + educator-link + age-based consent** implemented and verified — `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; `frontend.md`/`design-system.md` specs removed (SPA deleted, future rebuild in Angular) |
+| Specs (`specs/`) | ✅ Done | Index (`specs/README.md`) with dependency graph + layer specs; **student self-registration + educator-link + age-based consent** implemented and verified — `auth`/`architecture`/`backend`/`dynamodb-schema`/`lgpd` flipped to `stable`; **`frontend.md`/`design-system.md` re-created 2026-09-10** as `proposed` (Angular SPA + design system) |
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ✅ Done | S3 + CloudFront + `/api/*` origin; validated, mirrors 0shared (unused while the SPA is absent) |
@@ -28,7 +28,7 @@ Backend vertical slice + offline ML pipeline are implemented and documented. The
 | Binary student self-service | ✅ Done | Student **self-registers** (`role: student`, pending) and is **linked by an educator** to a single student entity (approves + attributes); adult students (≥18) `self_consent`, minors (<18) need guardian/institution — e2e verified |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
 | Tests (`sam-app/tests/`) | ✅ Done | 23 unit passing; **e2e 125/0 passing** against the real stack (admin bootstrap + new student flow) |
-| Frontend SPA (`frontend/`) | ⛔ Removed | SPA directory deleted by the owner (not tracked in git); `frontend.md`/`design-system.md` specs removed; no S3/CloudFront deploy until reintroduced (future: Angular) |
+| Frontend SPA (`frontend/`) | ⛔ Removed | SPA directory deleted by the owner (not tracked in git); **docs re-created 2026-09-10** (`frontend.md` + `design-system.md`, `proposed`); no S3/CloudFront deploy until reintroduced (planned: Angular) |
 
 ---
 
@@ -61,5 +61,5 @@ Everything below is implemented, tested, and documented in its own layer spec (`
 
 1. ✅ Cleaned, deployed, e2e validated — admin bootstrap + approval flow verified live.
 2. ✅ Student self-registration + educator-link + age-based consent — implemented and verified live (e2e **125/0**); backend specs flipped to `stable`.
-3. ⛔ Frontend SPA removed — no deploy pending; `frontend.md`/`design-system.md` specs deleted. **Next frontend effort: rebuild the SPA in Angular** (fresh `specs/frontend.md` + `specs/design-system.md`), then deploy via `terraform/aws-frontend`.
+3. ⛔ Frontend SPA removed — no deploy pending. **Docs re-created 2026-09-10** as `proposed`: `specs/frontend.md` (Angular SPA) + `specs/design-system.md` (Angular Material, CSS-variable tokens, WCAG 2.2 AA). **Next frontend effort: implement the Angular rebuild per those specs**, then deploy via `terraform/aws-frontend`.
 4. Report generator Lambda — still a future-work stub by scope decision.
