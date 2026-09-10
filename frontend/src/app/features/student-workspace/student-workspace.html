@@ -1,0 +1,182 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Ficha do estudante</h1>
+    <p>
+      @if (student(); as student) {
+        {{ student.name }} · {{ details(student) }}
+      } @else {
+        Carregando informações…
+      }
+    </p>
+  </header>
+
+  @if (studentError(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>{{ message }}</p>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <div class="panels">
+    <mat-card appearance="outlined" class="panel">
+      <mat-card-header>
+        <mat-card-title>Observações</mat-card-title>
+        <mat-card-subtitle>Registre notas pedagógicas para este estudante.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="observationForm" (ngSubmit)="submitObservation()" class="inline-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Categoria</mat-label>
+            <mat-select formControlName="category">
+              @for (entry of annotations().observations | keyvalue; track entry.key) {
+                <mat-option [value]="entry.key">{{ entry.value }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="grow">
+            <mat-label>Observação</mat-label>
+            <textarea matInput formControlName="text" rows="2" required></textarea>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Nota (1-5)</mat-label>
+            <input matInput type="number" min="1" max="5" formControlName="rating" />
+          </mat-form-field>
+
+          <button mat-flat-button color="primary" type="submit" [disabled]="obsSubmitting()">
+            <span>Registrar</span>
+            @if (obsSubmitting()) {
+              <mat-spinner diameter="20" />
+            } @else {
+              <mat-icon>add_comment</mat-icon>
+            }
+          </button>
+        </form>
+
+        @if (obsError(); as message) {
+          <p class="error">{{ message }}</p>
+        }
+
+        <div class="feed">
+          @if (obsLoading()) {
+            <div class="state-content"><mat-spinner diameter="32" /></div>
+          } @else if (obsErrorMessage(); as message) {
+            <p class="error">{{ message }}</p>
+          } @else {
+            @if (obsList().length === 0) {
+              <p class="empty">Nenhuma observação ainda.</p>
+            } @else {
+              @for (obs of obsList(); track obs.observationTimestamp) {
+                <mat-list-item class="feed-item">
+                  <div>
+                    <div class="feed-heading">
+                      <mat-chip-set>
+                        <mat-chip>{{ categoryLabel(obs.category) }}</mat-chip>
+                      </mat-chip-set>
+                      <time>{{ obs.observationTimestamp | date: "dd/MM/yyyy 'às' HH:mm" }}</time>
+                    </div>
+                    <p>{{ obs.text }}</p>
+                    @if (obs.rating) {
+                      <p class="rating">Nota: {{ obs.rating }}/5</p>
+                    }
+                  </div>
+                  @if (obs.deletable) {
+                    <button mat-icon-button (click)="deleteObservation(obs.observationTimestamp)" aria-label="Excluir observação">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  }
+                </mat-list-item>
+              }
+            }
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="panel">
+      <mat-card-header>
+        <mat-card-title>Recomendações</mat-card-title>
+        <mat-card-subtitle>Proponha orientações; aprovar/publicar as torna visíveis ao estudante.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="recoForm" (ngSubmit)="submitRecommendation()" class="inline-form column">
+          <mat-form-field appearance="outline">
+            <mat-label>Título</mat-label>
+            <input matInput formControlName="title" required autocomplete="off" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Texto</mat-label>
+            <textarea matInput formControlName="text" rows="2" required></textarea>
+          </mat-form-field>
+
+          <button mat-flat-button color="primary" type="submit" [disabled]="recoSubmitting()">
+            <span>Propor</span>
+            @if (recoSubmitting()) {
+              <mat-spinner diameter="20" />
+            } @else {
+              <mat-icon>lightbulb</mat-icon>
+            }
+          </button>
+        </form>
+
+        @if (recoError(); as message) {
+          <p class="error">{{ message }}</p>
+        }
+
+        <div class="feed">
+          @if (recoLoading()) {
+            <div class="state-content"><mat-spinner diameter="32" /></div>
+          } @else if (recoErrorMessage(); as message) {
+            <p class="error">{{ message }}</p>
+          } @else {
+            @if (recoList().length === 0) {
+              <p class="empty">Nenhuma recomendação ainda.</p>
+            } @else {
+              @for (reco of recoList(); track reco.recoId) {
+                <div class="feed-item">
+                  <div class="feed-heading">
+                    <mat-chip-set>
+                      <mat-chip>{{ statusLabel(reco.status) }}</mat-chip>
+                    </mat-chip-set>
+                  </div>
+                  <h3>{{ reco.title }}</h3>
+                  <p>{{ reco.text }}</p>
+                  @if (reco.tags?.length) {
+                    <mat-chip-set>
+                      @for (tag of reco.tags; track tag) {
+                        <mat-chip>{{ tag }}</mat-chip>
+                      }
+                    </mat-chip-set>
+                  }
+                  @if (reco.mutable && canPublish(reco.status)) {
+                    <div class="actions">
+                      @if (canApprove(reco.status)) {
+                        <button mat-stroked-button (click)="updateRecommendation(reco.recoId, { status: 'approved' })">
+                          Aprovar
+                        </button>
+                      }
+                      @if (canReject(reco.status)) {
+                        <button mat-stroked-button (click)="updateRecommendation(reco.recoId, { status: 'rejected' })">
+                          Rejeitar
+                        </button>
+                      }
+                      <button
+                        mat-flat-button
+                        [disabled]="reco.status === 'published'"
+                        (click)="updateRecommendation(reco.recoId, { status: 'published', visibility: 'published' })">
+                        Publicar
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+            }
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</section>

@@ -3,9 +3,12 @@ import { inject, Injectable } from '@angular/core';
 
 import {
   AssessmentsList,
+  ObservationCreateRequest,
   ObservationListResponse,
   PredictionsList,
+  RecommendationCreateRequest,
   RecommendationListResponse,
+  RecommendationUpdateRequest,
   StudentCreateRequest,
   StudentCreateResponse,
   StudentListResponse,
@@ -44,5 +47,21 @@ export class StudentsService {
 
   observations(id: string) {
     return this.http.get<ObservationListResponse>(`/api/students/${id}/observations`);
+  }
+
+  addObservation(id: string, body: ObservationCreateRequest) {
+    return this.http.post<never>(`/api/students/${id}/observations`, body);
+  }
+
+  deleteObservation(id: string, timestamp: string) {
+    return this.http.delete(`/api/students/${id}/observations/${encodeURIComponent(timestamp)}`);
+  }
+
+  proposeRecommendation(id: string, body: RecommendationCreateRequest) {
+    return this.http.post<never>(`/api/students/${id}/recommendations`, body);
+  }
+
+  updateRecommendation(id: string, recoId: string, body: RecommendationUpdateRequest) {
+    return this.http.patch<never>(`/api/students/${id}/recommendations/${recoId}`, body);
   }
 }

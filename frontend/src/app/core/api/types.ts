@@ -249,3 +249,28 @@ export interface ObservationListResponse {
   data: Observation[];
   count: number;
 }
+
+export type ObservationCategory =
+  | 'academic'
+  | 'behavior'
+  | 'social'
+  | 'emotional'
+  | 'attention'
+  | 'other';
+
+export interface ObservationCreateRequest {
+  category: ObservationCategory;
+  text: string;
+  rating?: number;
+}
+
+export interface RecommendationCreateRequest {
+  title: string;
+  text: string;
+  tags?: string[];
+}
+
+export interface RecommendationUpdateRequest {
+  status?: 'proposed' | 'approved' | 'rejected' | 'published';
+  visibility?: 'private' | 'published';
+}
