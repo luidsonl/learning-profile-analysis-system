@@ -1,0 +1,68 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Relatórios</h1>
+    <p>Gere e baixe relatórios do perfil de aprendizado.</p>
+    <button
+      mat-flat-button
+      color="primary"
+      [disabled]="generating() || isLoading()"
+      (click)="generate()"
+      class="generate-button"
+    >
+      @if (generating()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        <mat-icon aria-hidden="true">file_download</mat-icon>
+        Gerar relatório
+      }
+    </button>
+  </header>
+
+  @if (isPending()) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>Vincule a conta a um estudante para gerar relatórios.</p>
+      </mat-card-content>
+    </mat-card>
+  } @else if (isLoading()) {
+    <div class="state-content">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else if (errorMessage(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>{{ message }}</p>
+        <button mat-flat-button color="primary" (click)="load()">Tentar novamente</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (reportList(); as reports) {
+    @if (reports.length === 0) {
+      <mat-card appearance="outlined" class="state-card">
+        <mat-card-content class="state-content">
+          <p>Nenhum relatório até o momento.</p>
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <mat-list>
+        @for (report of reports; track report.reportId) {
+          <mat-list-item>
+            <mat-icon matListItemIcon aria-hidden="true">description</mat-icon>
+            <span class="list-title">
+              Relatório de perfil
+              @if (report.status === 'queued') {
+                · em geração
+              }
+            </span>
+            <span class="list-subtitle">{{ formatDate(report.createdAt) }}</span>
+            @if (report.status === 'generated') {
+              <button mat-button color="primary" (click)="download(report.reportId)">
+                <mat-icon aria-hidden="true">download</mat-icon>
+                Baixar
+              </button>
+            }
+          </mat-list-item>
+        }
+      </mat-list>
+    }
+  }
+</section>

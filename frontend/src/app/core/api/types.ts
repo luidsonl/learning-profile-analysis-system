@@ -182,3 +182,38 @@ export interface RecommendationListResponse {
   data: Recommendation[];
   count: number;
 }
+
+export type ReportKind = 'profile' | string;
+export type ReportStatus = 'queued' | 'generated';
+
+export interface ReportMetadata {
+  reportId: string;
+  studentId: string;
+  kind: ReportKind;
+  status: ReportStatus;
+  createdAt: string;
+  requestedBy: string;
+}
+
+export interface ReportListResponse {
+  data: ReportMetadata[];
+  count: number;
+}
+
+export interface ReportGenerateRequest {
+  kind?: ReportKind;
+}
+
+export interface ReportGenerateResponse {
+  reportId: string;
+  studentId: string;
+  kind: ReportKind;
+  status: ReportStatus;
+}
+
+export interface ReportDownloadResponse {
+  url: string;
+  reportId: string;
+  s3Key: string;
+  expiresIn: number;
+}
