@@ -2,6 +2,12 @@
   <header class="page-header">
     <h1>Estudantes</h1>
     <p>Perfis que você acompanha.</p>
+    <div class="header-actions">
+      <a mat-flat-button routerLink="/estudantes/novo">
+        <mat-icon>person_add</mat-icon>
+        Novo estudante
+      </a>
+    </div>
   </header>
 
   @if (isLoading()) {

@@ -9,11 +9,11 @@
       (click)="generate()"
       class="generate-button"
     >
+      <span>Gerar relatório</span>
       @if (generating()) {
         <mat-spinner diameter="20" />
       } @else {
         <mat-icon aria-hidden="true">file_download</mat-icon>
-        Gerar relatório
       }
     </button>
   </header>

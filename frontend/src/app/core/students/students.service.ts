@@ -6,6 +6,8 @@ import {
   ObservationListResponse,
   PredictionsList,
   RecommendationListResponse,
+  StudentCreateRequest,
+  StudentCreateResponse,
   StudentListResponse,
   StudentResponse,
 } from '../api/types';
@@ -20,6 +22,10 @@ export class StudentsService {
 
   getStudent(id: string) {
     return this.http.get<StudentResponse>(`/api/students/${id}`);
+  }
+
+  createStudent(body: StudentCreateRequest) {
+    return this.http.post<StudentCreateResponse>('/api/students', body);
   }
 
   predictions(id: string, form?: string) {

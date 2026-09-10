@@ -1,0 +1,59 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Novo estudante</h1>
+    <p>Cadastre um perfil para começar a acompanhar.</p>
+  </header>
+
+  <mat-card appearance="outlined" class="form-card">
+    <mat-card-content>
+      <form [formGroup]="form" (ngSubmit)="submit()" class="form">
+        <mat-form-field appearance="outline">
+          <mat-label>Nome completo</mat-label>
+          <input matInput formControlName="name" required autocomplete="off" />
+          @if (form.controls.name.invalid && form.controls.name.touched) {
+            <mat-error>Informe o nome do estudante.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Data de nascimento</mat-label>
+          <input matInput type="date" formControlName="birthDate" required />
+          @if (form.controls.birthDate.invalid && form.controls.birthDate.touched) {
+            <mat-error>Informe a data de nascimento.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Gênero (opcional)</mat-label>
+          <input matInput formControlName="gender" autocomplete="off" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Série (opcional)</mat-label>
+          <input matInput formControlName="grade" autocomplete="off" placeholder="Ex.: 6º ano" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Escola (opcional)</mat-label>
+          <input matInput formControlName="school" autocomplete="off" />
+        </mat-form-field>
+
+        @if (errorMessage(); as message) {
+          <p class="error">{{ message }}</p>
+        }
+
+        <div class="actions">
+          <button mat-flat-button color="primary" type="submit" [disabled]="isLoading()">
+            <span>Cadastrar</span>
+            @if (isLoading()) {
+              <mat-spinner diameter="20" />
+            } @else {
+              <mat-icon>person_add</mat-icon>
+            }
+          </button>
+          <button mat-stroked-button type="button" routerLink="/estudantes">Cancelar</button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</section>

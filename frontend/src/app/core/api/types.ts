@@ -150,6 +150,20 @@ export interface StudentListResponse {
   count: number;
 }
 
+export interface StudentCreateRequest {
+  name: string;
+  birthDate: string;
+  gender?: string;
+  grade?: string;
+  school?: string;
+  specialNeeds?: string[];
+  accountability?: Record<string, string>;
+}
+
+export interface StudentCreateResponse {
+  studentId: string;
+}
+
 export interface SubmissionSummary {
   submissionId: string;
   formId: string;

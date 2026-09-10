@@ -34,6 +34,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/students-list/students-list').then((m) => m.StudentsList),
   },
   {
+    path: 'estudantes/novo',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/student-create/student-create').then((m) => m.StudentCreate),
+  },
+  {
     path: 'recomendacoes',
     canActivate: [authGuard],
     loadComponent: () =>
