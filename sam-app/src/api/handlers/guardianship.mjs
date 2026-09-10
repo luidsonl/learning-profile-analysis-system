@@ -1,5 +1,5 @@
 import { CMD, client, TABLE } from "../lib/db.mjs";
-import { ok, errorResponse, parseBody, param, HttpError, noContent } from "../lib/http.mjs";
+import { ok, errorResponse, parseBody, param, qparam, HttpError, noContent } from "../lib/http.mjs";
 import { nowIso } from "../lib/ids.mjs";
 import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
@@ -7,6 +7,8 @@ import { auditStudent, assertScopeStudent, getOwnStudentId } from "../lib/scope.
 import { getUser } from "../lib/auth.mjs";
 import { getStudent } from "./students.mjs";
 import { ageFromRecord, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
+import { unmarshall } from "@aws-sdk/util-dynamodb";
+import { selectGuardianHits } from "../lib/accounts.mjs";
 
 const grantGuardian = async (event, ctx) => {
   const studentId = param(event, "id");
@@ -201,6 +203,30 @@ const listEducators = async (event, ctx) => {
   return ok({ data });
 };
 
+const searchGuardians = async (event, ctx) => {
+  if (!["educator", "admin"].includes(ctx.role)) {
+    throw new HttpError(403, "forbidden", "Only educators and admins can search guardian accounts");
+  }
+  assert(qparam(event, "role") === "guardian", "invalid_role", "role must be guardian");
+  const email = (qparam(event, "email") || "").trim().toLowerCase();
+  assert(email.length >= 3, "invalid_email", "email prefix must have at least 3 characters");
+  // GSI2 groups every guardian; match the email prefix in-memory. Only active
+  // guardians can receive guardianship — pending/denied accounts are excluded.
+  const res = await client.send(
+    new CMD.query({
+      TableName: TABLE,
+      IndexName: "RoleStatus",
+      KeyConditionExpression: "GSI2PK = :pk",
+      ExpressionAttributeValues: { ":pk": { S: "USER#ROLE#guardian" } },
+    }),
+  );
+  const data = selectGuardianHits(
+    (res.Items || []).map((item) => unmarshall(item)),
+    email,
+  );
+  return ok({ data, count: data.length });
+};
+
 export const lambdaHandler = async (event) => {
   try {
     const route = `${event.httpMethod} ${event.resource}`;
@@ -220,6 +246,8 @@ export const lambdaHandler = async (event) => {
         return await listGuardians(event, ctx);
       case "GET /students/{id}/educators":
         return await listEducators(event, ctx);
+      case "GET /users":
+        return await searchGuardians(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");
     }

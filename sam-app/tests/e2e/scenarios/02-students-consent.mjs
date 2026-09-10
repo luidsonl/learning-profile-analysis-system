@@ -71,6 +71,25 @@ export default async (ctx) => {
       body: { email: "sem.consentimento@example.com", name: "Sem Consentimento", password: "senha12345", role: "student", birthDate: "2017-05-01" },
     });
     expect("student registers for no-consent student", noConsentReg.status === 201, JSON.stringify(noConsentReg.data));
+
+    // Both self-registered accounts are now pending and discoverable for the link flow.
+    const pendingBefore = await api("GET", "/auth/pending-accounts", { token: ctx.educatorToken });
+    expect(
+      "educator lists pending student accounts",
+      pendingBefore.status === 200 &&
+        pendingBefore.data.count === 2 &&
+        pendingBefore.data.data.some((a) => a.userId === ctx.studentAccountUserId) &&
+        pendingBefore.data.data.some((a) => a.userId === noConsentReg.data.user.userId),
+      JSON.stringify(pendingBefore.data),
+    );
+    expect(
+      "minors flag guardian_institution consent on pending accounts",
+      pendingBefore.data.data.every((a) => a.consentRequired === "guardian_institution"),
+      JSON.stringify(pendingBefore.data),
+    );
+    const deniedPending = await api("GET", "/auth/pending-accounts", { token: ctx.guardianToken });
+    expect("guardian cannot list pending accounts", deniedPending.status === 403, JSON.stringify(deniedPending.data));
+
     const sFail = await api("POST", `/students/${ctx.noConsentChildId}/accounts/${noConsentReg.data.user.userId}/link`, { token: ctx.educatorToken, body: {} });
     expect("link blocked without consent (minor)", sFail.status === 409 && sFail.data.error.code === "consent_required", JSON.stringify(sFail.data));
 
@@ -84,6 +103,19 @@ export default async (ctx) => {
     });
     const s2 = await api("POST", `/students/${ctx.studentId}/accounts/${dupReg.data.user.userId}/link`, { token: ctx.educatorToken, body: {} });
     expect("at-most-one account per entity enforced", s2.status === 409, JSON.stringify(s2.data));
+
+    // The linked account left the pending pool; the no-consent and the
+    // duplicate (never-linked) registrations remain.
+    const pendingAfter = await api("GET", "/auth/pending-accounts", { token: ctx.educatorToken });
+    expect(
+      "linked account dropped from pending list",
+      pendingAfter.status === 200 &&
+        pendingAfter.data.count === 2 &&
+        !pendingAfter.data.data.some((a) => a.userId === ctx.studentAccountUserId) &&
+        pendingAfter.data.data.some((a) => a.userId === noConsentReg.data.user.userId) &&
+        pendingAfter.data.data.some((a) => a.userId === dupReg.data.user.userId),
+      JSON.stringify(pendingAfter.data),
+    );
   }
 
   step("auth: linked student self login");

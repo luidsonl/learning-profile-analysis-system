@@ -6,6 +6,8 @@ import { hashPassword, verifyPassword, genToken, getUserByEmail, getUser } from 
 import { requireAuth } from "../lib/session.mjs";
 import { writeAudit, getOwnStudentId } from "../lib/scope.mjs";
 import { computeAge, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
+import { unmarshall } from "@aws-sdk/util-dynamodb";
+import { selectPendingAccounts } from "../lib/accounts.mjs";
 
 // True if at least one admin account exists (GSI2 `RoleStatus`).
 const hasAdmin = async () => {
@@ -207,6 +209,27 @@ const me = async (event, ctx) => {
   return ok(payload);
 };
 
+const pendingAccounts = async (event, ctx) => {
+  if (!["educator", "admin"].includes(ctx.role)) {
+    throw new HttpError(403, "forbidden", "Only educators and admins can list pending student accounts");
+  }
+  // All student accounts live under GSI2 (USER#ROLE#student); the pending ones
+  // are the self-registered accounts not yet linked by an educator.
+  const res = await client.send(
+    new CMD.query({
+      TableName: TABLE,
+      IndexName: "RoleStatus",
+      KeyConditionExpression: "GSI2PK = :pk",
+      ExpressionAttributeValues: { ":pk": { S: "USER#ROLE#student" } },
+    }),
+  );
+  const data = selectPendingAccounts(
+    (res.Items || []).map((item) => unmarshall(item)),
+    MIN_SELF_CONSENT_AGE,
+  );
+  return ok({ data, count: data.length });
+};
+
 export const lambdaHandler = async (event) => {
   try {
     const route = `${event.httpMethod} ${event.resource}`;
@@ -223,6 +246,8 @@ export const lambdaHandler = async (event) => {
         return await logout(event, ctx);
       case "GET /auth/me":
         return await me(event, ctx);
+      case "GET /auth/pending-accounts":
+        return await pendingAccounts(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");
     }

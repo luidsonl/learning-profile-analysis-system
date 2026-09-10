@@ -32,6 +32,27 @@ export default async (ctx) => {
     expect("educator lists students (created + followed)", educatorsList.status === 200 && educatorsList.data.count >= 2, JSON.stringify(educatorsList.data));
   }
 
+  step("guardian search (educator picks a responsible)");
+  {
+    const hit = await api("GET", "/users?role=guardian&email=maria.", { token: ctx.educatorToken });
+    expect(
+      "educator searches active guardians by email prefix",
+      hit.status === 200 && hit.data.data.some((g) => g.userId === ctx.guardianId),
+      JSON.stringify(hit.data),
+    );
+    const restricted = hit.data.data[0];
+    expect("search returns minimal identity fields only", Object.keys(restricted).sort().join(",") === "email,name,userId", JSON.stringify(restricted));
+
+    const badRole = await api("GET", "/users?role=educator&email=maria.", { token: ctx.educatorToken });
+    expect("educator-only role rejected", badRole.status === 400, JSON.stringify(badRole.data));
+
+    const shortPrefix = await api("GET", "/users?role=guardian&email=ma", { token: ctx.educatorToken });
+    expect("short email prefix rejected", shortPrefix.status === 400, JSON.stringify(shortPrefix.data));
+
+    const studentDenied = await api("GET", "/users?role=guardian&email=maria.", { token: ctx.studentToken });
+    expect("student cannot search guardians", studentDenied.status === 403, JSON.stringify(studentDenied.data));
+  }
+
   step("observations");
   {
     const o = await api("POST", `/students/${ctx.studentId}/observations`, { token: ctx.educatorToken, body: { category: "academic", text: "Demonstra grande curiosidade por ciências.", rating: 4 } });

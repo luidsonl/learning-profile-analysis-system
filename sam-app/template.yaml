@@ -145,6 +145,12 @@ Resources:
             RestApiId: !Ref Api
             Path: /auth/me
             Method: GET
+        PendingAccounts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /auth/pending-accounts
+            Method: GET
 
   StudentsFunction:
     Type: AWS::Serverless::Function
@@ -226,6 +232,12 @@ Resources:
           Properties:
             RestApiId: !Ref Api
             Path: /students/{id}/educators
+            Method: GET
+        SearchGuardians:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /users
             Method: GET
 
   ConsentFunction:
