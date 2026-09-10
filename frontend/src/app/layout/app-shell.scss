@@ -1,0 +1,30 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.app-title {
+  margin-inline-start: var(--space-2);
+  font-weight: 600;
+}
+
+.sidenav-container {
+  flex: 1;
+}
+
+mat-sidenav {
+  width: 240px;
+  border-inline-end: 1px solid var(--mat-sys-outline-variant);
+}
+
+mat-nav-list a.active {
+  background-color: var(--mat-sys-secondary-container);
+}
+
+.content {
+  padding: var(--space-4);
+  max-width: 1200px;
+  margin-inline: auto;
+  width: 100%;
+}

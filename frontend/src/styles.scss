@@ -1,1 +1,49 @@
-/* You can add global styles to this file, and also import other style files */
+// Global entry. Material M3 themes are the baseline (light + dark via
+// data-theme); custom tokens + global base fill the gaps.
+
+@use '@angular/material' as mat;
+@use './styles/tokens';
+@use './styles/global';
+
+$light-theme: mat.define-theme(
+  (
+    color: (
+      theme-type: light,
+      primary: mat.$azure-palette,
+      tertiary: mat.$cyan-palette,
+    ),
+    typography: (
+      plain-family: system-ui,
+      brand-family: system-ui,
+    ),
+  )
+);
+
+$dark-theme: mat.define-theme(
+  (
+    color: (
+      theme-type: dark,
+      primary: mat.$azure-palette,
+      tertiary: mat.$cyan-palette,
+    ),
+  )
+);
+
+html {
+  color-scheme: light;
+  background-color: var(--mat-sys-surface);
+  @include mat.all-component-themes($light-theme);
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  @include mat.all-component-themes($dark-theme);
+}
+
+// Respect the user's OS preference until a data-theme is chosen by the app.
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme='light']):not([data-theme='dyslexia-friendly']) {
+    color-scheme: dark;
+    @include mat.all-component-themes($dark-theme);
+  }
+}

@@ -1,0 +1,40 @@
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
+<mat-toolbar color="primary">
+  <button
+    mat-icon-button
+    (click)="nav.toggle()"
+    (keydown.enter)="nav.toggle()"
+    aria-label="Abrir menu de navegação"
+    *ngIf="isHandset()"
+  >
+    <mat-icon>menu</mat-icon>
+  </button>
+  <span class="app-title">Perfil de Aprendizado</span>
+</mat-toolbar>
+
+<mat-sidenav-container class="sidenav-container">
+  <mat-sidenav
+    #nav
+    [mode]="isHandset() ? 'over' : 'side'"
+    [opened]="!isHandset()"
+    aria-label="Navegação principal"
+  >
+    <mat-nav-list>
+      <a
+        mat-list-item
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        Início
+      </a>
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content id="conteudo">
+    <main class="content">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

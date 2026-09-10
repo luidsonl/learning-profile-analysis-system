@@ -1,0 +1,61 @@
+// Custom design tokens — Angular Material gaps ONLY.
+// Material-native tokens are the baseline; never duplicate them here.
+// Tiers: Material M3 tokens win; these cover status colors, focus ring,
+// spacing grid, radius/focus extras, z-index and motion scales.
+
+:root {
+  // Status roles (non-M3) + focus ring
+  --color-success: #2e7d32;
+  --color-success-bg: #e8f5e9;
+  --color-warning: #8a6d00;
+  --color-warning-bg: #fff8e1;
+  --color-danger: #b3261e;
+  --color-danger-bg: #fce8e6;
+  --color-info: #01609c;
+  --color-info-bg: #e1f3fb;
+  --color-focus: #1a73e8;
+
+  // Spacing — 4 px base grid
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  // Radius — extras beyond the M3 shape scale
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  // Z-index scale
+  --z-app-bar: 100;
+  --z-overlay: 200;
+  --z-nav: 300;
+  --z-tooltip: 400;
+  --z-toast: 500;
+
+  // Motion
+  --motion-duration-1: 120ms;
+  --motion-duration-2: 220ms;
+  --motion-duration-3: 320ms;
+  --motion-duration-4: 480ms;
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-easing-decelerate: cubic-bezier(0, 0, 0, 1);
+}
+
+html[data-theme='dark'] {
+  --color-success: #81c784;
+  --color-success-bg: #1b3b1f;
+  --color-warning: #e6c14f;
+  --color-warning-bg: #3a3011;
+  --color-danger: #f2b8b5;
+  --color-danger-bg: #3c1c1a;
+  --color-info: #7cc1e8;
+  --color-info-bg: #0f2f42;
+  --color-focus: #8ab4f8;
+}
