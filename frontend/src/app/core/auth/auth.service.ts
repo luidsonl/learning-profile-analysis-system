@@ -21,9 +21,11 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly token$ = signal<string | null>(sessionStorage.getItem(TOKEN_KEY));
   private readonly user$ = signal<PublicUser | null>(null);
+  private readonly studentId$ = signal<string | null>(null);
 
   readonly token = this.token$.asReadonly();
   readonly user = this.user$.asReadonly();
+  readonly studentId = this.studentId$.asReadonly();
   readonly isAuthenticated = computed(() => this.token$() !== null);
 
   login(payload: LoginRequest) {
@@ -41,7 +43,12 @@ export class AuthService {
   }
 
   me() {
-    return this.http.get<MeResponse>('/api/auth/me').pipe(tap(({ user }) => this.user$.set(user)));
+    return this.http
+      .get<MeResponse>('/api/auth/me')
+      .pipe(tap(({ user, studentId }) => {
+        this.user$.set(user);
+        this.studentId$.set(studentId);
+      }));
   }
 
   logout() {
@@ -51,6 +58,7 @@ export class AuthService {
   clearSession() {
     this.token$.set(null);
     this.user$.set(null);
+    this.studentId$.set(null);
     sessionStorage.removeItem(TOKEN_KEY);
   }
 }

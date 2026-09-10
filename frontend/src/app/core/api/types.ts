@@ -43,3 +43,77 @@ export interface MeResponse {
   user: PublicUser;
   studentId: string | null;
 }
+
+export type Audience = 'guardian' | 'educator' | 'student';
+
+export type QuestionType = 'likert' | 'single' | 'multiple' | 'text' | 'date' | 'number';
+
+export interface FormQuestion {
+  id: string;
+  type: QuestionType;
+  text: string;
+  group: string;
+  options?: number[] | string[];
+  example?: string;
+}
+
+export interface FormSection {
+  id: string;
+  title: string;
+  group: string;
+  questions: FormQuestion[];
+}
+
+export interface FormDefinition {
+  formId: string;
+  version: number;
+  name: string;
+  audience: Audience;
+  description: string;
+  scale?: string;
+  sections: FormSection[];
+}
+
+export interface FormResponse {
+  form: FormDefinition;
+}
+
+export interface FormSubmissionRequest {
+  answers: Record<string, number>;
+  requestId: string;
+}
+
+export interface FormSubmissionAccepted {
+  submissionId: string;
+  formId: string;
+  submittedBy?: string;
+}
+
+export interface Prediction {
+  predictionId: string;
+  model: string;
+  modelVersion: string;
+  method: string;
+  label: string;
+  form?: string | null;
+  submission?: string | null;
+  formVersion?: number | null;
+  createdAt: string;
+  scores: Record<string, number>;
+  confidence: number;
+}
+
+export interface PredictionsList {
+  data: Prediction[];
+  count: number;
+}
+
+export interface Assessment {
+  kind: string;
+  scores: Record<string, number>;
+  label?: string | null;
+  multimodal: boolean;
+  method: string;
+  submission?: string | null;
+  createdAt: string;
+}

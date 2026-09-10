@@ -9,6 +9,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/home/home').then((m) => m.Home),
   },
   {
+    path: 'avaliacao',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/assessment/vark-assessment').then((m) => m.VarkAssessment),
+  },
+  {
     path: 'login',
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },

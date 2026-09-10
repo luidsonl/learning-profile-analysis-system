@@ -29,7 +29,11 @@
       >
         Início
       </a>
-      @if (!auth.isAuthenticated()) {
+      @if (auth.isAuthenticated()) {
+        <a mat-list-item routerLink="/avaliacao" routerLinkActive="active">
+          Avaliação
+        </a>
+      } @else {
         <a mat-list-item routerLink="/login">Entrar</a>
       }
     </mat-nav-list>
