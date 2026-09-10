@@ -1,0 +1,59 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Recomendações</h1>
+    <p>Sugestões pedagógicas para apoiar o aprendizado do estudante.</p>
+  </header>
+
+  @if (isPending()) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>Vincule a conta a um estudante para ver as recomendações.</p>
+      </mat-card-content>
+    </mat-card>
+  } @else if (isLoading()) {
+    <div class="state-content">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else if (errorMessage(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>{{ message }}</p>
+        <button mat-flat-button color="primary" (click)="load()">Tentar novamente</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (recommendations(); as items) {
+    @if (items.length === 0) {
+      <mat-card appearance="outlined" class="state-card">
+        <mat-card-content class="state-content">
+          <p>Nenhuma recomendação publicada até o momento.</p>
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <div class="list">
+        @for (reco of items; track reco.recoId) {
+          <mat-card appearance="outlined">
+            <mat-card-header>
+              <mat-card-title>{{ reco.title }}</mat-card-title>
+              <mat-card-subtitle>
+                {{ formatDate(reco.createdAt) }}
+                @if (reco.kind === 'auto') {
+                  · gerada pelo modelo
+                }
+              </mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <p>{{ reco.text }}</p>
+              @if (reco.tags?.length) {
+                <mat-chip-set>
+                  @for (tag of reco.tags; track tag) {
+                    <mat-chip>{{ tag }}</mat-chip>
+                  }
+                </mat-chip-set>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+      </div>
+    }
+  }
+</section>

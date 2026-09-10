@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 
-import { AssessmentsList, PredictionsList, StudentResponse } from '../api/types';
+import { AssessmentsList, PredictionsList, RecommendationListResponse, StudentResponse } from '../api/types';
 
 @Injectable({ providedIn: 'root' })
 export class StudentsService {
@@ -19,5 +19,9 @@ export class StudentsService {
   assessments(id: string, profile?: string) {
     const query = profile ? `?profile=${encodeURIComponent(profile)}` : '';
     return this.http.get<AssessmentsList>(`/api/students/${id}/assessments${query}`);
+  }
+
+  recommendations(id: string) {
+    return this.http.get<RecommendationListResponse>(`/api/students/${id}/recommendations`);
   }
 }

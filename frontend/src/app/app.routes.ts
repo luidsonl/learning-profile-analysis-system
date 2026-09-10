@@ -19,6 +19,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/profile/student-profile').then((m) => m.StudentProfile),
   },
   {
+    path: 'recomendacoes',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/recommendations/student-recommendations').then((m) => m.StudentRecommendations),
+  },
+  {
     path: 'login',
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },

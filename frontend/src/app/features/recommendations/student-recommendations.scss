@@ -1,0 +1,42 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.page-header h1 {
+  margin: 0 0 var(--space-1);
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--sys-on-surface-variant);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.state-card {
+  align-self: center;
+  width: 100%;
+  max-width: 30rem;
+}
+
+.state-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.state-content mat-spinner {
+  margin: var(--space-8) auto;
+}
+
+mat-chip-set {
+  margin-top: var(--space-2);
+}

@@ -159,3 +159,26 @@ export interface SubmissionsList {
   data: SubmissionSummary[];
   count: number;
 }
+
+export type RecommendationKind = 'manual' | 'auto';
+export type RecommendationStatus = 'proposed' | 'approved' | 'rejected' | 'published';
+export type RecommendationVisibility = 'private' | 'published';
+
+export interface Recommendation {
+  recoId: string;
+  kind: RecommendationKind;
+  title: string;
+  text: string;
+  tags?: string[];
+  status: RecommendationStatus;
+  visibility: RecommendationVisibility;
+  source?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface RecommendationListResponse {
+  data: Recommendation[];
+  count: number;
+}
