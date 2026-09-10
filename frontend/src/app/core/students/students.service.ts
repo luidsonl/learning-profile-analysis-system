@@ -1,7 +1,13 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 
-import { AssessmentsList, PredictionsList, RecommendationListResponse, StudentResponse } from '../api/types';
+import {
+  AssessmentsList,
+  ObservationListResponse,
+  PredictionsList,
+  RecommendationListResponse,
+  StudentResponse,
+} from '../api/types';
 
 @Injectable({ providedIn: 'root' })
 export class StudentsService {
@@ -23,5 +29,9 @@ export class StudentsService {
 
   recommendations(id: string) {
     return this.http.get<RecommendationListResponse>(`/api/students/${id}/recommendations`);
+  }
+
+  observations(id: string) {
+    return this.http.get<ObservationListResponse>(`/api/students/${id}/observations`);
   }
 }

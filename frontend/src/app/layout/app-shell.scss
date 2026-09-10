@@ -22,6 +22,10 @@ mat-nav-list a.active {
   background-color: var(--mat-sys-secondary-container);
 }
 
+.logout-link {
+  color: var(--mat-sys-error);
+}
+
 .content {
   padding: var(--space-4);
   max-width: 1200px;

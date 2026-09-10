@@ -42,6 +42,10 @@
         <a mat-list-item routerLink="/relatorios" routerLinkActive="active">
           Relatórios
         </a>
+        <a mat-list-item routerLink="/observacoes" routerLinkActive="active">
+          Observações
+        </a>
+        <a mat-list-item (click)="logout()" class="logout-link">Sair</a>
       } @else {
         <a mat-list-item routerLink="/login">Entrar</a>
       }

@@ -1,11 +1,29 @@
-<mat-card class="home-card">
+<mat-card class="home-card" appearance="outlined">
   <mat-card-header>
-    <mat-card-title>Bem-vindo ao Perfil de Aprendizado</mat-card-title>
+    <mat-card-title>
+      @if (isAuthenticated()) {
+        Olá, {{ userName() }}!
+      } @else {
+        Bem-vindo ao Perfil de Aprendizado
+      }
+    </mat-card-title>
   </mat-card-header>
   <mat-card-content>
     <p>
       Plataforma para personalizar o ensino de estudantes com altas habilidades
       e necessidades específicas.
     </p>
+
+    @if (isAuthenticated()) {
+      <div class="actions">
+        <a mat-flat-button color="primary" routerLink="/avaliacao">Fazer avaliação</a>
+        <a mat-stroked-button routerLink="/perfil">Ver meu perfil</a>
+      </div>
+    } @else {
+      <div class="actions">
+        <a mat-flat-button color="primary" routerLink="/register">Criar conta</a>
+        <a mat-stroked-button routerLink="/login">Entrar</a>
+      </div>
+    }
   </mat-card-content>
 </mat-card>

@@ -30,6 +30,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/reports/student-reports').then((m) => m.StudentReports),
   },
   {
+    path: 'observacoes',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/observations/student-observations').then((m) => m.StudentObservations),
+  },
+  {
     path: 'login',
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },

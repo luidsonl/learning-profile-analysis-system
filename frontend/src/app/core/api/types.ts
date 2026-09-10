@@ -217,3 +217,16 @@ export interface ReportDownloadResponse {
   s3Key: string;
   expiresIn: number;
 }
+
+export interface Observation {
+  observationTimestamp: string;
+  category: string;
+  text: string;
+  rating?: number | null;
+  submittedBy: string;
+}
+
+export interface ObservationListResponse {
+  data: Observation[];
+  count: number;
+}
