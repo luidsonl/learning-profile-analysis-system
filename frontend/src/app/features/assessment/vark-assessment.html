@@ -7,7 +7,13 @@
     </p>
   </header>
 
-  @if (isProcessing()) {
+  @if (!scopeStudentId()) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>Nenhum estudante selecionado. Vincule sua conta ou acesse pela lista de estudantes.</p>
+      </mat-card-content>
+    </mat-card>
+  } @else if (isProcessing()) {
     <mat-card appearance="outlined" class="state-card">
       <mat-card-content class="state-content">
         <mat-spinner diameter="40" />

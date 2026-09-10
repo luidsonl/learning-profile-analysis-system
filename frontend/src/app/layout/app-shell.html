@@ -30,6 +30,11 @@
         Início
       </a>
       @if (auth.isAuthenticated()) {
+        @if (auth.user()?.role !== 'student') {
+          <a mat-list-item routerLink="/estudantes" routerLinkActive="active">
+            Estudantes
+          </a>
+        }
         <a mat-list-item routerLink="/perfil" routerLinkActive="active">
           Meu perfil
         </a>

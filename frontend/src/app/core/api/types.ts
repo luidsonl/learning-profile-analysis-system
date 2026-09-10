@@ -145,6 +145,11 @@ export interface StudentResponse {
   student: Student;
 }
 
+export interface StudentListResponse {
+  data: Student[];
+  count: number;
+}
+
 export interface SubmissionSummary {
   submissionId: string;
   formId: string;

@@ -1,0 +1,55 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Estudantes</h1>
+    <p>Perfis que você acompanha.</p>
+  </header>
+
+  @if (isLoading()) {
+    <div class="state-content">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else if (errorMessage(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>{{ message }}</p>
+        <button mat-flat-button color="primary" (click)="load()">Tentar novamente</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (studentList(); as students) {
+    @if (students.length === 0) {
+      <mat-card appearance="outlined" class="state-card">
+        <mat-card-content class="state-content">
+          <p>Você ainda não acompanha nenhum estudante.</p>
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <div class="list">
+        @for (student of students; track student.studentId) {
+          <mat-card appearance="outlined">
+            <mat-card-header>
+              <mat-card-title>{{ student.name }}</mat-card-title>
+              <mat-card-subtitle>
+                {{ details(student) }}
+              </mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              @if (student.varkLabel; as label) {
+                <mat-chip-set>
+                  <mat-chip>{{ formatLabel(label) }}</mat-chip>
+                </mat-chip-set>
+              } @else {
+                <p class="no-profile">Ainda não avaliado.</p>
+              }
+            </mat-card-content>
+            <mat-card-actions align="end">
+              <a mat-button routerLink="/perfil/{{ student.studentId }}">Perfil</a>
+              <a mat-flat-button color="primary" routerLink="/avaliacao/{{ student.studentId }}">
+                Aplicar avaliação
+              </a>
+            </mat-card-actions>
+          </mat-card>
+        }
+      </div>
+    }
+  }
+</section>

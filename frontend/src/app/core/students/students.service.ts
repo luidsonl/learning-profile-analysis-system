@@ -6,12 +6,17 @@ import {
   ObservationListResponse,
   PredictionsList,
   RecommendationListResponse,
+  StudentListResponse,
   StudentResponse,
 } from '../api/types';
 
 @Injectable({ providedIn: 'root' })
 export class StudentsService {
   private readonly http = inject(HttpClient);
+
+  list() {
+    return this.http.get<StudentListResponse>('/api/students');
+  }
 
   getStudent(id: string) {
     return this.http.get<StudentResponse>(`/api/students/${id}`);

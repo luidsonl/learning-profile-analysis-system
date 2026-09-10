@@ -14,9 +14,24 @@ export const routes: Routes = [
     loadComponent: () => import('./features/assessment/vark-assessment').then((m) => m.VarkAssessment),
   },
   {
+    path: 'avaliacao/:studentId',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/assessment/vark-assessment').then((m) => m.VarkAssessment),
+  },
+  {
     path: 'perfil',
     canActivate: [authGuard],
     loadComponent: () => import('./features/profile/student-profile').then((m) => m.StudentProfile),
+  },
+  {
+    path: 'perfil/:studentId',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/profile/student-profile').then((m) => m.StudentProfile),
+  },
+  {
+    path: 'estudantes',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/students-list/students-list').then((m) => m.StudentsList),
   },
   {
     path: 'recomendacoes',

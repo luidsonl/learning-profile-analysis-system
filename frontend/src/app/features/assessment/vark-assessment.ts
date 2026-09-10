@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -28,9 +28,15 @@ import { VARK_LABELS, VARK_DESCRIPTIONS } from '../../core/vark/vark-labels';
   styleUrl: './vark-assessment.scss',
 })
 export class VarkAssessment {
+  // Optional route param (educator/guardian acting for a student); falls back
+  // to the own studentId for a linked student's self-assessment.
+  readonly routeStudentId = input<string>();
+
   private readonly forms = inject(FormsService);
   private readonly auth = inject(AuthService);
   readonly polling = inject(PredictionPollingService);
+
+  readonly scopeStudentId = computed(() => this.routeStudentId() ?? this.auth.studentId() ?? undefined);
 
   readonly form = toSignal(this.forms.getForm('vark'), { initialValue: undefined });
 
@@ -71,7 +77,7 @@ export class VarkAssessment {
   }
 
   submit(): void {
-    const studentId = this.auth.studentId();
+    const studentId = this.scopeStudentId();
     if (!studentId || !this.allAnswered()) {
       return;
     }

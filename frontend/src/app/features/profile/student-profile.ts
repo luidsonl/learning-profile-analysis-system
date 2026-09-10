@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -19,6 +19,8 @@ type ProfileState =
   | { status: 'error'; message: string }
   | { status: 'ready'; student: Student; assessments: Assessment[]; predictions: Prediction[] };
 
+const NOT_LOADED = Symbol('never-loaded');
+
 @Component({
   selector: 'app-student-profile',
   imports: [
@@ -34,8 +36,17 @@ type ProfileState =
   styleUrl: './student-profile.scss',
 })
 export class StudentProfile {
+  // Optional route param (educator/guardian acting for a student); falls back
+  // to the own studentId for a linked student's self-view.
+  readonly routeStudentId = input<string>();
+
   private readonly auth = inject(AuthService);
   private readonly students = inject(StudentsService);
+
+  private readonly scopeStudentId = computed(
+    () => this.routeStudentId() ?? this.auth.studentId() ?? undefined,
+  );
+  private loadedFor: unknown = NOT_LOADED;
 
   readonly state = signal<ProfileState>({ status: 'loading' });
 
@@ -54,11 +65,17 @@ export class StudentProfile {
   });
 
   constructor() {
-    this.load();
+    effect(() => {
+      const studentId = this.scopeStudentId();
+      if (studentId !== this.loadedFor) {
+        this.loadedFor = studentId;
+        this.load(studentId);
+      }
+    });
   }
 
-  load(): void {
-    const studentId = this.auth.studentId();
+  load(studentId?: string): void {
+    const id = studentId ?? this.scopeStudentId();
     if (!studentId) {
       this.state.set({ status: 'pending' });
       return;
