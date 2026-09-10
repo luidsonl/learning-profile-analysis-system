@@ -44,6 +44,45 @@ export interface MeResponse {
   studentId: string | null;
 }
 
+export type ConsentRequired = 'self' | 'guardian_institution';
+
+export interface PendingAccount {
+  userId: string;
+  name: string;
+  email: string;
+  birthDate: string;
+  createdAt: string;
+  consentRequired: ConsentRequired;
+}
+
+export interface PendingAccountsResponse {
+  data: PendingAccount[];
+  count: number;
+}
+
+export interface GuardianSearchHit {
+  userId: string;
+  name: string;
+  email: string;
+}
+
+export interface GuardianSearchResponse {
+  data: GuardianSearchHit[];
+  count: number;
+}
+
+export interface GuardianEdge {
+  userId: string;
+  name: string;
+  email: string;
+  relation: string;
+  grantedAt: string;
+}
+
+export interface GuardianListResponse {
+  data: GuardianEdge[];
+}
+
 export type Audience = 'guardian' | 'educator' | 'student';
 
 export type QuestionType = 'likert' | 'single' | 'multiple' | 'text' | 'date' | 'number';

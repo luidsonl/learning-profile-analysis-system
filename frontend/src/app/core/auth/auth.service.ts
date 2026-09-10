@@ -6,6 +6,7 @@ import {
   LoginRequest,
   LoginResponse,
   MeResponse,
+  PendingAccountsResponse,
   PublicUser,
   RegisterRequest,
   RegisterResponse,
@@ -40,6 +41,10 @@ export class AuthService {
 
   register(payload: RegisterRequest) {
     return this.http.post<RegisterResponse>('/api/auth/register', payload);
+  }
+
+  pendingAccounts() {
+    return this.http.get<PendingAccountsResponse>('/api/auth/pending-accounts');
   }
 
   me() {

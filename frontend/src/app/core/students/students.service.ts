@@ -3,6 +3,8 @@ import { inject, Injectable } from '@angular/core';
 
 import {
   AssessmentsList,
+  GuardianListResponse,
+  GuardianSearchResponse,
   ObservationCreateRequest,
   ObservationListResponse,
   PredictionsList,
@@ -35,6 +37,28 @@ export class StudentsService {
 
   updateStudent(id: string, body: StudentUpdateRequest) {
     return this.http.patch<StudentUpdateResponse>(`/api/students/${id}`, body);
+  }
+
+  linkStudentAccount(id: string, userId: string) {
+    return this.http.post<never>(`/api/students/${id}/accounts/${userId}/link`, {});
+  }
+
+  searchGuardians(email: string) {
+    return this.http.get<GuardianSearchResponse>('/api/users', {
+      params: { role: 'guardian', email },
+    });
+  }
+
+  guardians(id: string) {
+    return this.http.get<GuardianListResponse>(`/api/students/${id}/guardians`);
+  }
+
+  grantGuardian(id: string, userId: string) {
+    return this.http.post<never>(`/api/students/${id}/guardians`, { userId });
+  }
+
+  revokeGuardian(id: string, userId: string) {
+    return this.http.delete<never>(`/api/students/${id}/guardians/${userId}`);
   }
 
   predictions(id: string, form?: string) {
