@@ -1,0 +1,7 @@
+{
+  "/api": {
+    "target": "https://<api-gateway-endpoint>",
+    "changeOrigin": true,
+    "secure": true
+  }
+}

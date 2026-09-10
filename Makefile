@@ -6,7 +6,7 @@
 #   2. terraform/aws-app        → DynamoDB + S3 buckets + SQS + async Lambdas
 #   3. sam-app                  → API Lambdas + API Gateway (served under /api/*)
 #   4. frontend                 → S3 + CloudFront SPA (single domain for app + /api/*)
-#                                (skipped while the SPA is absent — planned Angular rebuild)
+#                                (Angular SPA lives in frontend/; deploy with `make frontend`)
 #
 # ML is fully offline: `make train` / `make package` run locally in ml/ and
 # bundle the artifact into sam-app before the next backend deploy.
@@ -16,7 +16,7 @@ TF          ?= terraform
 STACK_NAME  ?= learning-profile-api
 REGION      ?= us-east-1
 
-.PHONY: all deploy deploy-full bootstrap infra backend frontend train package sanity smoke destroy destroy-backend validate-api
+.PHONY: all deploy deploy-full bootstrap infra backend frontend frontend-serve train package sanity smoke destroy destroy-backend validate-api
 
 all: deploy
 
@@ -56,20 +56,24 @@ backend:
 sync:
 	cd sam-app && $(MAKE) sync
 
-# 4. Frontend (future Angular SPA → S3 + CloudFront; serves app + API under the same domain)
-# No-op while the SPA is absent. `frontend_enabled=true` activates
-# terraform/aws-frontend explicitly — otherwise the module creates nothing.
+# 4. Frontend (Angular SPA → S3 + CloudFront; serves app + API under the same domain)
 # Build + upload + CloudFront invalidation run here (NOT inside Terraform), so
 # the module never references the frontend/ tree and can't break on its absence.
+# `frontend_enabled=true` activates terraform/aws-frontend explicitly.
 frontend:
-	@if [ ! -d frontend ]; then echo "--> frontend/ missing (SPA removed; Angular rebuild planned) — skipping."; exit 0; fi
+	@if [ ! -d frontend ]; then echo "--> frontend/ missing (Angular SPA not scaffolded) — skipping."; exit 0; fi
 	cd frontend && npm install --no-audit --no-fund && npm run build
 	cd terraform/aws-frontend && $(TF) init -input=false && $(TF) apply -auto-approve -var 'frontend_enabled=true'
 	@echo "--> Uploading to S3..."
-	@aws s3 sync frontend/dist/ "s3://$$(cd terraform/aws-frontend && $(TF) output -raw bucket_name)/" --delete
+	@aws s3 sync frontend/dist/frontend/browser/ "s3://$$(cd terraform/aws-frontend && $(TF) output -raw bucket_name)/" --delete
 	@echo "--> Invalidating CloudFront..."
 	@aws cloudfront create-invalidation --distribution-id "$$(cd terraform/aws-frontend && $(TF) output -raw cloudfront_id)" --paths "/*"
 	@echo "--> Frontend available at: https://$$(cd terraform/aws-frontend && $(TF) output -raw cloudfront_domain_name)"
+
+# Dev server that proxies /api to the deployed API Gateway (no CORS, mirrors prod).
+# Requires AWS credentials + an exported ApiEndpoint from `make backend`.
+frontend-serve:
+	cd frontend && node scripts/fetch-api.js && npm start -- --proxy-config proxy.conf.json
 
 # ── Offline ML pipeline (never runs in AWS) ──────────────────────────────────
 train:
