@@ -97,7 +97,7 @@ Custom token taxonomy (prefix → category):
 
 ## Component Library
 
-Implemented as Angular standalone components extending Material primitives, used by the [frontend](./frontend.md) features:
+Implemented as Angular standalone components extending Material primitives and **placed by the tier rule** (see *Implementation Structure*): app-wide extensions in `shared/ui/`, product composites inside their feature's `ui/`. Every component is usable by the [frontend](./frontend.md):
 
 | Component | Material/CDK base | Notes |
 |-----------|-------------------|-------|
@@ -115,7 +115,7 @@ Implemented as Angular standalone components extending Material primitives, used
 | `Chips`, `Badge`, `Avatar` | Material | Labels, status markers, person identity |
 | `Progress`, `Spinner`, `Skeleton`, `EmptyState`, `ErrorState` | Mat progress + custom | Loading/empty/error surfaces |
 | `Menu`, `NavRail`, `TopAppBar` | CDK menu + custom | App shell; responsive — bottom nav on mobile, rail `≥ sm`, sidebar `≥ md` |
-| `FormRenderer` | custom (composites) | Dynamic form from API definitions — maps question types to controls (see [frontend](./frontend.md) → *Forms Renderer*) |
+| `FormRenderer` | custom (composites) | Dynamic form from API definitions — maps question types to controls; homed in `features/forms/ui/` (see [frontend](./frontend.md) → *Forms Renderer*) |
 
 Component contract: every component exposes only its public API, uses tokens (never raw values), supports keyboard operation, and ships with the ARIA roles/wiring required for its pattern (CDK-provided where possible).
 
@@ -147,16 +147,26 @@ Compliance is verified by: token contrast checks in CI, automated a11y scans on 
 
 ## Implementation Structure
 
+Component organization follows **layers by intent, colocated by feature** — not Atomic Design (no atom/molecule/… taxonomy; a component's tier is set by **real reuse**, not size):
+
 ```
-frontend/src/styles/
-├── tokens.scss            # design tokens (CSS custom properties)
-├── themes/                # light, dark, dyslexia-friendly token sets
-└── global.scss            # resets, base typography, focus styles
-frontend/src/app/shared/   # design-system standalone components (re-exported)
-└── components/            # one folder per component in the library table
+frontend/src/styles/                      # core/style tier — tokens, themes, global
+│   ├── tokens.scss                       # custom design tokens (gaps Material does not cover)
+│   ├── themes/                           # light, dark, dyslexia-friendly token sets
+│   └── global.scss                       # resets, base typography, focus styles
+frontend/src/app/core/                    # singleton services/providers (auth store, interceptors)
+frontend/src/app/shared/ui/               # app-wide Material extensions (Button, Field, Card,
+│                                         #   DataTable, EmptyState, …) — promoted here ONLY when
+│                                         #   ≥ 2 features reuse them
+frontend/src/app/features/<feature>/      # one dir per feature: routes, services, state
+│   └── ui/                               # feature-local composites (PredictionCard,
+│                                         #   ProfileCard, FormRenderer, …) colocated with the
+│                                         #   feature that owns them
 ```
 
-- Material theme is configured once (Material 3 provider); **Material's native styling is the default** — component styles are authoring customs/custom composites only, via tokens. Material component overrides are avoided unless a WCAG AA gap demands one.
+**Dependency rule**: dependencies always point inward — `feature/…/ui` → `shared/ui` → `core/styles`. Features never import from other features; when a component is reused by a second feature it moves up to `shared/ui`. The [form renderer](./frontend.md) → *Forms Renderer* lives in `features/forms/ui/` because it is a product pattern, not a primitive.
+
+- Material theme is configured once (Material 3 provider); **Material's native styling is the default** — custom component styles exist only for custom composites (tier 2/3), via tokens. Material component overrides are avoided unless a WCAG AA gap demands one.
 - Custom token files are the source of truth for the gaps Material does not cover; changing a custom token re-themes the affected composites.
 
 ## Testing

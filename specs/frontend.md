@@ -59,26 +59,27 @@ frontend/
 ├── proxy.conf.json         # dev proxy: /api → deployed API Gateway
 └── src/
     ├── main.ts             # bootstrap, provideRouter, provideAnimations
-    ├── styles/
-    │   ├── tokens.scss     # design-token CSS variables (from design-system spec)
-    │   └── global.scss     # resets, base typography, utility classes
-    ├── app/
-    │   ├── core/           # HttpClient providers, interceptors, auth store/service
-    │   │   ├── auth/       # login/register calls, session storage, guards
-    │   │   ├── api/        # generated DTOs + typed feature clients
-    │   │   └── errors/     # API error envelope → pt-BR user messages
-    │   ├── layout/         # app shell: header, nav, role-aware menu, footer
-    │   ├── features/       # one lazy-loaded module per feature/route group
-    │   │   ├── auth/       # login, register
-    │   │   ├── home/       # role-aware landing/dashboard
-    │   │   ├── students/   # list, detail (profile, submissions, predictions,
-    │   │   │               #   recommendations, observations, consent, audit)
-    │   │   ├── forms/      # dynamic form renderer, submissions list
-    │   │   ├── reports/    # report list, generate, download
-    │   │   └── admin/      # user management (approve/deny, tokens, RBAC)
-    │   └── shared/         # design-system component re-exports, pipes, utils
-    └── environments/       # no secrets; empty placeholders by design
+    ├── styles/             # core/style tier: tokens.scss, themes/, global.scss (see design-system)
+    ├── paths.ts            # typescript path aliases (@core, @shared/ui, @features)
+    └── app/
+        ├── core/           # singleton providers: interceptors, auth service, errors
+        │   ├── auth/       # login/register calls, session storage, guards
+        │   ├── api/        # generated DTOs + typed feature clients
+        │   └── errors/     # API error envelope → pt-BR user messages
+        ├── shared/ui/      # app-wide Material extensions (Button, Field, Card, DataTable, EmptyState, …)
+        │                   #   promoted here only when ≥ 2 features reuse the component
+        ├── layout/         # app shell: header, responsive nav, role-aware menu, footer
+        └── features/       # one dir per feature: routes, services, state, and its own ui/ colocated
+            ├── auth/       # login, register (+ ui/)
+            ├── home/       # role-aware landing/dashboard (+ ui/)
+            ├── students/   # list, detail — profile, submissions, predictions, recommendations,
+            │   │           #   observations, consent, audit (+ ui/ holds PredictionCard, ProfileCard…)
+            ├── forms/      # dynamic form renderer FormRenderer + submissions list (+ ui/)
+            ├── reports/    # report list, generate, download (+ ui/)
+            └── admin/      # user management (approve/deny, tokens, RBAC) (+ ui/)
 ```
+
+Component organization follows the **tier + colocation rule** (no Atomic Design): a component lives in its feature's `ui/` unless ≥ 2 features reuse it, then it is promoted to `shared/ui/`; dependencies point inward (`feature/ui` → `shared/ui` → `core/styles`). Details in [design system](./design-system.md) → *Implementation Structure*.
 
 ## Routing & Navigation
 
