@@ -171,6 +171,73 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /auth/pending-accounts:
+    get:
+      tags: [Auth]
+      summary: List self-registered student accounts awaiting link
+      description: |
+        Educators and admins only. Returns every `student` account with status
+        `pending` (self-registered, `studentId` null), newest first. Each entry
+        carries the consent gate that `POST /students/{id}/accounts/{userId}/link`
+        would apply to that account: `self` for adults (>= `MIN_SELF_CONSENT_AGE`,
+        self-consents on link) or `guardian_institution` for minors (< 18, requires
+        guardian/institution consent already granted). This is the discovery
+        mechanism for the educator link flow; the link itself stays permissioned
+        at `POST /students/{id}/accounts/{userId}/link`.
+      security:
+        - bearerAuth: []
+      operationId: listPendingStudentAccounts
+      responses:
+        "200":
+          description: Pending student accounts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingAccountsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /users:
+    get:
+      tags: [Auth]
+      summary: Search guardian accounts
+      description: |
+        Educators (in scope) and admins only. Prefix (case-insensitive) search on
+        guardian account email to pick the `userId` for granting guardianship
+        (`POST /students/{id}/guardians`). Returns minimal identity fields only
+        (`userId`, `name`, `email`) — no birthDate, accountability or status.
+      security:
+        - bearerAuth: []
+      operationId: searchGuardians
+      parameters:
+        - name: role
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [guardian]
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 3
+      responses:
+        "200":
+          description: Matching guardian accounts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuardianSearchResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /students:
     post:
       tags: [Students]
@@ -1277,6 +1344,64 @@ components:
           type: string
           nullable: true
           description: 'Linked student entity id (null while `pending`/unlinked).'
+
+    PendingAccountsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PendingAccount"
+        count:
+          type: number
+
+    PendingAccount:
+      type: object
+      required: [userId, name, email, birthDate, createdAt, consentRequired]
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        birthDate:
+          type: string
+          format: date
+          description: Age verification; drives the consent gate on link.
+        createdAt:
+          type: string
+          format: date-time
+        consentRequired:
+          type: string
+          enum: [self, guardian_institution]
+          description: |
+            `self` when the student already qualifies for self-consent (adult,
+            >= `MIN_SELF_CONSENT_AGE`); `guardian_institution` when the minor
+            needs guardian or institution consent granted before linking.
+
+    GuardianSearchResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuardianSearchHit"
+        count:
+          type: number
+
+    GuardianSearchHit:
+      type: object
+      required: [userId, name, email]
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
 
     PublicUser:
       type: object
