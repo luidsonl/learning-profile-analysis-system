@@ -24,7 +24,32 @@
     </mat-card>
   } @else if (profile(); as data) {
     <header class="profile-header">
-      <h1>{{ data.student.name }}</h1>
+      <div class="profile-title-row">
+        <h1>{{ data.student.name }}</h1>
+        @if (isOwnProfile()) {
+          <button mat-icon-button (click)="toggleRename()" aria-label="Editar nome">
+            <mat-icon>edit</mat-icon>
+          </button>
+        }
+      </div>
+
+      @if (isRenaming()) {
+        <form [formGroup]="nameForm" (ngSubmit)="rename()" class="rename-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Nome</mat-label>
+            <input matInput formControlName="name" required autocomplete="off" />
+            @if (nameForm.controls.name.invalid && nameForm.controls.name.touched) {
+              <mat-error>Informe o nome.</mat-error>
+            }
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" [disabled]="nameSaving()">Salvar</button>
+          <button mat-stroked-button type="button" (click)="toggleRename()">Cancelar</button>
+          @if (renameError(); as message) {
+            <span class="error">{{ message }}</span>
+          }
+        </form>
+      }
+
       @if (data.student.varkLabel; as label) {
         <div class="profile-badges">
           <mat-chip>{{ formatLabel(label) }}</mat-chip>

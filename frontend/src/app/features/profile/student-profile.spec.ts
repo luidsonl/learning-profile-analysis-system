@@ -22,6 +22,7 @@ const studentsStub = {
   getStudent: () => of({ student }),
   assessments: () => of({ data: [], count: 0 }),
   predictions: () => of({ data: [], count: 0 }),
+  updateStudent: (id: string, body: unknown) => of({ studentId: id, updated: ['name'], received: body }),
 };
 
 describe('StudentProfile', () => {
@@ -54,5 +55,14 @@ describe('StudentProfile', () => {
     await setup(null);
     const card = fixture.nativeElement.querySelector('.state-content') as HTMLElement;
     expect(card?.textContent).toContain('Aguardando vínculo');
+  });
+
+  it('allows renaming only on the own profile', async () => {
+    await setup('s1');
+    expect(fixture.componentInstance.isOwnProfile()).toBe(true);
+    fixture.componentInstance.toggleRename();
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector('input[formcontrolname="name"]') as HTMLInputElement;
+    expect(input).toBeTruthy();
   });
 });

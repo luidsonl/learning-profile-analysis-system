@@ -164,6 +164,15 @@ export interface StudentCreateResponse {
   studentId: string;
 }
 
+export interface StudentUpdateRequest {
+  name?: string;
+}
+
+export interface StudentUpdateResponse {
+  studentId: string;
+  updated: string[];
+}
+
 export interface SubmissionSummary {
   submissionId: string;
   formId: string;

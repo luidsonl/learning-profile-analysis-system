@@ -13,6 +13,8 @@ import {
   StudentCreateResponse,
   StudentListResponse,
   StudentResponse,
+  StudentUpdateRequest,
+  StudentUpdateResponse,
 } from '../api/types';
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +31,10 @@ export class StudentsService {
 
   createStudent(body: StudentCreateRequest) {
     return this.http.post<StudentCreateResponse>('/api/students', body);
+  }
+
+  updateStudent(id: string, body: StudentUpdateRequest) {
+    return this.http.patch<StudentUpdateResponse>(`/api/students/${id}`, body);
   }
 
   predictions(id: string, form?: string) {

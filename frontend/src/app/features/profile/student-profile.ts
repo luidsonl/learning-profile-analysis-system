@@ -1,8 +1,11 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { forkJoin } from 'rxjs';
@@ -30,6 +33,9 @@ const NOT_LOADED = Symbol('never-loaded');
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
     PredictionScores,
   ],
   templateUrl: './student-profile.html',
@@ -42,6 +48,9 @@ export class StudentProfile {
 
   private readonly auth = inject(AuthService);
   private readonly students = inject(StudentsService);
+  private readonly fb = inject(FormBuilder);
+
+  readonly isOwnProfile = computed(() => !this.routeStudentId());
 
   private readonly scopeStudentId = computed(
     () => this.routeStudentId() ?? this.auth.studentId() ?? undefined,
@@ -49,6 +58,13 @@ export class StudentProfile {
   private loadedFor: unknown = NOT_LOADED;
 
   readonly state = signal<ProfileState>({ status: 'loading' });
+
+  readonly isRenaming = signal(false);
+  readonly nameSaving = signal(false);
+  readonly renameError = signal<string | null>(null);
+  readonly nameForm = this.fb.group({
+    name: ['', [Validators.required, Validators.minLength(2)]],
+  });
 
   readonly errorMessage = computed(() => {
     const s = this.state();
@@ -107,5 +123,38 @@ export class StudentProfile {
 
   describe(label: string): string {
     return VARK_DESCRIPTIONS[label] ?? '';
+  }
+
+  toggleRename(): void {
+    if (this.isRenaming()) {
+      this.isRenaming.set(false);
+      this.renameError.set(null);
+      return;
+    }
+    const current = this.profile()?.student.name ?? '';
+    this.nameForm.setValue({ name: current });
+    this.isRenaming.set(true);
+  }
+
+  rename(): void {
+    const studentId = this.scopeStudentId();
+    if (!studentId || this.nameForm.invalid || this.nameSaving()) {
+      return;
+    }
+    this.nameSaving.set(true);
+    this.renameError.set(null);
+    this.students
+      .updateStudent(studentId, { name: this.nameForm.value.name ?? '' })
+      .subscribe({
+        next: () => {
+          this.nameSaving.set(false);
+          this.isRenaming.set(false);
+          this.load(studentId);
+        },
+        error: () => {
+          this.nameSaving.set(false);
+          this.renameError.set('Não foi possível atualizar o nome.');
+        },
+      });
   }
 }
