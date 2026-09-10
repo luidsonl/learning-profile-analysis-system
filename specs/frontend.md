@@ -55,7 +55,7 @@ Deployment artifacts live in `terraform/aws-frontend` (S3 static bucket + CloudF
 
 ```
 frontend/
-├── angular.json            # build config, budgets, i18n locale pt-BR
+├── angular.json            # build config, budgets
 ├── proxy.conf.json         # dev proxy: /api → deployed API Gateway
 └── src/
     ├── main.ts             # bootstrap, provideRouter, provideAnimations
@@ -151,8 +151,9 @@ Derived from the RBAC matrix — the SPA shows only these actions, each wired to
 
 ## Accessibility & Language
 
-- UI copy is **pt-BR** (domain language rule — see [architecture](./architecture.md)); code, comments, and docs remain English.
+- UI copy is **pt-BR fixed** (domain language rule — see [architecture](./architecture.md)): strings are hardcoded pt-BR (shared string constants), **no i18n framework** in scope. A future translation layer is an explicit non-goal until a concrete need appears. Code, comments, and docs remain English.
 - WCAG 2.2 AA is the floor across every screen; enforcement details live in the [design system](./design-system.md) → *Accessibility*.
+- `lang="pt-BR"` set on `<html>`; pt-BR date/number/intl formatting everywhere.
 
 ## Security
 
