@@ -117,3 +117,45 @@ export interface Assessment {
   submission?: string | null;
   createdAt: string;
 }
+
+export interface AssessmentsList {
+  data: Assessment[];
+  count: number;
+}
+
+export interface Student {
+  studentId: string;
+  name: string;
+  birthDate?: string;
+  gender?: string | null;
+  grade?: string | null;
+  school?: string | null;
+  specialNeeds?: string[];
+  status: 'active';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  studentUserId?: string | null;
+  varkLabel?: string | null;
+  varkScores?: Record<string, number> | null;
+  varkMultimodal?: boolean | null;
+}
+
+export interface StudentResponse {
+  student: Student;
+}
+
+export interface SubmissionSummary {
+  submissionId: string;
+  formId: string;
+  formVersion: number;
+  answers: Record<string, number>;
+  submittedBy: string;
+  submittedByRole: string;
+  createdAt: string;
+}
+
+export interface SubmissionsList {
+  data: SubmissionSummary[];
+  count: number;
+}

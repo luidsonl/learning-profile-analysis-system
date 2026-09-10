@@ -14,6 +14,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/assessment/vark-assessment').then((m) => m.VarkAssessment),
   },
   {
+    path: 'perfil',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/profile/student-profile').then((m) => m.StudentProfile),
+  },
+  {
     path: 'login',
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },

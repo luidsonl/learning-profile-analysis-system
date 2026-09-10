@@ -1,0 +1,108 @@
+<section class="page">
+  @if (isPending()) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <mat-icon aria-hidden="true" class="state-icon">person_search</mat-icon>
+        <h2>Aguardando vínculo</h2>
+        <p>
+          Sua conta ainda não foi vinculada a um estudante. Procure um educador
+          ou responsável para liberar seu perfil.
+        </p>
+      </mat-card-content>
+    </mat-card>
+  } @else if (isLoading()) {
+    <div class="state-content">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else if (errorMessage(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <mat-icon color="warn" aria-hidden="true" class="state-icon">error</mat-icon>
+        <p>{{ message }}</p>
+        <button mat-flat-button color="primary" (click)="load()">Tentar novamente</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (profile(); as data) {
+    <header class="profile-header">
+      <h1>{{ data.student.name }}</h1>
+      @if (data.student.varkLabel; as label) {
+        <div class="profile-badges">
+          <mat-chip>{{ formatLabel(label) }}</mat-chip>
+          @if (data.student.varkMultimodal) {
+            <mat-chip>{{ formatLabel('multimodal') }}</mat-chip>
+          }
+        </div>
+        <p>{{ describe(label) }}</p>
+      } @else {
+        <p>Este estudante ainda não realizou a avaliação de perfil.</p>
+      }
+    </header>
+
+    @if (data.student.varkScores; as scores) {
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Pontuação</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <prediction-scores [scores]="scores" />
+        </mat-card-content>
+      </mat-card>
+    }
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Avaliações</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (data.assessments.length === 0) {
+          <p>Nenhuma avaliação registrada.</p>
+        } @else {
+          <mat-list>
+            @for (assessment of data.assessments; track assessment.createdAt) {
+              <mat-list-item>
+                <span class="list-title">{{ formatLabel(assessment.label ?? 'multimodal') }}</span>
+                <span class="list-subtitle">
+                  {{ formatDate(assessment.createdAt) }}
+                  @if (assessment.multimodal) {
+                    · multimodal
+                  }
+                  · método {{ assessment.method }}
+                </span>
+              </mat-list-item>
+            }
+          </mat-list>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Predições</mat-card-title>
+        <mat-card-subtitle>
+          Resultados automáticos calculados pelo modelo de aprendizado.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (data.predictions.length === 0) {
+          <p>Nenhuma predição disponível. As predições são geradas após cada avaliação.</p>
+        } @else {
+          <mat-list>
+            @for (prediction of data.predictions; track prediction.predictionId) {
+              <mat-list-item>
+                <span class="list-title">
+                  {{ formatLabel(prediction.label) }}
+                  <span class="list-confidence">
+                    confiança {{ (prediction.confidence * 100).toFixed(0) }}%
+                  </span>
+                </span>
+                <span class="list-subtitle">
+                  {{ formatDate(prediction.createdAt) }} · modelo {{ prediction.modelVersion }}
+                </span>
+              </mat-list-item>
+            }
+          </mat-list>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

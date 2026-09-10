@@ -30,6 +30,9 @@
         Início
       </a>
       @if (auth.isAuthenticated()) {
+        <a mat-list-item routerLink="/perfil" routerLinkActive="active">
+          Meu perfil
+        </a>
         <a mat-list-item routerLink="/avaliacao" routerLinkActive="active">
           Avaliação
         </a>
