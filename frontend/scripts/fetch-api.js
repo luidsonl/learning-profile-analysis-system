@@ -20,13 +20,19 @@ if (!apiGateway) {
   throw new Error(`Export ${exportName} not found. Deploy sam-app first (make backend).`);
 }
 
-const base = apiGateway.replace(/\/$/, "");
+const url = new URL(apiGateway);
+const stage = url.pathname.replace(/\/$/, "");
+
 const proxy = {
   "/api": {
-    target: base,
+    // API Gateway routes live under the stage WITHOUT the CloudFront /api
+    // prefix (e.g. /auth/register, not /api/auth/register), so strip /api
+    // and prepend the stage.
+    target: url.origin,
     changeOrigin: true,
     secure: true,
     logLevel: "info",
+    pathRewrite: { "^/api": stage },
   },
 };
 

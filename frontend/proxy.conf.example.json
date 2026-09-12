@@ -1,7 +1,11 @@
 {
   "/api": {
-    "target": "https://<api-gateway-endpoint>",
+    "target": "https://<api-gateway-endpoint-ORIGIN>",
     "changeOrigin": true,
-    "secure": true
+    "secure": true,
+    "logLevel": "info",
+    "pathRewrite": {
+      "^/api": "/<stage>"
+    }
   }
 }
