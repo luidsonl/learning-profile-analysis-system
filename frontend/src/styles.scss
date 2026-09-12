@@ -2,6 +2,7 @@
 // data-theme); custom tokens + global base fill the gaps.
 
 @use '@angular/material' as mat;
+@use './styles/fonts';
 @use './styles/tokens';
 @use './styles/global';
 
@@ -33,11 +34,15 @@ html {
   color-scheme: light;
   background-color: var(--mat-sys-surface);
   @include mat.all-component-themes($light-theme);
+  // Emit the full --mat-sys-* system palette (outline, error, containers, ...).
+  // all-component-themes alone does not emit these; custom styles reference them.
+  @include mat.theme((color: $light-theme));
 }
 
 html[data-theme='dark'] {
   color-scheme: dark;
   @include mat.all-component-themes($dark-theme);
+  @include mat.theme((color: $dark-theme));
 }
 
 // Respect the user's OS preference until a data-theme is chosen by the app.
@@ -45,5 +50,6 @@ html[data-theme='dark'] {
   html:not([data-theme='light']):not([data-theme='dyslexia-friendly']) {
     color-scheme: dark;
     @include mat.all-component-themes($dark-theme);
+    @include mat.theme((color: $dark-theme));
   }
 }

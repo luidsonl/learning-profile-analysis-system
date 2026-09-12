@@ -13,9 +13,19 @@
   flex: 1;
 }
 
+mat-toolbar {
+  border-bottom: 1px solid var(--mat-sys-outline);
+}
+
 mat-sidenav {
   width: 240px;
-  border-inline-end: 1px solid var(--mat-sys-outline-variant);
+  border-inline-end: 1px solid var(--mat-sys-outline);
+
+  // Desktop (side mode, >= 600px): square edge against the app content.
+  @media (min-width: 600px) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
 }
 
 mat-nav-list a.active {
