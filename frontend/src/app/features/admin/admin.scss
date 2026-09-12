@@ -1,0 +1,124 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.filters mat-form-field {
+  min-width: 12rem;
+  max-width: 16rem;
+}
+
+.action-error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.user-card {
+  max-width: 52rem;
+}
+
+.self-tag {
+  color: var(--mat-sys-on-surface-variant);
+  font-weight: 400;
+}
+
+.admin-chip {
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  font-weight: 600;
+}
+
+.user-since {
+  margin: var(--space-2) 0 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85rem;
+}
+
+.password-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  max-width: 36rem;
+}
+
+.password-form mat-form-field {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.user-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.user-actions-role {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: var(--space-2);
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+}
+
+.role-select {
+  width: 11rem;
+}
+
+.delete-btn {
+  margin-left: var(--space-1);
+}
+
+.state-card {
+  align-self: center;
+  width: 100%;
+  max-width: 30rem;
+}
+
+.state-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.state-icon {
+  font-size: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.state-content mat-spinner {
+  margin: var(--space-8) auto;
+}

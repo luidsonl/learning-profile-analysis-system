@@ -1,0 +1,155 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Gerenciar usuários</h1>
+    <p>Contas cadastradas na plataforma. Filtre e gerencie acessos.</p>
+    <div class="filters">
+      <mat-form-field appearance="outline">
+        <mat-label>Perfil</mat-label>
+        <mat-select [value]="roleFilter()" (selectionChange)="onRoleFilter($event.value)">
+          <mat-option value="">Todos</mat-option>
+          @for (role of roles; track role) {
+            <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Status</mat-label>
+        <mat-select [value]="statusFilter()" (selectionChange)="onStatusFilter($event.value)">
+          <mat-option value="">Todos</mat-option>
+          @for (status of statuses; track status) {
+            <mat-option [value]="status">{{ statusLabels[status] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </header>
+
+  @if (actionError(); as message) {
+    <p class="action-error" role="alert">{{ message }}</p>
+  }
+
+  @if (isLoading()) {
+    <div class="state-content">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else if (errorMessage(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>{{ message }}</p>
+        <button mat-flat-button color="primary" (click)="load()">Tentar novamente</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (users(); as users) {
+    @if (users.length === 0) {
+      <mat-card appearance="outlined" class="state-card">
+        <mat-card-content class="state-content">
+          <p>Nenhum usuário encontrado com esses filtros.</p>
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <div class="list">
+        @for (user of users; track user.userId) {
+          <mat-card appearance="outlined" class="user-card">
+            <mat-card-header>
+              <mat-card-title>
+                {{ user.name }}
+                @if (isSelf(user)) {
+                  <span class="self-tag">(você)</span>
+                }
+              </mat-card-title>
+              <mat-card-subtitle>{{ user.email }}</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <mat-chip-set>
+                <mat-chip [class.admin-chip]="user.role === 'admin'">{{ roleLabels[user.role] }}</mat-chip>
+                <mat-chip>{{ statusLabels[user.status] }}</mat-chip>
+              </mat-chip-set>
+              <p class="user-since">Registrado em {{ since(user) }}</p>
+
+              @if (passwordUserId() === user.userId) {
+                <div class="password-form">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Nova senha (mín. 8 caracteres)</mat-label>
+                    <input matInput type="password" [formControl]="passwordControl" />
+                    @if (passwordControl.invalid && passwordControl.touched) {
+                      <mat-error>A senha deve ter ao menos 8 caracteres.</mat-error>
+                    }
+                  </mat-form-field>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    [disabled]="passwordControl.invalid || busyFor() !== null"
+                    (click)="savePassword(user)"
+                  >
+                    @if (isBusy(user, 'password')) {
+                      <mat-spinner diameter="20" />
+                    }
+                    Salvar senha
+                  </button>
+                  <button mat-stroked-button type="button" (click)="togglePassword(user)">Cancelar</button>
+                </div>
+              }
+            </mat-card-content>
+            <mat-card-actions align="end" class="user-actions">
+              <span class="user-actions-role">
+                Perfil:
+                <mat-form-field appearance="outline" class="role-select">
+                  <mat-select
+                    [value]="user.role"
+                    [disabled]="isSelf(user)"
+                    (selectionChange)="changeRole(user, $event.value)"
+                  >
+                    @for (role of roles; track role) {
+                      <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </span>
+
+              @if (user.status !== 'active') {
+                <button
+                  mat-flat-button
+                  color="primary"
+                  [disabled]="busyFor() !== null"
+                  (click)="approve(user)"
+                >
+                  @if (isBusy(user, 'approve')) {
+                    <mat-spinner diameter="20" />
+                  }
+                  Aprovar
+                </button>
+              } @else {
+                <button
+                  mat-stroked-button
+                  [disabled]="busyFor() !== null || isSelf(user)"
+                  (click)="block(user)"
+                >
+                  @if (isBusy(user, 'block')) {
+                    <mat-spinner diameter="20" />
+                  }
+                  Banir
+                </button>
+              }
+
+              @if (passwordUserId() !== user.userId) {
+                <button mat-button (click)="togglePassword(user)">Redefinir senha</button>
+              }
+
+              <button
+                mat-icon-button
+                color="warn"
+                class="delete-btn"
+                [disabled]="isSelf(user) || busyFor() !== null"
+                (click)="deleteUser(user)"
+                matTooltip="Excluir conta"
+                aria-label="Excluir conta"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </mat-card-actions>
+          </mat-card>
+        }
+      </div>
+    }
+  }
+</section>

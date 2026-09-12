@@ -1,0 +1,39 @@
+<section class="page">
+  @if (user(); as user) {
+    <mat-card appearance="outlined" class="account-card">
+      <mat-card-content class="account-content">
+        <mat-icon class="account-avatar" aria-hidden="true">account_circle</mat-icon>
+        <div class="account-fields">
+          <h1>{{ user.name }}</h1>
+          <p class="account-email">{{ user.email }}</p>
+          <div class="account-chips">
+            <mat-chip [class.admin-chip]="user.role === 'admin'">{{ roleLabel() }}</mat-chip>
+            <mat-chip>{{ statusLabel() }}</mat-chip>
+          </div>
+          <p class="account-meta">
+            Membro desde {{ memberSince(user) }}
+            @if (user.role === 'student' && user.birthDate) {
+              · Nascimento {{ birthDate(user) }}
+            }
+          </p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    @if (studentScopeId(); as studentId) {
+      <h2 class="learner-title">Meu perfil de aprendizado</h2>
+      <app-student-profile-view [studentId]="studentId" [isOwn]="true" />
+    } @else if (isStudent()) {
+      <mat-card appearance="outlined" class="state-card">
+        <mat-card-content class="state-content">
+          <mat-icon aria-hidden="true" class="state-icon">person_search</mat-icon>
+          <h2>Aguardando vínculo</h2>
+          <p>
+            Sua conta ainda não foi vinculada a um estudante. Procure um educador
+            ou responsável para liberar seu perfil.
+          </p>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</section>

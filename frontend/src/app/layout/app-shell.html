@@ -11,7 +11,34 @@
     <mat-icon>menu</mat-icon>
   </button>
   <span class="app-title">Perfil de Aprendizado</span>
+  <span class="toolbar-spacer"></span>
+  @if (auth.isAuthenticated()) {
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="accountMenu"
+      aria-label="Menu da conta"
+      class="account-button"
+    >
+      <mat-icon>account_circle</mat-icon>
+    </button>
+  }
 </mat-toolbar>
+
+<mat-menu #accountMenu="matMenu" class="account-menu">
+  <div class="account-menu-header">
+    <strong>{{ auth.user()?.name }}</strong>
+    <span>{{ auth.user()?.email }}</span>
+    <span class="account-menu-role">{{ roleLabel() }}</span>
+  </div>
+  <button mat-menu-item routerLink="/perfil">
+    <mat-icon>person</mat-icon>
+    Meu perfil
+  </button>
+  <button mat-menu-item (click)="logout()">
+    <mat-icon>logout</mat-icon>
+    Sair
+  </button>
+</mat-menu>
 
 <mat-sidenav-container class="sidenav-container">
   <mat-sidenav
@@ -35,9 +62,11 @@
             Estudantes
           </a>
         }
-        <a mat-list-item routerLink="/perfil" routerLinkActive="active">
-          Meu perfil
-        </a>
+        @if (auth.user()?.role === 'admin') {
+          <a mat-list-item routerLink="/admin" routerLinkActive="active">
+            Administração
+          </a>
+        }
         <a mat-list-item routerLink="/avaliacao" routerLinkActive="active">
           Avaliação
         </a>
@@ -50,7 +79,6 @@
         <a mat-list-item routerLink="/observacoes" routerLinkActive="active">
           Observações
         </a>
-        <a mat-list-item (click)="logout()" class="logout-link">Sair</a>
       } @else {
         <a mat-list-item routerLink="/login">Entrar</a>
       }

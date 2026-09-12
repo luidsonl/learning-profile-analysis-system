@@ -1,0 +1,72 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Aprovar usuários</h1>
+    <p>Contas recém-registradas aguardando aprovação de acesso.</p>
+  </header>
+
+  @if (actionError(); as message) {
+    <p class="action-error" role="alert">{{ message }}</p>
+  }
+
+  @if (isLoading()) {
+    <div class="state-content">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else if (errorMessage(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <p>{{ message }}</p>
+        <button mat-flat-button color="primary" (click)="load()">Tentar novamente</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (pendingUsers(); as users) {
+    @if (users.length === 0) {
+      <mat-card appearance="outlined" class="state-card">
+        <mat-card-content class="state-content">
+          <mat-icon aria-hidden="true" class="state-icon">verified_user</mat-icon>
+          <p>Nenhuma conta aguardando aprovação.</p>
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <div class="list">
+        @for (user of users; track user.userId) {
+          <mat-card appearance="outlined">
+            <mat-card-header>
+              <mat-card-title>{{ user.name }}</mat-card-title>
+              <mat-card-subtitle>{{ user.email }}</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <mat-chip-set>
+                <mat-chip>{{ roleLabel(user) }}</mat-chip>
+              </mat-chip-set>
+              <p class="user-since">Registrado em {{ since(user) }}</p>
+            </mat-card-content>
+            <mat-card-actions align="end">
+              <button
+                mat-flat-button
+                color="primary"
+                [disabled]="busyFor() !== null"
+                (click)="approve(user)"
+              >
+                @if (isBusy(user, 'approve')) {
+                  <mat-spinner diameter="20" />
+                }
+                Aprovar
+              </button>
+              <button
+                mat-stroked-button
+                [disabled]="busyFor() !== null"
+                (click)="deny(user)"
+              >
+                @if (isBusy(user, 'deny')) {
+                  <mat-spinner diameter="20" />
+                }
+                Recusar
+              </button>
+            </mat-card-actions>
+          </mat-card>
+        }
+      </div>
+    }
+  }
+</section>

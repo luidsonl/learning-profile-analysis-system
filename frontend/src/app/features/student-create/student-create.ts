@@ -57,7 +57,7 @@ export class StudentCreate {
         school: form.school ?? undefined,
       })
       .subscribe({
-        next: () => this.router.navigate(['/estudantes']),
+        next: () => void this.router.navigate(['/estudantes']).catch(() => undefined),
         error: () => {
           this.isLoading.set(false);
           this.errorMessage.set('Não foi possível cadastrar o estudante. Verifique os dados e tente novamente.');

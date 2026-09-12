@@ -60,6 +60,25 @@ export interface PendingAccountsResponse {
   count: number;
 }
 
+export interface UserListResponse {
+  data: PublicUser[];
+  count: number;
+}
+
+export interface UserUpdateRequest {
+  status?: UserStatus;
+  role?: Role;
+  birthDate?: string;
+}
+
+export interface UserUpdateResponse {
+  user: PublicUser;
+}
+
+export interface UserResetPasswordRequest {
+  password: string;
+}
+
 export interface GuardianSearchHit {
   userId: string;
   name: string;

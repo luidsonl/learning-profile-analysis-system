@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { tap } from 'rxjs';
+import { firstValueFrom, tap } from 'rxjs';
 
 import {
   LoginRequest,
@@ -54,6 +54,24 @@ export class AuthService {
         this.user$.set(user);
         this.studentId$.set(studentId);
       }));
+  }
+
+  // Resolves the current session user, rehydrating from /auth/me when needed
+  // (route guards may run before the app-level me() call finishes).
+  async ensureSession(): Promise<PublicUser | null> {
+    if (this.user$()) {
+      return this.user$();
+    }
+    if (!this.token$()) {
+      return null;
+    }
+    try {
+      await firstValueFrom(this.me());
+    } catch {
+      this.clearSession();
+      return null;
+    }
+    return this.user$();
   }
 
   logout() {

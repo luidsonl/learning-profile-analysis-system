@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard } from './core/auth/auth.guard';
+import { adminGuard, authGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -21,12 +21,17 @@ export const routes: Routes = [
   {
     path: 'perfil',
     canActivate: [authGuard],
-    loadComponent: () => import('./features/profile/student-profile').then((m) => m.StudentProfile),
+    loadComponent: () => import('./features/profile/meu-perfil').then((m) => m.MeuPerfil),
   },
   {
     path: 'perfil/:studentId',
     canActivate: [authGuard],
     loadComponent: () => import('./features/profile/student-profile').then((m) => m.StudentProfile),
+  },
+  {
+    path: 'admin',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./features/admin/admin-area').then((m) => m.AdminArea),
   },
   {
     path: 'estudantes',

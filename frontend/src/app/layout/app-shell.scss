@@ -9,6 +9,35 @@
   font-weight: 600;
 }
 
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.account-button {
+  margin-inline-start: var(--space-2);
+}
+
+// mat-menu content renders in an overlay outside the component, so it is
+// styled through the menu's class with ::ng-deep.
+::ng-deep .account-menu .account-menu-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  min-width: 13rem;
+
+  span {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+  }
+
+  .account-menu-role {
+    font-weight: 500;
+    color: var(--mat-sys-primary);
+  }
+}
+
 .sidenav-container {
   flex: 1;
 }
@@ -30,10 +59,6 @@ mat-sidenav {
 
 mat-nav-list a.active {
   background-color: var(--mat-sys-secondary-container);
-}
-
-.logout-link {
-  color: var(--mat-sys-error);
 }
 
 .content {

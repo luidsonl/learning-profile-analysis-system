@@ -23,6 +23,14 @@ const PT_BY_CODE: Record<string, string> = {
   not_found: 'Não encontrado.',
   conflict: 'Já existe uma conta com este e-mail.',
   internal_error: 'Erro no servidor. Tente novamente.',
+  // Admin/user-management codes (see sam-app/src/api/handlers/admin.mjs)
+  last_admin: 'Não é possível modificar ou remover o último administrador ativo.',
+  cannot_delete_self: 'Você não pode excluir a própria conta.',
+  cannot_demote_self: 'Você não pode rebaixar o próprio perfil.',
+  user_not_found: 'Usuário não encontrado.',
+  weak_password: 'A senha deve ter ao menos 8 caracteres.',
+  no_changes: 'Nenhuma alteração informada.',
+  email_in_use: 'Já existe uma conta com este e-mail.',
 };
 
 // Maps the API's uniform error envelope
