@@ -4,7 +4,7 @@ title: Backend
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-30
+lastReviewed: 2026-09-12
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -177,7 +177,7 @@ The API is exercised via the deployed stack; there is no local Lambda/DynamoDB e
 
 - `make e2e-test` runs the **full e2e suite** (`sam-app/tests/e2e/`) against the deployed API — scenarios run **in order and share state** through `ctx` (tokens, student ids, submission ids), and the suite cleans only its own fixtures.
 - **Optional filter** `make e2e-test FILTER=<id|name>` runs **a contiguous prefix** `01 → <matched scenario>` of the suite. Because each scenario reuses `ctx` seeded by the ones before it, only a prefix can run in isolation; everything after the matched scenario is skipped. `FILTER` accepts the two-digit id (`FILTER=04`) or a case-insensitive name substring (`FILTER=inference`, or the shorthand `make e2e-inference`) — e.g. filtering the **ML inference** scenario (`04-ml-inference.mjs`: vark submission → async inference → `PRED#` read-back) still runs the bootstrap first (auth/consent/forms). `inferencia` aliases `inference`; an unknown filter aborts with the list of valid ids.
-- **Clean-table precondition**: the first educator to register becomes the initial admin (auth `hasAdmin` bootstrap), so the suite requires a table with **no admin before it starts**. The runner has a **preflight check** (`findAdmins`) that fails fast with an actionable message when a leftover non-fixture admin blocks that bootstrap. Reset the dev table with `make db-wipe CONFIRM=yes`.
+- **Clean-table precondition**: the first educator to register becomes the initial admin (auth `hasAdmin` bootstrap), so the suite requires a table with **no admin before it starts**. The runner has a **preflight check** (`findAdmins`) that fails fast with an actionable message when a leftover non-fixture admin blocks that bootstrap. Reset the dev table with `make clean CONFIRM=yes`.
 
 ---
 

@@ -76,7 +76,7 @@ const assertCleanBootstrap = async () => {
     console.error(
       `\nERROR[preflight]: admin "${stray.email}" exists but is not an e2e fixture. ` +
         `The suite requires a clean table (first educator -> initial admin). ` +
-        `Remove it manually or wipe the dev table: make db-wipe CONFIRM=yes\n`,
+        `Remove it manually or wipe the dev table: make clean CONFIRM=yes\n`,
     );
     process.exit(2);
   }

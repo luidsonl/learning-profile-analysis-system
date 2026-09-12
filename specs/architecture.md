@@ -4,7 +4,7 @@ title: Architecture
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-30
+lastReviewed: 2026-09-12
 dependsOn: []
 requiredBy:
   - dynamodb-schema
@@ -144,7 +144,7 @@ Training always happens **outside** the deployed system (local machine). The dep
 │   │                      #   recommendations, reports, audit, inference)
 │   ├── samconfig.toml     # SAM config (stack name, parameter overrides)
 │   ├── resources.env      # Central resource names (source of truth)
-│   ├── Makefile           # deploy, redeploy-api, unit/e2e tests, db-clean/db-wipe, clean
+│   ├── Makefile           # deploy, redeploy-api, unit/e2e tests, clean (full dev DB wipe)
 │   ├── src/api/           # Lambda code — Node.js handlers, forms engine, lib
 │   └── src/inference/      # Lambda code — Python + bundled models (models/<formId>/model.joblib)
 │       ├── health.mjs, auth.mjs, students.mjs, guardianship.mjs,
@@ -301,7 +301,7 @@ make train package # offline ML: retrain and bundle a new artifact into sam-app
 make destroy-backend / make destroy
 ```
 
-`sam-app/Makefile` handles the backend alone; its `redeploy-api` step works around the SAM "empty deployment" race (a no-op deploy can leave the Prod stage without the routes). Database maintenance: `make db-clean` (default: legacy `MODEL#`/`FORM#` orphans; pass `PREFIXES="..."` to target others) and `make db-wipe CONFIRM=yes` (full wipe).
+`sam-app/Makefile` handles the backend alone; its `redeploy-api` step works around the SAM "empty deployment" race (a no-op deploy can leave the Prod stage without the routes). Database maintenance: `make clean CONFIRM=yes` (full dev wipe — every item; the old `db-clean` default `MODEL#`/`FORM#` orphans are gone)`.
 
 Cleanup happens in reverse order.
 

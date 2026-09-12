@@ -21,7 +21,7 @@ STACK_NAME ?= learning-profile-api
 
 export TABLE_NAME FILES_BUCKET DATA_BUCKET STACK_NAME REGION
 
-.PHONY: install validate build deploy redeploy-api unit-test e2e-test test db-clean db-wipe clean
+.PHONY: install validate build deploy redeploy-api unit-test e2e-test test clean db-wipe
 
 install:
 	npm install --no-audit --no-fund --prefix src
@@ -85,7 +85,7 @@ unit-test:
 #   make e2e-test FILTER=inference # same, by scenario label
 #   make e2e-inference           # shorthand (via the e2e-% rule below)
 # NOTE: the first educator must become admin, so the suite assumes a clean table
-# (run `make db-wipe CONFIRM=yes` if a leftover admin breaks the bootstrap).
+# (run `make clean CONFIRM=yes` if a leftover admin breaks the bootstrap).
 e2e-test:
 	API_BASE=$$(aws cloudformation describe-stacks --stack-name $(STACK_NAME) \
 		--query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
@@ -98,16 +98,15 @@ e2e-%:
 test:
 	@if [ -n "$(FILTER)" ]; then npm test -- --test-name-pattern="$(FILTER)"; else npm test; fi
 
-# Remove items by PK prefix. Defaults to legacy orphans; pass your own:
-#   make db-clean PREFIXES="MODEL# FORM# EMAIL#stale@"
-db-clean:
-	node scripts/clean-db.mjs $(PREFIXES)
-
-# Full wipe — dev only, requires explicit confirmation:
-#   make db-wipe CONFIRM=yes
-db-wipe:
+# Full dev DB wipe. The single table is disposable in development; this deletes
+# EVERY item (all entity prefixes). Requires explicit confirmation:
+#   make clean CONFIRM=yes
+# (The old `db-clean` default targeted legacy MODEL#/FORM# orphans which no
+# longer exist — use `clean` for a real reset, or script scripts/clean-db.mjs
+# directly with PREFIXES for a targeted prefix cleanup.)
+clean:
 	@if [ "$(CONFIRM)" != "yes" ]; then echo "Refusing to wipe '$(TABLE_NAME)' without CONFIRM=yes."; exit 2; fi
 	CONFIRM=yes node scripts/clean-db.mjs --all
 
-clean:
-	rm -rf .aws-sam
+# Compatibility alias for the old full-wipe name.
+db-wipe: clean
