@@ -43,15 +43,6 @@
             <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
           }
         </mat-select>
-        <mat-hint>
-          @if (isStudent) {
-            Estudante se cadastra sozinho e é vinculado a um responsável/instituição depois.
-          } @else if (form.controls.role.value === 'educator') {
-            Educador(a) acessa os estudantes que acompanha.
-          } @else {
-            Responsável acessa apenas seus filhos.
-          }
-        </mat-hint>
       </mat-form-field>
 
       @if (isStudent) {
