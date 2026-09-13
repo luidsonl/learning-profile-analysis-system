@@ -9,7 +9,7 @@ const CATEGORIES = ["academic", "behavior", "social", "emotional", "attention", 
 
 const addObservation = async (event, ctx) => {
   const studentId = param(event, "id");
-  assert(ctx.role === "educator", "forbidden", "Only educators can add observations", 403);
+  assert(ctx.role === "educator" || ctx.role === "admin", "forbidden", "Only educators or admins can add observations", 403);
   await assertScopeStudent(studentId, ctx);
 
   const body = parseBody(event);

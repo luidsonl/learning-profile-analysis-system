@@ -67,15 +67,30 @@ export default async (ctx) => {
     const o = await api("POST", `/students/${ctx.studentId}/observations`, { token: ctx.educatorToken, body: { category: "academic", text: "Demonstra grande curiosidade por ciências.", rating: 4 } });
     expect("observation added", o.status === 201, JSON.stringify(o.data));
 
+    const adminObs = await api("POST", `/students/${ctx.studentId}/observations`, { token: ctx.adminToken, body: { category: "social", text: "Acompanhamento registrado pela administração." } });
+    expect("admin adds an observation too", adminObs.status === 201, JSON.stringify(adminObs.data));
+
+    const guardianDenied = await api("POST", `/students/${ctx.studentId}/observations`, { token: ctx.guardianToken, body: { category: "academic", text: "Tentativa do responsável." } });
+    expect("guardian cannot add an observation", guardianDenied.status === 403, JSON.stringify(guardianDenied.data));
+
+    const studentDenied = await api("POST", `/students/${ctx.studentId}/observations`, { token: ctx.studentToken, body: { category: "academic", text: "Tentativa do estudante." } });
+    expect("student cannot add an observation", studentDenied.status === 403, JSON.stringify(studentDenied.data));
+
     const studentView = await api("GET", `/students/${ctx.studentId}/observations`, { token: ctx.studentToken });
-    expect("student reads own observations", studentView.status === 200 && studentView.data.count === 1, JSON.stringify(studentView.data));
+    expect("student reads own observations", studentView.status === 200 && studentView.data.count === 2, JSON.stringify(studentView.data));
 
     const list = await api("GET", `/students/${ctx.studentId}/observations`, { token: ctx.educatorToken });
-    expect("educator lists observations", list.status === 200 && list.data.count === 1, JSON.stringify(list.data));
+    expect("educator lists observations", list.status === 200 && list.data.count === 2, JSON.stringify(list.data));
   }
 
   step("recommendations: propose + approve (educator)");
   {
+    const guardianProposeDenied = await api("POST", `/students/${ctx.studentId}/recommendations`, { token: ctx.guardianToken, body: { title: "Tentativa", text: "Proposta do responsável." } });
+    expect("guardian cannot propose a recommendation", guardianProposeDenied.status === 403, JSON.stringify(guardianProposeDenied.data));
+
+    const studentProposeDenied = await api("POST", `/students/${ctx.studentId}/recommendations`, { token: ctx.studentToken, body: { title: "Tentativa", text: "Proposta do estudante." } });
+    expect("student cannot propose a recommendation", studentProposeDenied.status === 403, JSON.stringify(studentProposeDenied.data));
+
     const studentRecs = await api("GET", `/students/${ctx.studentId}/recommendations`, { token: ctx.studentToken });
     expect("student sees 0 recs before approval", studentRecs.status === 200 && studentRecs.data.count === 0, JSON.stringify(studentRecs.data));
 
