@@ -70,6 +70,35 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 # ---------------------------------------------------------------------------
+# Strip the /api prefix before forwarding to the API Gateway origin
+# ---------------------------------------------------------------------------
+# The SPA calls absolute /api/* paths, but API Gateway routes live under the
+# stage (e.g. /auth/login, not /api/auth/login). The origin's origin_path
+# (/prod) is prepended by CloudFront automatically, so this function only has
+# to remove the /api prefix — mirroring the dev proxy's pathRewrite. Without it
+# the origin receives /prod/api/health → 403 "Missing Authentication Token",
+# which the SPA-fallback custom_error_response then hides as index.html.
+resource "aws_cloudfront_function" "api_rewrite" {
+  count   = var.frontend_enabled ? 1 : 0
+  name    = "${local.name_prefix}-api-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "Strip the /api prefix on requests to the API Gateway origin"
+
+  code = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var uri     = request.uri;
+      if (uri.startsWith("/api/")) {
+        request.uri = uri.substring(4);
+      } else if (uri === "/api" || uri === "/api/") {
+        request.uri = "/";
+      }
+      return request;
+    }
+  EOT
+}
+
+# ---------------------------------------------------------------------------
 # CloudFront origin request policy for the API Gateway origin
 # ---------------------------------------------------------------------------
 resource "aws_cloudfront_origin_request_policy" "api" {
@@ -143,6 +172,11 @@ resource "aws_cloudfront_distribution" "main" {
     cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # CachingDisabled
 
     origin_request_policy_id = aws_cloudfront_origin_request_policy.api[0].id
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.api_rewrite[0].arn
+    }
   }
 
   price_class = "PriceClass_100"
