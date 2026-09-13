@@ -1,0 +1,25 @@
+<nav class="steps" aria-label="Etapas da avaliação">
+  @if (step() > 1) {
+    <a class="done" routerLink="/avaliacoes">1. Estudante</a>
+  } @else {
+    <span class="current">1. Estudante</span>
+  }
+
+  <span class="sep" aria-hidden="true">›</span>
+
+  @if (step() === 3) {
+    <a class="done" routerLink="/avaliacoes/{{ studentId() }}">2. Formulário</a>
+  } @else if (step() === 2) {
+    <span class="current">2. Formulário</span>
+  } @else {
+    <span class="pending">2. Formulário</span>
+  }
+
+  <span class="sep" aria-hidden="true">›</span>
+
+  @if (step() === 3) {
+    <span class="current">3. Envios e resultados</span>
+  } @else {
+    <span class="pending">3. Envios e resultados</span>
+  }
+</nav>

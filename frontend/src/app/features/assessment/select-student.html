@@ -1,0 +1,59 @@
+<section class="page">
+  <assessment-steps [step]="1" />
+
+  <header class="page-header">
+    <h1>Avaliações</h1>
+    @if (isStudent()) {
+      <p>Este é o seu perfil de aprendizagem.</p>
+    } @else {
+      <p>Selecione o estudante que será avaliado.</p>
+    }
+  </header>
+
+  @switch (block().status) {
+    @case ('loading') {
+      <div class="state-content"><mat-spinner diameter="32" /></div>
+    }
+    @case ('error') {
+      <div class="state-content">
+        <p class="error">{{ errorMessage() }}</p>
+        <button mat-stroked-button (click)="load()">Tentar novamente</button>
+      </div>
+    }
+    @case ('ready') {
+      @if (items().length === 0) {
+        @if (isStudent() && !ownStudentId()) {
+          <p class="empty">
+            Sua conta ainda não está vinculada a um perfil de estudante. Procure um educador para
+            concluir o vínculo.
+          </p>
+        } @else if (role() === 'guardian') {
+          <p class="empty">
+            Nenhum estudante vinculado à sua conta ainda. Um educador precisa atribuir responsáveis
+            aos perfis.
+          </p>
+        } @else {
+          <p class="empty">Nenhum estudante disponível ainda. Cadastre estudantes para começar.</p>
+        }
+      } @else {
+        <div class="card-grid">
+          @for (student of items(); track student.studentId) {
+            <mat-card appearance="outlined" class="student-card">
+              <mat-card-header>
+                <mat-card-title>{{ student.name }}</mat-card-title>
+                @if (details(student)) {
+                  <mat-card-subtitle>{{ details(student) }}</mat-card-subtitle>
+                }
+              </mat-card-header>
+              <mat-card-actions align="end">
+                <a mat-flat-button color="primary" routerLink="/avaliacoes/{{ student.studentId }}">
+                  Selecionar
+                </a>
+              </mat-card-actions>
+            </mat-card>
+          }
+        </div>
+      }
+    }
+  }
+</section>

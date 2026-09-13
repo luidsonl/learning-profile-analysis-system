@@ -11,12 +11,17 @@ export const routes: Routes = [
   {
     path: 'avaliacoes',
     canActivate: [authGuard],
-    loadComponent: () => import('./features/assessment/assessments').then((m) => m.Assessments),
+    loadComponent: () => import('./features/assessment/select-student').then((m) => m.SelectStudent),
   },
   {
     path: 'avaliacoes/:studentId',
     canActivate: [authGuard],
-    loadComponent: () => import('./features/assessment/assessments').then((m) => m.Assessments),
+    loadComponent: () => import('./features/assessment/select-form').then((m) => m.SelectForm),
+  },
+  {
+    path: 'avaliacoes/:studentId/:formId',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/assessment/submission-history').then((m) => m.SubmissionHistory),
   },
   {
     path: 'perfil',

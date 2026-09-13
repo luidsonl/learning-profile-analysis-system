@@ -8,25 +8,19 @@
   margin: 0 0 var(--space-1);
 }
 
-.panel {
-  width: 100%;
-}
-
-.student-select {
-  width: 100%;
-  max-width: 30rem;
-}
-
-.own-student-line {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.form-description {
-  margin: var(--space-3) 0 0;
+.page-header p {
+  margin: 0;
   color: var(--sys-on-surface-variant);
-  max-width: 42rem;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fill-card {
+  box-shadow: none;
+  border: 1px solid var(--mat-sys-primary);
 }
 
 .feed {
@@ -69,6 +63,8 @@
 
 .answers-panel {
   margin-top: var(--space-3);
+  box-shadow: none;
+  border: 1px solid var(--sys-outline-variant);
 }
 
 .answer-list {
@@ -108,8 +104,4 @@
 .empty {
   color: var(--sys-on-surface-variant);
   margin: 0;
-}
-
-.fill-panel {
-  margin-top: var(--space-2);
 }

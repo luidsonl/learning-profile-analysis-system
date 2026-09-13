@@ -1,0 +1,49 @@
+<section class="page">
+  <assessment-steps [step]="2" [studentId]="studentId()" />
+
+  <header class="page-header">
+    <h1>Escolher formulário</h1>
+    @if (studentLoadFailed()) {
+      <p>Estudante não encontrado.</p>
+    } @else {
+      <p>Avaliação de <strong>{{ studentName() ?? '…' }}</strong>. Selecione qual formulário aplicar.</p>
+    }
+  </header>
+
+  @switch (block().status) {
+    @case ('loading') {
+      <div class="state-content"><mat-spinner diameter="32" /></div>
+    }
+    @case ('error') {
+      <div class="state-content">
+        <p class="error">{{ errorMessage() }}</p>
+        <button mat-stroked-button (click)="loadForms()">Tentar novamente</button>
+      </div>
+    }
+    @case ('ready') {
+      @if (formsList().length === 0) {
+        <p class="empty">Nenhum formulário disponível.</p>
+      } @else {
+        <div class="form-list">
+          @for (form of formsList(); track form.formId) {
+            <mat-card appearance="outlined" class="form-card">
+              <mat-card-header>
+                <mat-card-title>{{ form.name }}</mat-card-title>
+                <mat-card-subtitle>{{ form.description }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-actions align="end">
+                <a
+                  mat-flat-button
+                  color="primary"
+                  routerLink="/avaliacoes/{{ studentId() }}/{{ form.formId }}"
+                >
+                  Usar este formulário
+                </a>
+              </mat-card-actions>
+            </mat-card>
+          }
+        </div>
+      }
+    }
+  }
+</section>

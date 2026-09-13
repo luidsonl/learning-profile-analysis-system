@@ -1,0 +1,143 @@
+import { DatePipe } from '@angular/common';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+
+import { FormDefinition, FormResponseItem, Prediction } from '../../core/api/types';
+import { FormsService } from '../../core/forms/forms.service';
+import { StudentsService } from '../../core/students/students.service';
+import { ROLE_LABELS } from '../../core/users/user-labels';
+import { VARK_LABELS } from '../../core/vark/vark-labels';
+import { PredictionScores } from '../../shared/ui/prediction-scores/prediction-scores';
+import { VarkAssessment } from './vark-assessment';
+import { AssessmentSteps } from './steps';
+
+type BlockState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; items: FormResponseItem[] };
+
+// Step 3 — the selected student + form: the submission history (answers,
+// deterministic assessment and async ML prediction) and an "Enviar nova
+// avaliação" action that reveals the questionnaire in place.
+@Component({
+  selector: 'app-submission-history',
+  imports: [
+    DatePipe,
+    MatButtonModule,
+    MatCardModule,
+    MatChipsModule,
+    MatExpansionModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    AssessmentSteps,
+    PredictionScores,
+    VarkAssessment,
+  ],
+  templateUrl: './submission-history.html',
+  styleUrl: './submission-history.scss',
+})
+export class SubmissionHistory {
+  readonly studentId = input.required<string>();
+  readonly formId = input.required<string>();
+
+  private readonly students = inject(StudentsService);
+  private readonly forms = inject(FormsService);
+
+  readonly filling = signal(false);
+
+  readonly studentName = signal<string | null>(null);
+  readonly formsState = signal<FormDefinition[] | null>(null);
+
+  readonly block = signal<BlockState>({ status: 'loading' });
+
+  readonly history = computed(() => {
+    const block = this.block();
+    return block.status === 'ready' ? block.items : [];
+  });
+
+  readonly errorMessage = computed(() => {
+    const block = this.block();
+    return block.status === 'error' ? block.message : null;
+  });
+
+  readonly selectedForm = computed(() =>
+    this.formsState()?.find((form) => form.formId === this.formId()) ?? null,
+  );
+
+  constructor() {
+    // Route params bind after construction: react to both of them.
+    effect(() => {
+      const id = this.studentId();
+      const formId = this.formId();
+      if (!id || !formId) {
+        return;
+      }
+      this.students.getStudent(id).subscribe({
+        next: (res) => this.studentName.set(res.student.name),
+        error: () => undefined,
+      });
+      this.loadHistory();
+    });
+
+    this.forms.listForms().subscribe({
+      next: (res) => this.formsState.set(res.data),
+      error: () => this.formsState.set(null),
+    });
+  }
+
+  loadHistory(): void {
+    const id = this.studentId();
+    const formId = this.formId();
+    if (!id || !formId) {
+      return;
+    }
+    this.block.set({ status: 'loading' });
+    this.students.responses(id, formId).subscribe({
+      next: (res) => this.block.set({ status: 'ready', items: res.data }),
+      error: () => this.block.set({ status: 'error', message: 'Não foi possível carregar os envios.' }),
+    });
+  }
+
+  // A submission just completed: collapse the questionnaire and refresh the
+  // history so the new row appears (its prediction lands asynchronously and
+  // shows up as "aguardando análise" until then).
+  onSubmitted(): void {
+    this.filling.set(false);
+    this.loadHistory();
+  }
+
+  answeredQuestions(item: FormResponseItem): { id: string; text: string }[] {
+    const selected = this.selectedForm();
+    if (!selected) {
+      return [];
+    }
+    const questions: { id: string; text: string }[] = [];
+    for (const section of selected.sections) {
+      for (const question of section.questions) {
+        questions.push({ id: question.id, text: question.text });
+      }
+    }
+    return questions.filter((question) => item.answers[question.id] !== undefined);
+  }
+
+  roleLabel(role: string): string {
+    return ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role;
+  }
+
+  formatLabel(label: string | null | undefined): string {
+    return label ? (VARK_LABELS[label] ?? label) : '';
+  }
+
+  confidence(prediction: Prediction): string {
+    return `${Math.round(prediction.confidence * 100)}%`;
+  }
+
+  hasScores(scores: Record<string, number> | null | undefined): boolean {
+    return !!scores && Object.keys(scores).length > 0;
+  }
+}
