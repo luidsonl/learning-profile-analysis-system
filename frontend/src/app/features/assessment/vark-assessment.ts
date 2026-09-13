@@ -1,11 +1,12 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
+import { of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { FormsService } from '../../core/forms/forms.service';
@@ -32,6 +33,11 @@ export class VarkAssessment {
   // to the own studentId for a linked student's self-assessment. The input name
   // must match the route param so withComponentInputBinding binds it.
   readonly studentId = input<string>();
+  // Which form is filled; only "vark" ships today (curated forms registry).
+  readonly formId = input<string>('vark');
+  // Emitted when a submission completes and its prediction lands (the parent
+  // uses it to refresh the history list).
+  readonly submitted = output<void>();
 
   private readonly forms = inject(FormsService);
   private readonly auth = inject(AuthService);
@@ -39,7 +45,10 @@ export class VarkAssessment {
 
   readonly scopeStudentId = computed(() => this.studentId() ?? this.auth.studentId() ?? undefined);
 
-  readonly form = toSignal(this.forms.getForm('vark'), { initialValue: undefined });
+  private readonly formRequest = toObservable(this.formId).pipe(
+    switchMap((id) => this.forms.getForm(id)),
+  );
+  readonly form = toSignal(this.formRequest, { initialValue: undefined });
 
   readonly answers = signal<Record<string, number>>({});
 
@@ -73,18 +82,36 @@ export class VarkAssessment {
 
   readonly allAnswered = computed(() => this.answeredCount() >= this.totalQuestions());
 
+  constructor() {
+    // Switching the target student or form restarts the fill flow, so stale
+    // answers or a finished prediction never leak into the next questionnaire.
+    effect(() => {
+      void this.studentId();
+      void this.formId();
+      this.reset();
+    });
+
+    // Let the parent know the history list should be refreshed.
+    effect(() => {
+      if (this.polling.state().status === 'ready') {
+        this.submitted.emit();
+      }
+    });
+  }
+
   onAnswer(questionId: string, value: number): void {
     this.answers.update((current) => ({ ...current, [questionId]: value }));
   }
 
   submit(): void {
     const studentId = this.scopeStudentId();
+    const formId = this.formId();
     if (!studentId || !this.allAnswered()) {
       return;
     }
     this.polling.submit({
       studentId,
-      formId: 'vark',
+      formId,
       answers: { ...this.answers() },
       requestId: crypto.randomUUID(),
     });

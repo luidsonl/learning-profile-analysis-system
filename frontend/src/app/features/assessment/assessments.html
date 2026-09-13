@@ -1,0 +1,212 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Avaliações</h1>
+    <p>
+      Escolha o estudante e o formulário, confira os envios e resultados, e preencha uma nova avaliação.
+    </p>
+  </header>
+
+  <!-- 1. Aluno -->
+  <mat-card appearance="outlined" class="panel">
+    <mat-card-header>
+      <mat-card-title>1. Estudante</mat-card-title>
+      <mat-card-subtitle>
+        @if (needsStudentSelection()) {
+          Selecione qual estudante será avaliado.
+        } @else {
+          Você avalia o seu próprio perfil de aprendizagem.
+        }
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (needsStudentSelection()) {
+        @if (studentsLoading()) {
+          <div class="state-content"><mat-spinner diameter="32" /></div>
+        } @else if (studentsError(); as message) {
+          <div class="state-content">
+            <p class="error">{{ message }}</p>
+            <button mat-stroked-button (click)="loadStudents()">Tentar novamente</button>
+          </div>
+        } @else if (studentsList(); as list) {
+          @if (list.length === 0) {
+            <p class="empty">
+              @if (role() === 'guardian') {
+                Nenhum estudante vinculado à sua conta ainda. Um educador precisa atribuir responsáveis aos perfis.
+              } @else {
+                Nenhum estudante disponível ainda. Cadastre estudantes para começar.
+              }
+            </p>
+          } @else {
+            <mat-form-field appearance="outline" class="student-select">
+              <mat-label>Estudante</mat-label>
+              <mat-select
+                [value]="selectedStudentId()"
+                (selectionChange)="onSelectStudent($event.value)"
+              >
+                @for (student of list; track student.studentId) {
+                  <mat-option [value]="student.studentId">
+                    {{ student.name }}{{ details(student) ? ' · ' + details(student) : '' }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+        }
+      } @else {
+        @if (ownStudentId(); as ownId) {
+          <div class="own-student-line">
+            <mat-icon>school</mat-icon>
+            <span>
+              Perfil próprio:
+              <strong>{{ activeStudent()?.name ?? '…' }}</strong>
+            </span>
+          </div>
+        } @else {
+          <p class="empty">
+            Sua conta ainda não está vinculada a um perfil de estudante. Procure um educador para concluir o vínculo.
+          </p>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <!-- 2. Formulário -->
+  <mat-card appearance="outlined" class="panel">
+    <mat-card-header>
+      <mat-card-title>2. Formulário</mat-card-title>
+      <mat-card-subtitle>Escolha o formulário da avaliação.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (formsLoading()) {
+        <div class="state-content"><mat-spinner diameter="32" /></div>
+      } @else if (formsError(); as message) {
+        <div class="state-content">
+          <p class="error">{{ message }}</p>
+          <button mat-stroked-button (click)="loadForms()">Tentar novamente</button>
+        </div>
+      } @else if (formsList(); as list) {
+        @if (list.length === 0) {
+          <p class="empty">Nenhum formulário disponível.</p>
+        } @else {
+          <mat-chip-listbox
+            [value]="selectedFormId()"
+            (change)="onSelectForm($event.value)"
+            aria-label="Formulário de avaliação"
+          >
+            @for (form of list; track form.formId) {
+              <mat-chip [value]="form.formId">{{ form.name }}</mat-chip>
+            }
+          </mat-chip-listbox>
+          @if (selectedForm(); as form) {
+            <p class="form-description">{{ form.description }}</p>
+          }
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <!-- 3. Envios e resultados -->
+  @if (activeStudentId()) {
+    <mat-card appearance="outlined" class="panel">
+      <mat-card-header>
+        <mat-card-title>3. Envios e resultados</mat-card-title>
+        <mat-card-subtitle>
+          Envios de {{ activeStudent()?.name ?? '…' }} para {{ selectedForm()?.name ?? '…' }}
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (historyLoading()) {
+          <div class="state-content"><mat-spinner diameter="32" /></div>
+        } @else if (historyError(); as message) {
+          <p class="error">{{ message }}</p>
+        } @else if (history(); as items) {
+          @if (items.length === 0) {
+            <p class="empty">Nenhum envio ainda. Responda abaixo para gerar a primeira avaliação.</p>
+          } @else {
+            <div class="feed">
+              @for (item of items; track item.submissionId) {
+                <mat-card appearance="outlined" class="submission">
+                  <mat-card-content>
+                    <div class="submission-head">
+                      <mat-chip-set>
+                        <mat-chip [class.result-chip]="!!item.prediction">
+                          @if (item.prediction; as prediction) {
+                            Perfil: {{ formatLabel(prediction.label) }}
+                          } @else {
+                            Aguardando análise
+                          }
+                        </mat-chip>
+                      </mat-chip-set>
+                      <span class="submission-meta">
+                        {{ roleLabel(item.submittedByRole) }} ·
+                        {{ item.createdAt | date: "dd/MM/yyyy 'às' HH:mm" }}
+                      </span>
+                    </div>
+
+                    @if (item.prediction; as prediction) {
+                      <prediction-scores [scores]="prediction.scores" />
+                      <p class="confidence">
+                        Confiança {{ confidence(prediction) }} · modelo {{ prediction.modelVersion }}
+                      </p>
+                    }
+
+                    @if (item.assessment; as assessment) {
+                      <p class="assessment-line">
+                        <mat-icon aria-hidden="true">assessment</mat-icon>
+                        Classificação: {{ formatLabel(assessment.label) }}
+                        @if (hasScores(assessment.scores)) {
+                          ({{ assessment.method }})
+                        }
+                      </p>
+                    }
+
+                    <mat-expansion-panel class="answers-panel">
+                      <mat-expansion-panel-header>
+                        <mat-panel-title>Respostas desta avaliação</mat-panel-title>
+                        <mat-panel-description>versão {{ item.formVersion }}</mat-panel-description>
+                      </mat-expansion-panel-header>
+                      @if (answeredQuestions(item).length === 0) {
+                        <p class="empty">Respostas indisponíveis para esta versão do formulário.</p>
+                      } @else {
+                        <div class="answer-list">
+                          @for (question of answeredQuestions(item); track question.id) {
+                            <div class="answer-row">
+                              <span>{{ question.text }}</span>
+                              <strong>{{ item.answers[question.id] }}</strong>
+                            </div>
+                          }
+                        </div>
+                      }
+                    </mat-expansion-panel>
+                  </mat-card-content>
+                </mat-card>
+              }
+            </div>
+          }
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- 4. Nova avaliação -->
+  @if (activeStudentId(); as studentId) {
+    @if (selectedFormId(); as formId) {
+      <mat-card appearance="outlined" class="panel fill-panel">
+        <mat-card-header>
+          <mat-card-title>4. Nova avaliação</mat-card-title>
+          <mat-card-subtitle>
+            Preencha o formulário {{ selectedForm()?.name ?? '' }} para
+            {{ activeStudent()?.name ?? '…' }}. O resultado da análise automática aparece aqui ao final.
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <app-vark-assessment
+            [studentId]="studentId"
+            [formId]="formId"
+            (submitted)="onSubmitted()"
+          />
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</section>

@@ -136,6 +136,28 @@ export interface FormResponse {
   form: FormDefinition;
 }
 
+export interface FormsList {
+  data: FormDefinition[];
+  count: number;
+}
+
+export interface FormResponseItem {
+  submissionId: string;
+  formId: string;
+  formVersion: number;
+  answers: Record<string, number>;
+  submittedBy: string;
+  submittedByRole: string;
+  createdAt: string;
+  prediction: Prediction | null;
+  assessment: Assessment | null;
+}
+
+export interface FormResponsesList {
+  data: FormResponseItem[];
+  count: number;
+}
+
 export interface FormSubmissionRequest {
   answers: Record<string, number>;
   requestId: string;

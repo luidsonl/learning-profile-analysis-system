@@ -93,6 +93,7 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 | `/students` | guardian, educator, admin | List in-scope students | `guardianEducatorAdminGuard` |
 | `/students/:id` | scoped | Student detail shell + tabs (profile, submissions/predictions, recommendations, observations, consent, audit) | `scopedStudentGuard`; admin adds audit tab |
 | `/students/:id/forms/:formId` | form persona | Fill a form (dynamic renderer) | audience check from `GET /api/forms` |
+| `/avaliacoes` (+ `/avaliacoes/:studentId`) | scoped | Four-level assessment workspace (see below) | `authGuard`; deep link from the student list preselects the student |
 | `/admin/users` | admin, educator | User management (approve/deny/promote/delete/reset) | `adminOrEducatorGuard`; role/status conditional UI; role selector only for staff (guardian/student roles are fixed — no selector) |
 
 **Status-aware login**: educator/guardian accounts that are `denied` or not yet `active` receive the mapped error and are routed accordingly; a `pending` student still signs in and lands on `/me` in restricted self-service mode (see [auth](./auth.md) → *Account status & approval flow*).
@@ -118,7 +119,16 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 - **`requestId` idempotency**: the SPA generates a `requestId` per submission attempt; a retry reuses the same value so the API deduplicates (see [backend](./backend.md) → *Forms*).
 - **Optimistic UI only where safe** (e.g. local tab state); anything that mutates students' data waits for the API response and refreshes from the server.
 
-## Forms Renderer
+## Assessment Workspace (`/avaliacoes`)
+
+A single screen covers **filling** and **reviewing** assessments, scoped by role:
+
+1. **Student selection** — educator: all students they follow (their in-scope list); guardian: only assigned students; **student: no selector, the screen acts on their own linked profile** (`studentId` from the session; a `null` → "conta não vinculada" hint). A deep link `/avaliacoes/:studentId` preselects the student.
+2. **Form selection** — chips from `GET /api/forms` (only `vark` ships today); the first available form is preselected.
+3. **Submissions & results** — `GET /api/students/:id/forms/:formId/responses`: each submission shows its answers (via the form definition), the deterministic assessment label/scores, and the async ML prediction (label, scores, confidence, model version) when it has landed; empty state prompts the first fill.
+4. **Fill area** — embeds the reusable questionnaire component (`VarkAssessment`, `[formId]` input + `(submitted)` output); a completed submission refreshes the history so the new row (and its prediction, once it arrives) appears in place. Predictions for the just-submitted `requestId` still transition through the polling states described below.
+
+**Forms Renderer**
 
 The SPA renders form definitions from `GET /api/forms/:formId` into a dynamic form built on design-system controls:
 

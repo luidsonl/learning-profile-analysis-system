@@ -6,6 +6,7 @@ import {
   ConsentResponse,
   ConsentSetRequest,
   ConsentSetResponse,
+  FormResponsesList,
   GuardianListResponse,
   GuardianSearchResponse,
   ObservationCreateRequest,
@@ -79,6 +80,12 @@ export class StudentsService {
   predictions(id: string, form?: string) {
     const query = form ? `?form=${encodeURIComponent(form)}` : '';
     return this.http.get<PredictionsList>(`/api/students/${id}/predictions${query}`);
+  }
+
+  responses(id: string, formId: string) {
+    return this.http.get<FormResponsesList>(
+      `/api/students/${id}/forms/${encodeURIComponent(formId)}/responses`,
+    );
   }
 
   assessments(id: string, profile?: string) {

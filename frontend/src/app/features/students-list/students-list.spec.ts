@@ -47,7 +47,7 @@ describe('StudentsList', () => {
 
   it('offers an apply-assessment action per student', () => {
     const link = fixture.nativeElement.querySelector(
-      'a[href="/avaliacao/s1"]',
+      'a[href="/avaliacoes/s1"]',
     ) as HTMLElement;
     expect(link).toBeTruthy();
   });

@@ -9,14 +9,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/home/home').then((m) => m.Home),
   },
   {
-    path: 'avaliacao',
+    path: 'avaliacoes',
     canActivate: [authGuard],
-    loadComponent: () => import('./features/assessment/vark-assessment').then((m) => m.VarkAssessment),
+    loadComponent: () => import('./features/assessment/assessments').then((m) => m.Assessments),
   },
   {
-    path: 'avaliacao/:studentId',
+    path: 'avaliacoes/:studentId',
     canActivate: [authGuard],
-    loadComponent: () => import('./features/assessment/vark-assessment').then((m) => m.VarkAssessment),
+    loadComponent: () => import('./features/assessment/assessments').then((m) => m.Assessments),
   },
   {
     path: 'perfil',
