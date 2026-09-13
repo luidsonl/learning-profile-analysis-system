@@ -207,6 +207,8 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 
 Uniqueness reservations (`EMAIL#`) use **conditional writes** inside the transaction so concurrent attempts fail instead of overwriting.
 
+**Student erasure** (`DELETE /students/:id`) is a **non-atomic cascade** (best-effort, idempotent): it removes the `STUDENT#<c>` partition, the dedicated `CONSENT#<c>` / `ASSESS#<c>` / `PRED#<c>` / `REPORT#<c>` partitions, the reverse edges on the users who guard/follow/are linked (`USER#<g>/GUARD#<c>`, `USER#<e>/FOLLOW#<c>`, `USER#<s>/STUDENT#<c>`), report artifacts in S3, and — when a self-account is linked — that `USER#<s>` partition + its `EMAIL#` reservation. The `AUDIT#STUDENT#<c>` items are **preserved** (LGPD accountability): only the deletion event is appended. See [LGPD](./lgpd.md).
+
 ---
 
 ## Consistency & Partitioning Notes

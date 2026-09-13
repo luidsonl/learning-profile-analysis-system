@@ -181,6 +181,13 @@ export interface AssessmentsList {
   count: number;
 }
 
+export interface StudentUser {
+  userId: string;
+  name: string;
+  email: string;
+  status: string;
+}
+
 export interface Student {
   studentId: string;
   name: string;
@@ -194,6 +201,7 @@ export interface Student {
   createdAt: string;
   updatedAt: string;
   studentUserId?: string | null;
+  studentUser?: StudentUser | null;
   varkLabel?: string | null;
   varkScores?: Record<string, number> | null;
   varkMultimodal?: boolean | null;

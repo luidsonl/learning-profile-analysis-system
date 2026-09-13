@@ -4,7 +4,7 @@ title: Project Progress
 type: report
 status: evolving
 since: 2026-08-27
-lastReviewed: 2026-09-10
+lastReviewed: 2026-09-13
 dependsOn: []
 requiredBy: []
 ---
@@ -13,9 +13,9 @@ requiredBy: []
 
 ## Status snapshot
 
-**As of:** 2026-09-10 · **Branch:** `main`
+**As of:** 2026-09-13 · **Branch:** `main`
 
-Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 125/0, now 134/0 after adding the **account-discovery endpoints**). The **frontend SPA was removed by the owner** (directory deleted, nothing tracked in git); the S3/CloudFront deploy remains unused until/unless the SPA is reintroduced — planned as a **future rebuild in Angular** under fresh specs. **The frontend docs were re-created on 2026-09-10**: `frontend.md` and `design-system.md` are back as `proposed` specs (Angular SPA + Angular Material design system on CSS-variable tokens, WCAG 2.2 AA) — registered in the dependency graph; implementation pending. **Also on 2026-09-10 the specs were sharpened through a design interview**: material-native tokens win by default (custom CSS vars only for gaps), no charting library for now (semantic card components instead), prediction polling contract (backoff 1s→2s→5s, 15s cap, manual retry preserving `requestId`), unit-test-only strategy (Vitest, API mocked; e2e deferred, real API when it comes), lenient session policy without idle logout (risk accepted), and responsive-first layout (mobile bottom nav/drawer, rail ≥ sm, sidebar ≥ md; touch targets ≥ 44 px). **2026-09-10 (backend)**: `GET /auth/pending-accounts` and `GET /users?role=guardian&email=` added (spec `api.yaml`, `lib/accounts.mjs`, handlers in `auth.mjs`/`guardianship.mjs`), deployed and verified live — e2e **134/0**.
+Backend vertical slice + offline ML pipeline are implemented and documented. The **student self-registration + educator-link + age-based consent** flow is implemented and verified live (e2e 125/0, then 134/0 after adding the **account-discovery endpoints**). **2026-09-13 (backend + frontend)**: `DELETE /students/{id}` implemented — LGPD erasure cascade (STUDENT/CONSENT/ASSESS/PRED/REPORT partitions, reverse user edges, linked self-account + EMAIL reservation, report artifacts in S3; the `AUDIT#` record of the deletion is preserved) — educator in scope or admin; specs `backend`/`api.yaml`/`dynamodb-schema`/`lgpd` updated and **deployed**. `GET /students/{id}` now returns the linked account identity (`studentUser`), and the Angular ficha shows the student's related users (responsibles + linked student account). E2e scenario `10-student-deletion` added; **full e2e reruns pending a clean table**. **The Angular SPA lives again in `frontend/`** (tracked, rebuilt since the owner's earlier removal) — frontend unit tests **52/0**, backend unit tests **27/0**.
 
 | Layer | Status | Notes |
 |---|---|---|
@@ -23,12 +23,12 @@ Backend vertical slice + offline ML pipeline are implemented and documented. The
 | Security & compliance tooling | ✅ Done | gitleaks, pre-commit, secret-scan CI |
 | Terraform stateful infra (`aws-bootstrap`, `aws-app`) | ✅ Done | DynamoDB, S3 buckets, SQS report queue, async Lambdas |
 | Terraform frontend infra (`terraform/aws-frontend`) | ✅ Done | S3 + CloudFront + `/api/*` origin; validated, mirrors 0shared (unused while the SPA is absent) |
-| Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~46 routes), RBAC (admin bootstrap + approval gating) + scoping; **student self-register + educator-link + age-based consent** implemented (link `/students/:id/accounts/:userId/link`) |
+| Backend API (`sam-app`) | ✅ Done | 11 Lambdas (~46 routes), RBAC (admin bootstrap + approval gating) + scoping; **student self-register + educator-link + age-based consent** implemented (link `/students/:id/accounts/:userId/link`); **`DELETE /students/:id` (LGPD erasure) + `studentUser` on `GET /students/:id` added 2026-09-13 & deployed** |
 | Forms engine | ✅ Done | Code-defined forms; guardian-assisted submissions |
 | Binary student self-service | ✅ Done | Student **self-registers** (`role: student`, pending) and is **linked by an educator** to a single student entity (approves + attributes); adult students (≥18) `self_consent`, minors (<18) need guardian/institution — e2e verified |
 | ML pipeline (`ml/` + `InferenceFunction`) | ✅ Done | Trained v2.0.0 on public dataset; async invoke on submission (no SQS); deployed and verified live |
-| Tests (`sam-app/tests/`) | ✅ Done | 27 unit passing; **e2e 134/0 passing** against the real stack (admin bootstrap + new student flow + account-discovery endpoints) |
-| Frontend SPA (`frontend/`) | ⛔ Removed | SPA directory deleted by the owner (not tracked in git); **docs re-created 2026-09-10** (`frontend.md` + `design-system.md`, `proposed`); no S3/CloudFront deploy until reintroduced (planned: Angular) |
+| Tests (`sam-app/tests/`) | ✅ Done | 27 unit passing; **e2e 134/0 passing** against the real stack; **scenario `10-student-deletion` added (rerun pending a clean table)** |
+| Frontend SPA (`frontend/`) | ✅ Active (Angular) | **Rebuilt in Angular** (tracked in git) after the owner's removal; ficha do estudante + edição de perfil + gestão de acesso (responsables, conta de estudante, `studentUser`) implemented; unit **52/0**, build OK |
 
 ---
 

@@ -94,12 +94,12 @@ requiredBy:
 |----------------------|-----------------|
 | Access | `GET /api/students/:id` (guardian) / `GET /api/students/:id/...` data download; admin export |
 | Correction | `PATCH /api/students/:id` (non-destructive, versioned) |
-| Erasure (apagamento) | **Erasure flow** (admin/DPO): delete `STUDENT#` partition items (submissions, assess, pred, rec, obs, reports + report artifacts, consent history), `GUARD#`/`FOLLOW#`/`STUDENT#` edges, student `USER#` + `EMAIL#` reservation; keep only anonymized snapshots + audit record of the deletion |
+| Erasure (apagamento) | **Erasure flow** (`DELETE /api/students/:id` — educator in scope or admin; runbook/admin CLI for DPO): delete `STUDENT#` partition items (submissions, assess, pred, rec, obs, reports + report artifacts, consent history), `GUARD#`/`FOLLOW#`/`STUDENT#` edges, student `USER#` + `EMAIL#` reservation; keep only anonymized snapshots + audit record of the deletion |
 | Consent revocation | `POST /api/students/:id/consent` with `status=revoked` |
 | Portability | Structured export (JSON) of the student's `SUBMISSION#`, `ASSESS#`, `PRED#`, `REC#` for the guardian |
 | Anonymous review / complaints | Institution DPO contact surfaced in the UI (footer) |
 
-Erasure is a **documented script/runbook** (admin-triggered Lambda or CLI) with a preflight dry-run and an `AUDIT#` record of execution.
+Erasure is implemented as `DELETE /api/students/:id` (educator in scope or admin) and as a **documented script/runbook** (admin/DPO-triggered Lambda or CLI), both with an `AUDIT#` record of execution.
 
 ## Security Controls (recap from Architecture)
 

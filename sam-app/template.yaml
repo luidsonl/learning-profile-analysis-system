@@ -183,6 +183,12 @@ Resources:
             RestApiId: !Ref Api
             Path: /students/{id}
             Method: PATCH
+        DeleteChild:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /students/{id}
+            Method: DELETE
 
   GuardianshipFunction:
     Type: AWS::Serverless::Function

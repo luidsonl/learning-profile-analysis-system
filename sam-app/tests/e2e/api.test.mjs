@@ -10,6 +10,7 @@ import s06 from "./scenarios/06-student-self-view.mjs";
 import s07 from "./scenarios/07-reports-audit.mjs";
 import s08 from "./scenarios/08-vark-form-classification.mjs";
 import s09 from "./scenarios/09-student-record-rules.mjs";
+import s10 from "./scenarios/10-student-deletion.mjs";
 
 const BASE = process.env.API_BASE;
 if (!BASE) {
@@ -31,6 +32,7 @@ const ALL_SCENARIOS = [
   ["07", "reports-audit", s07],
   ["08", "vark-form-classification", s08],
   ["09", "student-record-rules", s09],
+  ["10", "student-deletion", s10],
 ];
 
 // FILTER is an optional filter that limits the run to a contiguous prefix of

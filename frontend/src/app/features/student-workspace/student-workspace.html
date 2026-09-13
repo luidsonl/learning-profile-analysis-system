@@ -275,7 +275,19 @@
           <mat-card-subtitle>Vincule a conta auto-cadastrada do estudante a esta ficha.</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
-          @if (student()?.studentUserId) {
+          @if (student()?.studentUser) {
+            <div class="feed">
+              <div class="feed-item feed-heading">
+                <div>
+                  <h3>{{ student()?.studentUser?.name }}</h3>
+                  <p>
+                    {{ student()?.studentUser?.email }} · estudante (conta de acesso vinculada)
+                  </p>
+                </div>
+                <mat-icon class="linked-icon">account_circle</mat-icon>
+              </div>
+            </div>
+          } @else if (student()?.studentUserId) {
             <div class="feed">
               <p class="empty">Esta ficha já possui uma conta de acesso vinculada.</p>
             </div>

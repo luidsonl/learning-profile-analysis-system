@@ -55,8 +55,9 @@ requiredBy:
 |---------------|-------|-------------|--------------|
 | `POST /api/students` | educator, admin | Create student profile (educator auto-`FOLLOW#`; guardian **cannot**) | `STUDENT#<id>/META` + `FOLLOW#`/`EDUCATOR#` (txn) when educator |
 | `GET /api/students` | guardian, educator, admin | List students in scope (guardian `GUARD#` / educator `FOLLOW#`; admin all) | Query user partition `GUARD#`/`FOLLOW#` prefix |
-| `GET /api/students/:id` | scoped | Student profile | `STUDENT#<c>/META` |
+| `GET /api/students/:id` | scoped | Student profile + linked account identity (`studentUser`) when present | `STUDENT#<c>/META` + `USER#<s>/META` lookup |
 | `PATCH /api/students/:id` | scoped, admin (linked student may edit their own profile fields) | Update profile (non-destructive); a linked student edits their own entity's profile | `STUDENT#<c>/META` |
+| `DELETE /api/students/:id` | educator (scoped), admin | **Hard-delete** (LGPD erasure): `STUDENT#`/`CONSENT#`/`ASSESS#`/`PRED#`/`REPORT#` partitions, reverse user edges (`GUARD#`/`FOLLOW#`/`STUDENT#`), linked self-account (`USER#` + `EMAIL#` reservation), report artifacts in S3; **audit record of the deletion is kept** | deletes across partitions |
 | `POST /api/students/:id/guardians` | educator (scoped), admin | Grant guardianship to a guardian | `GUARD#` + `GUARDIAN#` + `AUDIT#` (txn) |
 | `DELETE /api/students/:id/guardians/:userId` | educator (scoped), admin | Revoke guardianship | reverse txn |
 | `POST /api/students/:id/follow` | educator | Follow a student | `FOLLOW#` + `EDUCATOR#` + `AUDIT#` (txn) |

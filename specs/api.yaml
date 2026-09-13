@@ -330,6 +330,27 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+    delete:
+      tags: [Students]
+      summary: Delete a student profile (LGPD erasure)
+      description: |
+        Hard-deletes the student record and everything derived from it — consent
+        history, submissions, assessments, predictions, recommendations,
+        observations, reports (incl. report artifacts in S3), reverse user edges
+        (`GUARD#`/`FOLLOW#`/`STUDENT#`) and the linked self-account when present.
+        The audit event of the deletion is kept. Only an educator in scope
+        (following the student) or an admin.
+      security:
+        - bearerAuth: []
+      operationId: deleteStudent
+      responses:
+        "204":
+          description: Student record erased
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /students/{id}/guardians:
     parameters:
       - $ref: "#/components/parameters/StudentId"
@@ -1500,6 +1521,20 @@ components:
           type: string
           nullable: true
           description: Linked student account id.
+        studentUser:
+          type: object
+          nullable: true
+          description: Identity of the linked student account, when present.
+          properties:
+            userId:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+            status:
+              type: string
+              enum: [active, pending, denied]
         varkLabel:
           type: string
           nullable: true

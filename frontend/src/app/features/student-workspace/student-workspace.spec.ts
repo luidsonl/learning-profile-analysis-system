@@ -105,6 +105,28 @@ describe('StudentWorkspace', () => {
     expect(text).toContain('Pedro Alves');
   });
 
+  it('shows the linked student account identity when present', () => {
+    studentsStub.getStudent = () =>
+      of({
+        student: {
+          studentId: 's1',
+          name: 'Ana Lima',
+          grade: '6º ano',
+          status: 'active',
+          createdBy: 'u1',
+          createdAt: '2026-08-01T00:00:00Z',
+          updatedAt: '2026-08-01T00:00:00Z',
+          studentUserId: 'sid1',
+          studentUser: { userId: 'sid1', name: 'Pedro Alves', email: 'pedro@example.com', status: 'active' },
+        },
+      });
+    fixture.componentRef.setInput('studentId', 's2');
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('pedro@example.com');
+    expect(text).toContain('conta de acesso vinculada');
+  });
+
   it('grants a responsable to the student', () => {
     fixture.componentInstance.grantGuardian('gu2');
     expect(grantSpy).toHaveBeenCalledWith('s1', 'gu2');
