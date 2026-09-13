@@ -50,11 +50,11 @@ export default async (ctx) => {
   step("ml: non-inference forms are not scored");
   {
     const ana = await api("GET", `/students/${ctx.studentId}/forms/anamnesis/responses`, { token: ctx.guardianToken });
-    const item = ana.data?.data?.[0];
     expect(
-      "anamnesis response has no prediction",
-      ana.status === 200 && ana.data.count >= 1 && item.submissionId === ctx.anamnesisSubmissionId && item.prediction === null,
-      JSON.stringify(item),
+      "anamnesis responses carry no prediction",
+      ana.status === 200 && ana.data.count >= 2 && ana.data.data.every((s) => s.prediction === null) &&
+        ana.data.data.some((s) => s.submissionId === ctx.anamnesisSubmissionId),
+      JSON.stringify(ana.data),
     );
   }
 

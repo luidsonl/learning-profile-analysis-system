@@ -16,9 +16,9 @@ const listForms = async (event, ctx) => {
     assert(AUDIENCES.includes(audience), "invalid_audience", "audience must be guardian, educator or student");
     forms = forms.filter((f) => f.audience === audience);
   }
-  if (ctx.role === "student") {
-    forms = forms.filter((f) => f.audience === "student");
-  }
+  // Students can fill every curated form about their own profile; the
+  // audience field only distinguishes who *administers* each form (the
+  // `?audience=` filter), it never hides forms from the subject themselves.
   return ok({ data: forms, count: forms.length });
 };
 
@@ -26,15 +26,14 @@ const getForm = async (event, ctx) => {
   const formId = param(event, "formId");
   const form = getFormDefinition(formId);
   if (!form) throw new HttpError(404, "form_not_found", "Form not found");
-  if (ctx.role === "student" && form.audience !== "student") {
-    throw new HttpError(403, "forbidden", "Students can only access their own forms");
-  }
   return ok({ form });
 };
 
 const audienceOkForRole = (ctx, formAudience) => {
   if (ctx.role === "admin") return true;
-  if (ctx.role === "student") return formAudience === "student";
+  // A student may fill any form, but only about their own linked profile (the
+  // self-scope check in submitForm is the gate that matters).
+  if (ctx.role === "student") return true;
   if (ctx.role === "guardian") return formAudience === "guardian" || formAudience === "student";
   if (ctx.role === "educator") return formAudience === "educator" || formAudience === "student";
   return ctx.role === formAudience;

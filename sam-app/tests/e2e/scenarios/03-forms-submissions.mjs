@@ -3,12 +3,13 @@ import { answers } from "../fixtures.mjs";
 
 // Seeds ctx: anamnesisSubmissionId (for the ML linkage scenario).
 export default async (ctx) => {
-  step("forms: student sees only student forms");
+  step("forms: students can fill every form about their own profile");
   {
     const all = await api("GET", "/forms", { token: ctx.studentToken });
-    expect("student lists forms", all.status === 200 && all.data.data.length === 1 && all.data.data[0].formId === "vark", JSON.stringify(all.data));
-    expect("form definition served from code with version", all.data.data[0].version === 1 && Array.isArray(all.data.data[0].sections), JSON.stringify(all.data.data[0]));
-    expect("vark declares result metadata (async inference, definitive label)", all.data.data[0].result?.hasInference === true && all.data.data[0].result?.type === "label", JSON.stringify(all.data.data[0]));
+    expect("student lists all curated forms", all.status === 200 && all.data.count === 4, JSON.stringify(all.data));
+    const vark = all.data.data.find((f) => f.formId === "vark");
+    expect("form definition served from code with version", vark?.version === 1 && Array.isArray(vark?.sections), JSON.stringify(vark));
+    expect("vark declares result metadata (async inference, definitive label)", vark?.result?.hasInference === true && vark?.result?.type === "label", JSON.stringify(vark));
 
     const guardianForms = await api("GET", "/forms", { token: ctx.guardianToken });
     expect("guardian sees all forms", guardianForms.status === 200 && guardianForms.data.count === 4, JSON.stringify(guardianForms.data));
@@ -16,7 +17,10 @@ export default async (ctx) => {
     expect("anamnesis declares no inference", anamnesis?.result?.hasInference === false && anamnesis?.result?.type === "none", JSON.stringify(anamnesis));
 
     const one = await api("GET", "/forms/vark", { token: ctx.studentToken });
-    expect("get single form definition", one.status === 200 && one.data.form.formId === "vark", JSON.stringify(one.data));
+    expect("student fetches a vark definition", one.status === 200 && one.data.form.formId === "vark", JSON.stringify(one.data));
+
+    const anamnesisOne = await api("GET", "/forms/anamnesis", { token: ctx.studentToken });
+    expect("student fetches a non-vark definition", anamnesisOne.status === 200 && anamnesisOne.data.form.formId === "anamnesis", JSON.stringify(anamnesisOne.data));
   }
 
   step("forms: submit tests (decoupled from classification)");
@@ -41,6 +45,12 @@ export default async (ctx) => {
     expect("guardian anamnesis accepted", byGuardian.status === 201, JSON.stringify(byGuardian.data));
     ctx.anamnesisSubmissionId = byGuardian.data.submissionId;
 
+    const byStudent = await api("POST", `/students/${ctx.studentId}/forms/anamnesis/responses`, {
+      token: ctx.studentToken,
+      body: { answers: { a01: "2016-03-12", a03: "não", a07: "Boa adaptação", a10: "Nenhuma" } },
+    });
+    expect("student anamnesis accepted (own profile)", byStudent.status === 201 && !!byStudent.data.submissionId, JSON.stringify(byStudent.data));
+
     const assisted = await api("POST", `/students/${ctx.studentId}/forms/vark/responses`, {
       token: ctx.guardianToken,
       body: { answers, requestId: "test-run-guardian" },
@@ -57,7 +67,7 @@ export default async (ctx) => {
   step("submissions: fetch stored tests (no classification side-effect)");
   {
     const before = await api("GET", `/students/${ctx.studentId}/submissions`, { token: ctx.guardianToken });
-    expect("submissions listed without assessment yet", before.status === 200 && before.data.count === 3, JSON.stringify(before.data));
+    expect("submissions listed without assessment yet", before.status === 200 && before.data.count === 4, JSON.stringify(before.data));
 
     const noAssessYet = await api("GET", `/students/${ctx.studentId}/assessments`, { token: ctx.guardianToken });
     expect("no assessment persisted yet (decoupled)", noAssessYet.status === 200 && noAssessYet.data.count === 0, JSON.stringify(noAssessYet.data));
