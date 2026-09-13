@@ -178,6 +178,16 @@ const updateUser = async (event, ctx) => {
   const target = await getUser(userId);
   if (!target) throw new HttpError(404, "user_not_found", "User not found");
 
+  // Student accounts are activated EXCLUSIVELY by the educator link flow
+  // (POST /students/{id}/accounts/{userId}/link), which attributes the entity
+  // and approves the account atomically. A manual `active` here would create an
+  // orphan active account with no student entity (a state the UI cannot link and
+  // the catalog wrongly shows as already-attributed) — so reject it outright.
+  // `denied` remains allowed to block a self-registration; `pending` is a no-op.
+  if (target.role === "student" && changes.status === "active") {
+    throw new HttpError(409, "link_required", "Student accounts become active through the student-account link only");
+  }
+
   if (ctx.role === "educator") {
     // Educators may only approve/deny responsable and student accounts.
     if (!["guardian", "student"].includes(target.role)) {

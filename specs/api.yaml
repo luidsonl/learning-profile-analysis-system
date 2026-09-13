@@ -1405,7 +1405,13 @@ components:
           enum: [pending, active]
         available:
           type: boolean
-          description: '`true` while the account can still be linked to a ficha.'
+          description: |
+            '`true` while the account has no student profile attributed yet and
+            can still be linked to a ficha — covers pending accounts AND orphan
+            `active` accounts (a previously manually-approved account without an
+            entity; reopening the loophole is blocked by `PATCH /admin/users`,
+            so orphans are self-healed on link). `false` only once the account
+            owns a student entity (`linkedStudentId` set, at-most-one).'
         linkedStudentId:
           type: string
           nullable: true

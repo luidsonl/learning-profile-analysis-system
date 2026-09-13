@@ -72,6 +72,17 @@ export default async (ctx) => {
     });
     expect("student registers for no-consent student", noConsentReg.status === 201, JSON.stringify(noConsentReg.data));
 
+    // Regression: a student account can ONLY become active through the link
+    // endpoint. A manual `active` via the admin users API would create an orphan
+    // (active + no studentId) that the link flow cannot attribute visually —
+    // so it must be rejected (link_required).
+    const manualActivation = await api("PATCH", `/admin/users/${noConsentReg.data.user.userId}`, { token: ctx.educatorToken, body: { status: "active" } });
+    expect(
+      "student accounts can only be activated via the link (manual active rejected)",
+      manualActivation.status === 409 && manualActivation.data.error.code === "link_required",
+      JSON.stringify(manualActivation.data),
+    );
+
     // Both self-registered accounts are now pending and discoverable for the
     // link flow. The table may hold unrelated student accounts (incl. active
     // linked ones from other environments), so assert membership/availability of

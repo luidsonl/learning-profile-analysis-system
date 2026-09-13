@@ -16,11 +16,14 @@ export const toStudentAccountDto = (user, minAge) => ({
   consentRequired: consentRequired(user, minAge),
 });
 
-// Catalog of every student account an educator may need to act on: `pending`
-// accounts are still available to be linked to a ficha (`available: true`); once
-// an account is linked its status flips to `active` and it owns a student entity
-// (`linkedStudentId`) — such an account already has a profile attributed and can
-// never be linked again (at-most-one, see specs/dynamodb-schema.md).
+// Catalog of every student account an educator may need to act on. A `pending`
+// account is still available to be linked to a ficha (`available: true`); a
+// linked account has flpped to `active` and owns a student entity
+// (`linkedStudentId`) — already-attributed, can never be linked again (at-most-one,
+// see specs/dynamodb-schema.md). An `active` account WITHOUT `linkedStudentId`
+// is an orphan (previously activated by a manual approval, now blocked by
+// `PATCH /admin/users`); it has no profile attributed, so it remains linkable
+// and the link self-heals it into a proper attributed account.
 export const selectStudentAccounts = (items, minAge) =>
   items
     .filter((u) => (u.status === "pending" || u.status === "active") && u.userId)
@@ -28,7 +31,7 @@ export const selectStudentAccounts = (items, minAge) =>
       ...toStudentAccountDto(u, minAge),
       status: u.status,
       linkedStudentId: u.linkedStudentId ?? null,
-      available: u.status === "pending" && !u.linkedStudentId,
+      available: !u.linkedStudentId,
     }))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 

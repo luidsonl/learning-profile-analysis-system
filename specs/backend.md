@@ -124,11 +124,11 @@ requiredBy:
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
 | `GET /api/admin/users` | admin (all roles), educator (guardian/student only) | List users by optional `role`/`status` filter | GSI2 `RoleStatus` query per role |
-| `PATCH /api/admin/users/:id` | admin, educator | Change `status` (approve/deny), `role` (promote/demote, admin only), and **`birthDate`/`age`** (adjust LGPD eligibility); guards: no self-demote, no last-admin removal | `USER#<id>/META` + `AUDIT#USER#` |
+| `PATCH /api/admin/users/:id` | admin, educator | Change `status` (approve/deny; **denying student accounts only — activation is link-only**, `409 link_required` otherwise), `role` (promote/demote, admin only), and **`birthDate`/`age`** (adjust LGPD eligibility); guards: no self-demote, no last-admin removal | `USER#<id>/META` + `AUDIT#USER#` |
 | `POST /api/admin/users/:id/password` | admin | Reset a user's password | update `USER#<id>/META` `passwordHash` |
 | `DELETE /api/admin/users/:id` | admin | Hard-delete account: user items + `EMAIL#` + sessions + reverse edges | deletes across partitions |
 
-> **Approval gating** — educators/guardians register `pending` and can't sign in until approved. Educators may approve/deny `guardian`/`student` accounts (status only). Admins additionally approve/deny educators and promote/demote `educator↔admin`. The **first educator to register** (when no admin exists) becomes the initial `admin`+`active`.
+> **Approval gating** — educators/guardians register `pending` and can't sign in until approved. Educators may approve/deny `guardian` accounts and **deny** `student` accounts (status only). Admins additionally approve/deny educators and promote/demote `educator↔admin`. **Student accounts are NEVER activated via this endpoint**: `PATCH /admin/users/:id` rejects `status: active` for `role: student` with `409 link_required` — a student account is activated **exclusively** by the link flow (`POST /students/:id/accounts/:userId/link`, which attributes the entity and approves the account atomically). This prevents orphan `active` accounts (no student entity) that the link catalog would otherwise mislabel as already-attributed. The **first educator to register** (when no admin exists) becomes the initial `admin`+`active`.
 
 ### Admin — Audit
 | Method & Path | Roles | Description | Schema items |
