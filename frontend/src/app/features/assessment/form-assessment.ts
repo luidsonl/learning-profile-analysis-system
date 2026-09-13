@@ -189,4 +189,11 @@ export class FormAssessment {
     const value = this.answers()[questionId];
     return Array.isArray(value) && value.includes(option as string);
   }
+
+  // Unanswered text-like inputs must render empty — binding an `undefined`
+  // value stringifies to the literal "undefined" in the DOM input.
+  answerInputValue(questionId: string): string {
+    const value = this.answers()[questionId];
+    return value === undefined || value === null ? '' : String(value);
+  }
 }

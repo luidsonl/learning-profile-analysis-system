@@ -51,6 +51,7 @@ export class VarkAssessment {
   readonly form = toSignal(this.formRequest, { initialValue: undefined });
 
   readonly answers = signal<Record<string, number>>({});
+  readonly done = signal(false);
 
   readonly readyPrediction = computed(() => {
     const state = this.polling.state();
@@ -63,6 +64,14 @@ export class VarkAssessment {
   });
 
   readonly isProcessing = computed(() => this.polling.state().status === 'processing');
+
+  // The API accepted the stored submission and the bundled model is now
+  // scoring it (polling in flight with a submissionId) — vs. the initial
+  // "sending" phase before the POST response.
+  readonly hasSubmission = computed(() => {
+    const state = this.polling.state();
+    return state.status === 'processing' && !!state.submissionId;
+  });
 
   readonly totalQuestions = computed(() => {
     const formDef = this.form();
@@ -94,6 +103,7 @@ export class VarkAssessment {
     // Let the parent know the history list should be refreshed.
     effect(() => {
       if (this.polling.state().status === 'ready') {
+        this.done.set(true);
         this.submitted.emit();
       }
     });
@@ -122,6 +132,7 @@ export class VarkAssessment {
 
   reset(): void {
     this.answers.set({});
+    this.done.set(false);
     this.polling.reset();
   }
 

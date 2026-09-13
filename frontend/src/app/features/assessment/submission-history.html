@@ -80,6 +80,13 @@
                   </span>
                 </div>
 
+                @if (!item.prediction) {
+                  <div class="pending-indicator">
+                    <mat-progress-spinner diameter="18" mode="indeterminate" aria-label="Gerando resultado" />
+                    <span>Resultado em geração — aparece aqui automaticamente.</span>
+                  </div>
+                }
+
                 @if (item.prediction; as prediction) {
                   <prediction-scores [scores]="prediction.scores" />
                   <p class="confidence">

@@ -66,14 +66,20 @@ const responseItem = {
   },
 };
 
+const pendingItem = { ...responseItem, submissionId: 'sub9', prediction: null };
+
 describe('SubmissionHistory', () => {
   let fixture: ComponentFixture<SubmissionHistory>;
   let responsesSpy: ReturnType<typeof vi.fn>;
+  let pollForSpy: ReturnType<typeof vi.fn>;
   let pollingState: ReturnType<typeof signal<import('../../core/predictions/prediction-polling.service').PollState>>;
 
   beforeEach(() => {
     responsesSpy = vi.fn(() => of({ data: [responseItem], count: 1 }));
     pollingState = signal({ status: 'idle' });
+    pollForSpy = vi.fn((opts: { submissionId: string }) =>
+      pollingState.set({ status: 'processing', submissionId: opts.submissionId }),
+    );
     TestBed.configureTestingModule({
       imports: [SubmissionHistory],
       providers: [
@@ -94,7 +100,7 @@ describe('SubmissionHistory', () => {
         },
         {
           provide: PredictionPollingService,
-          useValue: { state: pollingState, submit: vi.fn(), retry: vi.fn(), reset: vi.fn() },
+          useValue: { state: pollingState, submit: vi.fn(), retry: vi.fn(), reset: vi.fn(), pollFor: pollForSpy },
         },
         provideRouter([]),
         provideAnimations(),
@@ -163,5 +169,26 @@ describe('SubmissionHistory', () => {
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Nenhum envio ainda');
+  });
+
+  it('auto-polls a pending prediction and reveals the result when it lands', async () => {
+    responsesSpy.mockReturnValue(of({ data: [pendingItem], count: 1 }));
+    await mount();
+
+    expect(pollForSpy).toHaveBeenCalledWith({ studentId: 's1', formId: 'vark', submissionId: 'sub9' });
+    let el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Resultado em geração');
+
+    responsesSpy.mockReturnValue(
+      of({ data: [{ ...pendingItem, prediction: responseItem.prediction }], count: 1 }),
+    );
+    pollingState.set({ status: 'ready', prediction: { predictionId: 'p9', label: 'K', scores: {}, confidence: 0.8 } as never });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Perfil: Cinestésico');
+    expect(el.textContent).not.toContain('Resultado em geração');
   });
 });

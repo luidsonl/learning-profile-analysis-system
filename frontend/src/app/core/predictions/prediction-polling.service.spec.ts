@@ -110,4 +110,45 @@ describe('PredictionPollingService', () => {
 
     expect(service.state().status).toBe('ready');
   });
+
+  it('polls for an already stored submission without posting it', async () => {
+    service.pollFor({
+      studentId: 's1',
+      formId: 'vark',
+      submissionId: 'SUBMISSION#vark#2026-09-10T12:00:00Z',
+    });
+
+    expect(service.state().status).toBe('processing');
+    await vi.advanceTimersByTimeAsync(1000);
+    http.expectOne('/api/students/s1/predictions?form=vark').flush({ data: [prediction], count: 1 });
+
+    expect(service.state().status).toBe('ready');
+  });
+
+  it('does not restart a poll that is already watching the same submission', async () => {
+    service.submit({
+      studentId: 's1',
+      formId: 'vark',
+      answers: { q01: 5 },
+      requestId: 'req-4',
+    });
+    http.expectOne('/api/students/s1/forms/vark/responses').flush({
+      submissionId: 'SUBMISSION#vark#2026-09-10T12:00:00Z',
+      formId: 'vark',
+    } as never);
+
+    service.pollFor({
+      studentId: 's1',
+      formId: 'vark',
+      submissionId: 'SUBMISSION#vark#2026-09-10T12:00:00Z',
+    });
+
+    // The original single poll sequence is untouched: one GET per backoff step.
+    await vi.advanceTimersByTimeAsync(1000);
+    http.expectOne('/api/students/s1/predictions?form=vark').flush({ data: [], count: 0 });
+    await vi.advanceTimersByTimeAsync(2000);
+    http.expectOne('/api/students/s1/predictions?form=vark').flush({ data: [prediction], count: 1 });
+
+    expect(service.state().status).toBe('ready');
+  });
 });

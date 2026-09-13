@@ -127,7 +127,12 @@ Filling and reviewing assessments is a **three-screen flow**, one action per scr
 
 1. **Pick the student** (`/avaliacoes`) — a card list, one "Selecionar" action per student. Educator: every student in scope (all they follow); guardian: only assigned students; **student: no choice, their own linked profile is shown** (a `null` link → "conta não vinculada" hint). The student list's *Aplicar avaliação* deep-links here with the student pre-chosen.
 2. **Pick the form** (`/avaliacoes/:studentId`) — a card per form from `GET /api/forms` (only `vark` ships today); the header shows who is being assessed.
-3. **Submissions & results** (`/avaliacoes/:studentId/:formId`) — submission history from `GET /api/students/:id/forms/:formId/responses`: each row shows the deterministic assessment label/scores, the async ML prediction (label, scores, confidence, model version) once it lands, and expandable answers. A toolbar **"Enviar nova avaliação"** reveals a generic questionnaire (`FormAssessment`, embedded, `[studentId]`/`[formId]`) that emits `(accepted)` when the API stores the submission — the history refreshes so the new row appears (with "aguardando análise" until the prediction lands, for forms with a bundled model) — and `(predicted)` when the async prediction arrives. If the user submits by clicking **"Enviar formulário"**, the handler calls `preventDefault()`: the page never reloads (an `ngSubmit` without it does a native GET that aborts the POST).
+3. **Submissions & results** (`/avaliacoes/:studentId/:formId`) — submission history from `GET /api/students/:id/forms/:formId/responses`: each row shows the deterministic assessment label/scores, the async ML prediction (label, scores, confidence, model version) once it lands, and expandable answers. A row whose prediction is still pending shows an inline **"Resultado em geração"** spinner; the screen **auto-polls** the newest pending submission (`PredictionPollingService.pollFor`) so the result appears without a manual refresh — even when navigating straight into a form that was filled earlier. A toolbar **"Enviar nova avaliação"** reveals a generic questionnaire (`FormAssessment`, embedded, `[studentId]`/`[formId]`) that emits `(accepted)` when the API stores the submission — the history refreshes so the new row appears — and `(predicted)` when the async prediction lands.
+
+**Submission UX**
+
+- The submit button is `type="button"` wired to `(click)="submit($event)"` (with `(ngSubmit)` kept as a safety net and `novalidate` on the form): clicking **never triggers a native page navigation/reload** — without `preventDefault` an `ngSubmit` does a GET that reloads the page and aborts the POST.
+- While the POST is in flight the questionnaire is replaced by an **"Enviando…"** processing card (indeterminate spinner). Once accepted, a **success card ("Formulário enviado com sucesso!")** is shown; for forms with a bundled model (`vark`) it additionally shows a **"Gerando resultado"** spinner until the prediction lands, then a **"Resultado gerado!"** line. The result also appears as a new row in the history list below.
 
 **Forms Renderer**
 
@@ -143,6 +148,7 @@ The SPA renders form definitions from `GET /api/forms/:formId` into a dynamic fo
 | date | date input (`matInput type="date"`), ISO `yyyy-mm-dd` value |
 
 - Validation is client-side complement over the definition (non-empty answers; values stored as-is — the API accepts strings, numbers and arrays per question). Server errors surface inline via the polling state (retry action preserves the same `requestId`).
+- Text-like inputs (text/date/number) render **empty until answered** — binding an unanswered `undefined` value would display the literal `"undefined"` (guarded by `answerInputValue()`).
 - The submit button stays disabled until every question is answered; while the request is in flight the questionnaire shows a **processing card**, and once the API accepts the submission a **success card** ("Formulário enviado com sucesso!") replaces it.
 - Only forms with a bundled ML model (`vark` today) keep polling after acceptance; other forms stop immediately and rely on the history refresh.
 - The dynamic renderer is part of the [design system](./design-system.md) (reused by future forms).

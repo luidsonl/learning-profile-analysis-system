@@ -68,6 +68,20 @@ export class PredictionPollingService {
     this.poll(this.lastRequest.formId, 0);
   }
 
+  // Poll for a submission that is already stored (used when navigating into a
+  // history that still has a pending prediction) — no POST, same poll + state
+  // machine as the submit flow. A submission already being polled is kept.
+  pollFor(opts: { studentId: string; formId: string; submissionId: string }): void {
+    const current = this.state$();
+    if (current.status === 'processing' && current.submissionId === opts.submissionId) {
+      return;
+    }
+    this.stop();
+    this.lastRequest = { studentId: opts.studentId, formId: opts.formId, submissionId: opts.submissionId };
+    this.state$.set({ status: 'processing', submissionId: opts.submissionId });
+    this.poll(opts.formId, 0);
+  }
+
   reset(): void {
     this.stop();
     this.lastRequest = null;

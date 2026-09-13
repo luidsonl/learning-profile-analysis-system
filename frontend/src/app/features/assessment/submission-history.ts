@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { FormDefinition, FormResponseItem, Prediction } from '../../core/api/types';
 import { FormsService } from '../../core/forms/forms.service';
+import { PredictionPollingService } from '../../core/predictions/prediction-polling.service';
 import { StudentsService } from '../../core/students/students.service';
 import { ROLE_LABELS } from '../../core/users/user-labels';
 import { VARK_LABELS } from '../../core/vark/vark-labels';
@@ -47,6 +48,11 @@ export class SubmissionHistory {
 
   private readonly students = inject(StudentsService);
   private readonly forms = inject(FormsService);
+  private readonly polling = inject(PredictionPollingService);
+
+  // Guards the history refresh triggered when a poll turns ready, so the
+  // effect reloads the list once per prediction instead of looping.
+  private handledReadyPrediction: string | null = null;
 
   readonly filling = signal(false);
 
@@ -87,6 +93,35 @@ export class SubmissionHistory {
     this.forms.listForms().subscribe({
       next: (res) => this.formsState.set(res.data),
       error: () => this.formsState.set(null),
+    });
+
+    // Catch-up polling: a stored submission whose prediction is still pending
+    // (e.g. navigating straight into a form that was filled before) is polled
+    // automatically so the result appears without a manual refresh. When the
+    // poll turns ready the history reloads and the row reveals the prediction.
+    effect(() => {
+      const state = this.polling.state();
+
+      if (state.status === 'ready') {
+        if (this.handledReadyPrediction !== state.prediction.predictionId) {
+          this.handledReadyPrediction = state.prediction.predictionId;
+          this.loadHistory();
+        }
+        return;
+      }
+
+      if (state.status !== 'idle') {
+        return;
+      }
+      const pending = this.history().find((item) => !item.prediction);
+      if (pending) {
+        this.handledReadyPrediction = null;
+        this.polling.pollFor({
+          studentId: this.studentId(),
+          formId: this.formId(),
+          submissionId: pending.submissionId,
+        });
+      }
     });
   }
 

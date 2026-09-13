@@ -17,9 +17,14 @@
     <mat-card appearance="outlined" class="state-card">
       <mat-card-content class="state-content">
         <mat-spinner diameter="40" />
-        <h2>Análise em processamento…</h2>
-        <p>Seu questionário foi enviado. A previsão leva alguns instantes.</p>
-        <button mat-button (click)="polling.retry()">Verificar novamente</button>
+        @if (hasSubmission()) {
+          <h2>Formulário enviado com sucesso!</h2>
+          <p>O resultado da análise está sendo gerado e aparece aqui em instantes.</p>
+          <button mat-button (click)="polling.retry()">Verificar novamente</button>
+        } @else {
+          <h2>Enviando…</h2>
+          <p>O formulário está sendo registrado.</p>
+        }
       </mat-card-content>
     </mat-card>
   } @else if (readyPrediction(); as prediction) {
@@ -87,8 +92,9 @@
           <button
             mat-flat-button
             color="primary"
-            type="submit"
-            [disabled]="!allAnswered()"
+            type="button"
+            [disabled]="!allAnswered() || isProcessing()"
+            (click)="submit($event)"
           >
             Enviar avaliação
           </button>

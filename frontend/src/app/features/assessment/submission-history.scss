@@ -47,6 +47,15 @@
   font-size: 0.85rem;
 }
 
+.pending-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--sys-on-surface-variant);
+  font-size: 0.85rem;
+  margin-bottom: var(--space-3);
+}
+
 .assessment-line {
   display: flex;
   align-items: center;

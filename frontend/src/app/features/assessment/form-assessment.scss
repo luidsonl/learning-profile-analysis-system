@@ -45,8 +45,20 @@
 }
 
 .progress-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--sys-on-surface-variant);
   font-size: 0.85rem;
+}
+
+.generating-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--sys-on-surface-variant);
+  max-width: 34rem;
+  text-align: left;
 }
 
 .state-card {

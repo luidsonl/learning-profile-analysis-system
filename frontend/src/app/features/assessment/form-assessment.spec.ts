@@ -75,6 +75,17 @@ describe('FormAssessment', () => {
     expect(el.querySelectorAll('mat-checkbox').length).toBe(2);
   });
 
+  it('renders text-like inputs empty before answering (no "undefined")', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const date = el.querySelector('input[type=date]') as HTMLInputElement;
+    const number = el.querySelector('input[type=number]') as HTMLInputElement;
+    const textarea = el.querySelector('textarea') as HTMLTextAreaElement;
+    expect(date.value).toBe('');
+    expect(number.value).toBe('');
+    expect(textarea.value).toBe('');
+    expect(el.textContent).not.toContain('undefined');
+  });
+
   it('submits the collected values and never triggers the native reload', () => {
     const event = { preventDefault: vi.fn() } as unknown as SubmitEvent;
 
@@ -88,8 +99,11 @@ describe('FormAssessment', () => {
     component.onAnswer('l1', 4);
     fixture.detectChanges();
 
-    const button = fixture.nativeElement.querySelector('button[type=submit]') as HTMLButtonElement;
+    const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Enviar formulário'),
+    ) as HTMLButtonElement;
     expect(button.disabled).toBe(false);
+    expect(button.type).toBe('button');
 
     component.submit(event);
     expect(event.preventDefault).toHaveBeenCalled();
@@ -137,5 +151,30 @@ describe('FormAssessment', () => {
     fixture.detectChanges();
 
     expect(predicted).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows success + a "generating result" indicator for vark, then the result', async () => {
+    fixture.componentRef.setInput('formId', 'vark');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    pollingState.set({ status: 'processing', submissionId: 'sub2' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    let text = fixture.nativeElement.textContent;
+    expect(text).toContain('Formulário enviado com sucesso!');
+    expect(text).toContain('Gerando resultado');
+
+    pollingState.set({ status: 'ready', prediction: { label: 'K' } as never });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    text = fixture.nativeElement.textContent;
+    expect(text).toContain('Resultado gerado!');
+    expect(text).not.toContain('Gerando resultado');
   });
 });

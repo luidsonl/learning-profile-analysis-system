@@ -77,7 +77,9 @@ describe('VarkAssessment', () => {
   });
 
   it('enables submit only after all questions are answered', () => {
-    const button = fixture.nativeElement.querySelector('button[type=submit]') as HTMLButtonElement;
+    const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Enviar avaliação'),
+    ) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
 
     fixture.componentInstance.onAnswer('q01', 5);

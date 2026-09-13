@@ -27,17 +27,23 @@
       <mat-card-content class="state-content">
         <mat-icon aria-hidden="true" class="state-icon success-icon">check_circle</mat-icon>
         <h2>Formulário enviado com sucesso!</h2>
-        <p>
-          As respostas foram registradas na lista de envios abaixo.
-          @if (predicts()) {
-            A análise automática aparece em instantes.
-          }
-        </p>
+        @if (predicts() && isProcessing()) {
+          <div class="generating-row">
+            <mat-spinner diameter="20" />
+            <span>
+              Gerando resultado — o perfil calculado aparece na lista de envios abaixo assim que a análise terminar.
+            </span>
+          </div>
+        } @else if (predicts()) {
+          <p>Resultado gerado! O perfil calculado aparece na lista de envios abaixo.</p>
+        } @else {
+          <p>As respostas foram registradas na lista de envios abaixo.</p>
+        }
         <button mat-stroked-button (click)="reset()">Preencher outro formulário</button>
       </mat-card-content>
     </mat-card>
   } @else if (form(); as def) {
-    <form (ngSubmit)="submit($event)">
+    <form (ngSubmit)="submit($event)" novalidate>
       @for (section of def.form.sections; track section.id) {
         <mat-card appearance="outlined">
           <mat-card-header>
@@ -89,7 +95,7 @@
                       <input
                         matInput
                         type="date"
-                        [value]="answers()[question.id]"
+                        [value]="answerInputValue(question.id)"
                         (input)="onTextInput(question.id, $event)"
                       />
                     </mat-form-field>
@@ -100,7 +106,7 @@
                       <input
                         matInput
                         type="number"
-                        [value]="answers()[question.id]"
+                        [value]="answerInputValue(question.id)"
                         (input)="onNumberInput(question.id, $event)"
                       />
                     </mat-form-field>
@@ -111,7 +117,7 @@
                       <textarea
                         matInput
                         rows="2"
-                        [value]="answers()[question.id]"
+                        [value]="answerInputValue(question.id)"
                         (input)="onTextInput(question.id, $event)"
                       ></textarea>
                     </mat-form-field>
@@ -132,8 +138,9 @@
         <button
           mat-flat-button
           color="primary"
-          type="submit"
-          [disabled]="!allAnswered()"
+          type="button"
+          [disabled]="!allAnswered() || isProcessing()"
+          (click)="submit($event)"
         >
           Enviar formulário
         </button>
