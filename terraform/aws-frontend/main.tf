@@ -99,6 +99,34 @@ resource "aws_cloudfront_function" "api_rewrite" {
 }
 
 # ---------------------------------------------------------------------------
+# SPA fallback: serve index.html for extensionless routes (deep links)
+# ---------------------------------------------------------------------------
+# The API origin must NOT use global custom_error_response 403/404 → index.html:
+# that would mask real API errors (e.g. login of a pending account → 403
+# pending_approval) as an empty HTML page. Instead the fallback is done here,
+# on the DEFAULT (S3) behavior only, by rewriting any extensionless route to
+# index.html — client-side routing (e.g. /students/:id, /admin) works on
+# refresh and deep links, while API responses pass through untouched.
+resource "aws_cloudfront_function" "spa_fallback" {
+  count   = var.frontend_enabled ? 1 : 0
+  name    = "${local.name_prefix}-spa-fallback"
+  runtime = "cloudfront-js-2.0"
+  comment = "Rewrite extensionless routes to /index.html on the S3 behavior"
+
+  code = <<-EOT
+    function handler(event) {
+      var request     = event.request;
+      var lastSegment = request.uri.split("/").pop();
+      // No dot in the last segment → an SPA route, not a file asset.
+      if (request.uri !== "/" && lastSegment.indexOf(".") === -1) {
+        request.uri = "/index.html";
+      }
+      return request;
+    }
+  EOT
+}
+
+# ---------------------------------------------------------------------------
 # CloudFront origin request policy for the API Gateway origin
 # ---------------------------------------------------------------------------
 resource "aws_cloudfront_origin_request_policy" "api" {
@@ -160,6 +188,11 @@ resource "aws_cloudfront_distribution" "main" {
         forward = "none"
       }
     }
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_fallback[0].arn
+    }
   }
 
   ordered_cache_behavior {
@@ -181,21 +214,9 @@ resource "aws_cloudfront_distribution" "main" {
 
   price_class = "PriceClass_100"
 
-  # Serve index.html for any path not found in S3 so client-side routing
-  # (e.g. /students/:id, /admin) works on refresh and deep links.
-  # With OAC the bucket has no ListBucket permission, so S3 answers 403
-  # (not 404) for missing keys - both must be handled.
-  custom_error_response {
-    error_code         = 403
-    response_code      = 200
-    response_page_path = "/index.html"
-  }
-
-  custom_error_response {
-    error_code         = 404
-    response_code      = 200
-    response_page_path = "/index.html"
-  }
+  # NOTE: no global custom_error_response here. SPA fallback for deep links is
+  # handled by the spa_fallback function on the default (S3) behavior only; a
+  # global 403/404 → index.html mapping would mask real API errors too.
 
   restrictions {
     geo_restriction {
