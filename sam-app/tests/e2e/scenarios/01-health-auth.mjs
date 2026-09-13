@@ -83,6 +83,11 @@ export default async (ctx) => {
     const approveG = await api("PATCH", `/admin/users/${ctx.guardianId}`, { token: ctx.educatorToken, body: { status: "active" } });
     expect("educator approves guardian", approveG.status === 200 && approveG.data.user.status === "active", JSON.stringify(approveG.data));
 
+    // Guardians are a self-registration identity class: they can never be
+    // promoted to a staff role, even by an admin.
+    const promoteG = await api("PATCH", `/admin/users/${ctx.guardianId}`, { token: ctx.adminToken, body: { role: "educator" } });
+    expect("admin cannot promote guardian to educator", promoteG.status === 403 && promoteG.data.error?.code === "fixed_role", JSON.stringify(promoteG.data));
+
     const loginGuardian2 = await api("POST", "/auth/login", { body: { email: TEST_FIXTURES[2].email, password: TEST_FIXTURES[2].password } });
     expect("approved guardian login", loginGuardian2.status === 200 && !!loginGuardian2.data.token, JSON.stringify(loginGuardian2.data));
     ctx.guardianToken = loginGuardian2.data.token;

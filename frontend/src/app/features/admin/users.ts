@@ -130,6 +130,13 @@ export class AdminUsers {
     return user.userId === this.auth.user()?.userId;
   }
 
+  // Guardian and student roles are fixed by self-registration — they are never
+  // shown a role selector. Only staff accounts (educator/admin) can be
+  // promoted or demoted between the two staff roles.
+  roleOptions(user: PublicUser): Role[] {
+    return user.role === 'guardian' || user.role === 'student' ? [] : ['educator', 'admin'];
+  }
+
   isBusy(user: PublicUser, action: BusyAction): boolean {
     return this.busyFor() === user.userId && this.busyAction() === action;
   }

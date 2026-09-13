@@ -85,6 +85,15 @@ export default async (ctx) => {
       JSON.stringify(manualActivation.data),
     );
 
+    // Students are a self-registration identity class: they can never be
+    // promoted to a staff role, even by an admin.
+    const promoteS = await api("PATCH", `/admin/users/${noConsentReg.data.user.userId}`, { token: ctx.adminToken, body: { role: "admin" } });
+    expect(
+      "admin cannot promote student to admin",
+      promoteS.status === 403 && promoteS.data.error?.code === "fixed_role",
+      JSON.stringify(promoteS.data),
+    );
+
     // Both self-registered accounts are now pending and discoverable for the
     // link flow. The table may hold unrelated student accounts (incl. active
     // linked ones from other environments), so assert membership/availability of

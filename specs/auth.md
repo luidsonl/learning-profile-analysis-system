@@ -39,7 +39,7 @@ Accounts are **approval-gated** before they can sign in:
 | `denied` | Rejected by an admin/educator | login blocked → `403 account_denied`; can be re-approved later (`pending`→`active`) |
 
 - **First educator → admin bootstrap**: the very first `educator` to register, when **no admin exists** (`GSI2 RoleStatus` `USER#ROLE#admin` scan), is created as `admin` + `active` immediately. All later `educator` and `guardian` registrations start `pending`.
-- **Who approves whom**: educators can approve/deny `guardian` and `student` accounts (status only, never roles). Admins have full control — approve/deny educators, promote/demote between `educator↔admin`, reset passwords, delete accounts.
+- **Who approves whom**: educators can approve/deny `guardian` and `student` accounts (status only, never roles). Admins have full control — approve/deny educators, promote/demote between `educator↔admin`, reset passwords, delete accounts. **Roles are fixed by identity class**: `guardian` and `student` are self-registration classes that can never be promoted to `educator`/`admin`, nor can staff be demoted onto them (`403 fixed_role`).
 - **`student` accounts are self-registered** via `POST /api/auth/register` (`role: "student"`) — educator/admin do **not** create them. They start `pending` and become `active` when the student is **linked** to a `STUDENT#` entity by an educator/admin (see [Student Accounts](#student-accounts-self-registration--educator-link)).
 - Because `requireAuth` **re-reads the user from the DB on every request** (see [Middleware](#middleware)), approving, denying, or demoting a user takes effect immediately (their session no longer validates).
 

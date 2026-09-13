@@ -93,7 +93,7 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 | `/students` | guardian, educator, admin | List in-scope students | `guardianEducatorAdminGuard` |
 | `/students/:id` | scoped | Student detail shell + tabs (profile, submissions/predictions, recommendations, observations, consent, audit) | `scopedStudentGuard`; admin adds audit tab |
 | `/students/:id/forms/:formId` | form persona | Fill a form (dynamic renderer) | audience check from `GET /api/forms` |
-| `/admin/users` | admin, educator | User management (approve/deny/promote/delete/reset) | `adminOrEducatorGuard`; role/status conditional UI |
+| `/admin/users` | admin, educator | User management (approve/deny/promote/delete/reset) | `adminOrEducatorGuard`; role/status conditional UI; role selector only for staff (guardian/student roles are fixed — no selector) |
 
 **Status-aware login**: educator/guardian accounts that are `denied` or not yet `active` receive the mapped error and are routed accordingly; a `pending` student still signs in and lands on `/me` in restricted self-service mode (see [auth](./auth.md) → *Account status & approval flow*).
 

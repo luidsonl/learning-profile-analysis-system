@@ -6,6 +6,7 @@ import { writeAudit } from "../lib/scope.mjs";
 import { computeAge, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
 
 const ROLES = ["guardian", "educator", "admin", "student"];
+const STAFF_ROLES = ["educator", "admin"];
 const STATUSES = ["pending", "active", "denied"];
 
 const parseId = (path, key) => {
@@ -177,6 +178,17 @@ const updateUser = async (event, ctx) => {
 
   const target = await getUser(userId);
   if (!target) throw new HttpError(404, "user_not_found", "User not found");
+
+  // Guardian and student are self-registration identity classes: they can never
+  // be promoted to a staff role, nor can staff be demoted onto them. Only the
+  // educator ↔ admin transition (promote/demote) is a legitimate role change.
+  // A no-op role payload stays allowed (it changes nothing).
+  if (changes.role !== undefined && changes.role !== target.role) {
+    const staffTransition = STAFF_ROLES.includes(target.role) && STAFF_ROLES.includes(changes.role);
+    if (!staffTransition) {
+      throw new HttpError(403, "fixed_role", "Guardian and student roles are fixed; only educator ↔ admin changes are allowed");
+    }
+  }
 
   // Student accounts are activated EXCLUSIVELY by the educator link flow
   // (POST /students/{id}/accounts/{userId}/link), which attributes the entity

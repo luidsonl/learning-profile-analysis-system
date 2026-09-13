@@ -27,6 +27,7 @@ const PT_BY_CODE: Record<string, string> = {
   last_admin: 'Não é possível modificar ou remover o último administrador ativo.',
   cannot_delete_self: 'Você não pode excluir a própria conta.',
   cannot_demote_self: 'Você não pode rebaixar o próprio perfil.',
+  fixed_role: 'Perfis de responsável e de estudante são fixos; apenas educador e administrador podem alternar entre si.',
   user_not_found: 'Usuário não encontrado.',
   weak_password: 'A senha deve ter ao menos 8 caracteres.',
   no_changes: 'Nenhuma alteração informada.',

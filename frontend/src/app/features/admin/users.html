@@ -94,7 +94,7 @@
               }
             </mat-card-content>
             <mat-card-actions align="end" class="user-actions">
-              @if (isAdmin()) {
+              @if (isAdmin() && roleOptions(user).length > 0) {
                 <span class="user-actions-role">
                   Perfil:
                   <mat-form-field appearance="outline" class="role-select">
@@ -103,7 +103,7 @@
                       [disabled]="isSelf(user)"
                       (selectionChange)="changeRole(user, $event.value)"
                     >
-                      @for (role of roles; track role) {
+                      @for (role of roleOptions(user); track role) {
                         <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
                       }
                     </mat-select>

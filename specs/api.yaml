@@ -1039,6 +1039,10 @@ paths:
         Admins: full control (incl. `birthDate` to adjust LGPD eligibility).
         Educators: only approve/deny `guardian`/`student` accounts (status
         `active`/`denied`). Guards: no self-demotion, no last-admin removal.
+        **Fixed roles**: `guardian` and `student` are self-registration identity
+        classes and can never be promoted to a staff role, nor can staff be
+        demoted onto them — only the `educator` ↔ `admin` transition is a
+        legitimate role change (anything else → `403 fixed_role`).
       security:
         - bearerAuth: []
       operationId: updateAdminUser
