@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
@@ -65,7 +66,7 @@ const studentsStub = {
 };
 
 const authStub = {
-  user: () => ({ userId: 'u1', role: 'educator' }),
+  user: signal<{ userId: string; role: 'educator' | 'admin' | 'guardian' | 'student' }>({ userId: 'u1', role: 'educator' }),
   studentAccounts: () =>
     of({
       data: [
@@ -75,6 +76,15 @@ const authStub = {
       count: 2,
     }),
 };
+
+function setUserRole(role: 'educator' | 'admin' | 'guardian' | 'student'): void {
+  authStub.user.set({ userId: role === 'guardian' ? 'gu1' : role === 'student' ? 'sid1' : 'u1', role });
+}
+
+function buttonsWithText(fixture: ComponentFixture<StudentWorkspace>, text: string): HTMLButtonElement[] {
+  const el = fixture.nativeElement as HTMLElement;
+  return [...el.querySelectorAll<HTMLButtonElement>('button')].filter((b) => (b.textContent ?? '').includes(text));
+}
 
 // Tab order for an access manager (educator/admin): 0 Dados, 1 Perfil,
 // 2 Observações, 3 Recomendações, 4 Consentimento, 5 Acessos. The assessment
@@ -93,6 +103,7 @@ describe('StudentWorkspace', () => {
   let fixture: ComponentFixture<StudentWorkspace>;
 
   beforeEach(async () => {
+    authStub.user.set({ userId: 'u1', role: 'educator' });
     TestBed.configureTestingModule({
       imports: [StudentWorkspace],
       providers: [
@@ -231,5 +242,41 @@ describe('StudentWorkspace', () => {
 
   it('loads the whole guardian catalog on open', () => {
     expect(searchSpy).toHaveBeenCalledWith('');
+  });
+
+  it('shows annotation write forms to staff (educator/admin)', () => {
+    selectTab(fixture, 2);
+    expect(buttonsWithText(fixture, 'Registrar').length).toBe(1);
+    selectTab(fixture, 3);
+    expect(buttonsWithText(fixture, 'Propor').length).toBe(1);
+  });
+
+  it('keeps observations read-only for a guardian', () => {
+    setUserRole('guardian');
+    fixture.detectChanges();
+    selectTab(fixture, 1);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Foco mantido em leitura.');
+    expect(buttonsWithText(fixture, 'Registrar').length).toBe(0);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[aria-label="Excluir observação"]')).toBeNull();
+  });
+
+  it('keeps recommendations read-only for a guardian', () => {
+    setUserRole('guardian');
+    fixture.detectChanges();
+    selectTab(fixture, 2);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Leitura em voz alta');
+    expect(buttonsWithText(fixture, 'Propor').length).toBe(0);
+  });
+
+  it('keeps observations read-only for the linked student', () => {
+    setUserRole('student');
+    fixture.detectChanges();
+    selectTab(fixture, 1);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Foco mantido em leitura.');
+    expect(buttonsWithText(fixture, 'Registrar').length).toBe(0);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[aria-label="Excluir observação"]')).toBeNull();
   });
 });

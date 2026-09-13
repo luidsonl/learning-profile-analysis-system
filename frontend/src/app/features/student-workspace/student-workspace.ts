@@ -97,6 +97,14 @@ export class StudentWorkspace {
     return role === 'educator' || role === 'admin';
   });
 
+  // Observations and recommendations are staff-authored: only educators and
+  // admins can create/edit them. Guardians and the student themselves keep a
+  // read-only view of the lists.
+  readonly canWriteAnnotations = computed(() => {
+    const role = this.auth.user()?.role;
+    return role === 'educator' || role === 'admin';
+  });
+
   readonly confirmDelete = signal(false);
   readonly deleteBusy = signal(false);
   readonly deleteError = signal<string | null>(null);
@@ -414,7 +422,7 @@ export class StudentWorkspace {
     this.students.observations(id).subscribe({
       next: (res) => {
         const myId = this.auth.user()?.userId;
-        this.obsList.set(res.data.map((o) => ({ ...o, deletable: o.submittedBy === myId })));
+        this.obsList.set(res.data.map((o) => ({ ...o, deletable: this.canWriteAnnotations() && o.submittedBy === myId })));
         this.obsState.set({ status: 'ready' });
       },
       error: () => this.obsState.set({ status: 'error', message: 'Não foi possível carregar as observações.' }),
@@ -426,7 +434,7 @@ export class StudentWorkspace {
     this.students.recommendations(id).subscribe({
       next: (res) => {
         const myId = this.auth.user()?.userId;
-        this.recoList.set(res.data.map((r) => ({ ...r, mutable: r.createdBy === myId })));
+        this.recoList.set(res.data.map((r) => ({ ...r, mutable: this.canWriteAnnotations() && r.createdBy === myId })));
         this.recoState.set({ status: 'ready' });
       },
       error: () => this.recoState.set({ status: 'error', message: 'Não foi possível carregar as recomendações.' }),
