@@ -759,7 +759,7 @@ paths:
     post:
       tags: [Observations]
       summary: Add a pedagogical observation
-      description: Only educators (in scope). Students read their own observations.
+      description: Educators or admins (in scope). Students and guardians read their own observations only.
       security:
         - bearerAuth: []
       operationId: addObservation

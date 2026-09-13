@@ -131,6 +131,8 @@ Filling and reviewing assessments is a **three-screen flow**, one action per scr
 
 Avaliações are reachable from the **student ficha** (`/estudantes/:id`): the ficha `mat-tab-group` no longer embeds an assessment tab — an **"avaliações"** action button at the end of the tab strip deep-links to `/avaliacoes/:studentId`. This is the single entry point for filling/reviewing forms about a student; the workspace flow is the same for every persona (educator, guardian or the linked student themselves).
 
+**Observations and recommendations are staff-authored**: in the ficha's Observações/Recomendações tabs the write forms (and the status/delete actions per item) render **only for educators and admins**; guardians and the linked student get the same lists **read-only** (the student's own recommendations are further visibility-filtered server-side to approved/published). Screens that a guardian/student self-view can't already reach are unreachable server-side too (403 on any write attempt).
+
 **Submission UX**
 
 - The submit button is `type="button"` wired to `(click)="submit($event)"` (with `(ngSubmit)` kept as a safety net and `novalidate` on the form): clicking **never triggers a native page navigation/reload** — without `preventDefault` an `ngSubmit` does a GET that reloads the page and aborts the POST.

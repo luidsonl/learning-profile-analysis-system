@@ -85,11 +85,11 @@ requiredBy:
 ### Observations
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `POST /api/students/:id/observations` | educator | Add observation (behavior/performance/academic) | `OBS#<ts>` |
+| `POST /api/students/:id/observations` | educator, admin | Add observation (behavior/performance/academic) | `OBS#<ts>` |
 | `GET /api/students/:id/observations` | scoped | List observations, newest first (students: own only) | `OBS#` prefix desc |
-| `DELETE /api/students/:id/observations/:timestamp` | educator (author) | Remove own observation | delete `OBS#` |
+| `DELETE /api/students/:id/observations/:timestamp` | educator (author), admin | Remove own observation | delete `OBS#` |
 
-> Students see their own observations (read-only); writing/removing is educator-only.
+> Observations are **staff-authored**: only educators and admins can write or remove them; guardians and students see the lists read-only (students only their own).
 
 ### Assessment & Prediction
 | Method & Path | Roles | Description | Schema items |
@@ -106,11 +106,11 @@ requiredBy:
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
 | `GET /api/students/:id/recommendations` | scoped | Recommendation list (filtered by `visibility`) | `REC#` prefix desc |
-| `POST /api/students/:id/recommendations` | educator | Propose recommendations | `REC#<type>#<ts>` |
+| `POST /api/students/:id/recommendations` | educator, admin | Propose recommendations | `REC#<type>#<ts>` |
 | `PATCH /api/students/:id/recommendations/:recoId` | educator, admin | Approve/publish or reject | update `REC#` status |
 | `DELETE /api/students/:id/recommendations/:recoId` | educator, admin | Remove | delete `REC#` |
 
-> Recommendations are a **manual, educator-driven** concern: prediction never auto-creates `REC#`. Educators propose and approve; students only ever see approved/published ones.
+> Recommendations are a **manual, educator/admin-driven** concern: prediction never auto-creates `REC#`. Only educators and admins propose, approve or publish; students only ever see approved/published ones and guardians read the same list.
 
 ### Reports (async, 0shared pattern)
 | Method & Path | Roles | Description | Schema items |
@@ -151,7 +151,7 @@ requiredBy:
 | User management (approval/RBAC) | ✗ | approve guardian/student (status only) | ✗ | ✓ (full, incl. edit birthDate) |
 | Consent | assigned students | followed (grant/revoke, institution basis) | own (self_consent, **only if ≥18**) | ✓ |
 | Forms (fill) | anamnesis, vark (assistido) | socioemotional, behavior-checklist, vark (assistido) | vark | ✓ all |
-| Observations | ✗ | ✓ | own (read-only) | ✓ |
+| Observations | assigned (read-only) | write/remove | own (read-only) | write/remove |
 | Assessments / Predict | assigned students | followed | own (full payload) | ✓ |
 | Recommendations | assigned (approved) | propose/approve | own (published) | ✓ |
 | Reports | assigned students | followed | own (incl. generate; never delete) | ✓ |
