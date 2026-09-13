@@ -116,9 +116,12 @@ const listChildren = async (event, ctx) => {
 
 const getStudentHandler = async (event, ctx) => {
   const studentId = param(event, "id");
-  await assertScopeStudent(studentId, ctx);
+  // Existence precedes authorization: an erased/unknown record is a plain 404
+  // for every persona (no existence leak via 403 vs 404, and after LGPD erasure
+  // the record is gone for everyone), while a live-but-unscoped record stays 403.
   const student = await getStudent(studentId);
   if (!student) throw new HttpError(404, "student_not_found", "Student not found");
+  await assertScopeStudent(studentId, ctx);
 
   // Related users of the entity (specs/backend.md): the linked self-registered
   // account, when present. Denormalized here so the ficha can show it directly.
