@@ -288,17 +288,20 @@ The API is exercised via the deployed stack; the future SPA (Angular) will proxy
  1. terraform/aws-bootstrap/   (one-time S3 state bucket)
  2. terraform/aws-app/        (DynamoDB + S3 files/data + SQS report queue + async Lambdas + EventBridge)
  3. sam-app/                  (API-triggered Lambdas + API Gateway, exports ApiEndpoint)
- 4. terraform/aws-frontend/   (S3 static + CloudFront infra; build+upload+invalidation via `make frontend` — **unused while the SPA is absent**)
+ 4. terraform/aws-frontend/   (S3 static + CloudFront infra; build+upload+invalidation via `make deploy-aws-front`)
 ```
 
 The root `Makefile` orchestrates the whole chain, mirroring 0shared:
 
 ```sh
-make deploy-full   # first time: bootstrap + infra + backend (+ frontend when it exists)
-make deploy        # regular: infra + backend
-make backend       # SAM only: sam build && sam deploy && forced API Gateway deployment
-make train package # offline ML: retrain and bundle a new artifact into sam-app
-make destroy-backend / make destroy
+make deploy-all        # full stack: aws-app → sam-app → frontend
+make deploy-api        # backend only: aws-app → sam-app (no frontend)
+make deploy-aws-app    # single stage — stateful infra only
+make deploy-sam-app    # single stage — API Lambdas + API Gateway only
+make deploy-aws-front  # single stage — SPA build + S3 + CloudFront only
+make bootstrap         # first-time only: remote state bucket
+make train package     # offline ML: retrain and bundle a new artifact into sam-app
+make destroy-all       # teardown everything (reverse order)
 ```
 
 `sam-app/Makefile` handles the backend alone; its `redeploy-api` step works around the SAM "empty deployment" race (a no-op deploy can leave the Prod stage without the routes). Database maintenance: `make clean CONFIRM=yes` (full dev wipe — every item; the old `db-clean` default `MODEL#`/`FORM#` orphans are gone)`.

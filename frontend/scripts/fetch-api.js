@@ -17,7 +17,7 @@ try {
 }
 
 if (!apiGateway) {
-  throw new Error(`Export ${exportName} not found. Deploy sam-app first (make backend).`);
+  throw new Error(`Export ${exportName} not found. Deploy sam-app first (make deploy-api).`);
 }
 
 const url = new URL(apiGateway);

@@ -37,7 +37,7 @@ The SPA is **not yet implemented**. This spec captures the agreed shape of the p
 | Production | CloudFront `/*` → S3 bucket `learning-profile-front`; `/api/*` → API Gateway | One distribution, no CORS; SPA fallback to `/index.html` for deep links |
 | Local dev | Angular CLI dev server, proxy `/api` to deployed API Gateway endpoint | `proxy.conf.json`; no CORS needed, mirrors prod topology |
 
-Deployment artifacts live in `terraform/aws-frontend` (S3 static bucket + CloudFront + OAC). Build + upload + invalidation is orchestrated from the root `Makefile` (`make frontend`), which is dormant until the SPA is reintroduced.
+Deployment artifacts live in `terraform/aws-frontend` (S3 static bucket + CloudFront + OAC). Build + upload + invalidation is orchestrated from the root `Makefile` (`make deploy-aws-front`, or as part of `make deploy-all`).
 
 ## Tech Stack
 
