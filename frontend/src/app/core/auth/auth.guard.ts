@@ -14,13 +14,14 @@ export const authGuard: CanActivateFn = () => {
   return router.createUrlTree(['/login']);
 };
 
-// Admin-only area (approvals + user management). Rehydrates the session first
-// because admin nav/routes can be deep-linked before app bootstrapping loads me().
-export const adminGuard: CanActivateFn = async () => {
+// Admin + educator area (approvals + user management). Educators get a
+// role-conditional UI: they can only approve/deny guardian and student
+// accounts (status only) — role/password/delete stay admin-gated.
+export const adminOrEducatorGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
   const user = await auth.ensureSession();
-  if (user?.role === 'admin') {
+  if (user?.role === 'admin' || user?.role === 'educator') {
     return true;
   }
   return router.createUrlTree(['/']);

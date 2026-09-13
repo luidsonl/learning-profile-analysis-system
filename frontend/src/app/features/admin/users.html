@@ -5,9 +5,12 @@
     <div class="filters">
       <mat-form-field appearance="outline">
         <mat-label>Perfil</mat-label>
-        <mat-select [value]="roleFilter()" (selectionChange)="onRoleFilter($event.value)">
+        <mat-select
+          [value]="roleFilter()"
+          (selectionChange)="onRoleFilter($event.value)"
+        >
           <mat-option value="">Todos</mat-option>
-          @for (role of roles; track role) {
+          @for (role of visibleRoles(); track role) {
             <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
           }
         </mat-select>
@@ -91,20 +94,22 @@
               }
             </mat-card-content>
             <mat-card-actions align="end" class="user-actions">
-              <span class="user-actions-role">
-                Perfil:
-                <mat-form-field appearance="outline" class="role-select">
-                  <mat-select
-                    [value]="user.role"
-                    [disabled]="isSelf(user)"
-                    (selectionChange)="changeRole(user, $event.value)"
-                  >
-                    @for (role of roles; track role) {
-                      <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-              </span>
+              @if (isAdmin()) {
+                <span class="user-actions-role">
+                  Perfil:
+                  <mat-form-field appearance="outline" class="role-select">
+                    <mat-select
+                      [value]="user.role"
+                      [disabled]="isSelf(user)"
+                      (selectionChange)="changeRole(user, $event.value)"
+                    >
+                      @for (role of roles; track role) {
+                        <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </span>
+              }
 
               @if (user.status !== 'active') {
                 <button
@@ -131,21 +136,23 @@
                 </button>
               }
 
-              @if (passwordUserId() !== user.userId) {
-                <button mat-button (click)="togglePassword(user)">Redefinir senha</button>
-              }
+              @if (isAdmin()) {
+                @if (passwordUserId() !== user.userId) {
+                  <button mat-button (click)="togglePassword(user)">Redefinir senha</button>
+                }
 
-              <button
-                mat-icon-button
-                color="warn"
-                class="delete-btn"
-                [disabled]="isSelf(user) || busyFor() !== null"
-                (click)="deleteUser(user)"
-                matTooltip="Excluir conta"
-                aria-label="Excluir conta"
-              >
-                <mat-icon>delete</mat-icon>
-              </button>
+                <button
+                  mat-icon-button
+                  color="warn"
+                  class="delete-btn"
+                  [disabled]="isSelf(user) || busyFor() !== null"
+                  (click)="deleteUser(user)"
+                  matTooltip="Excluir conta"
+                  aria-label="Excluir conta"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
             </mat-card-actions>
           </mat-card>
         }

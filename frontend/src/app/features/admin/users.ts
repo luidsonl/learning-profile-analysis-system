@@ -30,6 +30,10 @@ const STATUSES: UserStatus[] = ['pending', 'active', 'denied'];
 // approve/block, promote/demote role, reset password and delete. The backend
 // guards self-demotion, last-admin removal and self-deletion; errors surface
 // here with actionable messages.
+//
+// Educators get a restricted view: only guardian/student roles are visible and
+// only approve/block is allowed (status only). Role change, password reset and
+// delete are admin-gated and hidden for educators.
 @Component({
   selector: 'app-admin-users',
   imports: [
@@ -55,6 +59,11 @@ export class AdminUsers {
   readonly statuses = STATUSES;
   readonly roleLabels = ROLE_LABELS;
   readonly statusLabels = USER_STATUS_LABELS;
+
+  readonly isAdmin = computed(() => this.auth.user()?.role === 'admin');
+
+  // Educators can only see and manage guardian/student accounts.
+  readonly visibleRoles = computed<Role[]>(() => (this.isAdmin() ? ROLES : ROLES.filter((r) => r !== 'admin' && r !== 'educator')));
 
   readonly roleFilter = signal<Role | ''>('');
   readonly statusFilter = signal<UserStatus | ''>('');

@@ -38,4 +38,4 @@ const proxy = {
 
 const out = resolve(import.meta.dirname, "../proxy.conf.json");
 writeFileSync(out, `${JSON.stringify(proxy, null, 2)}\n`);
-console.log(`Proxy written (${out}): /api -> ${base}`);
+console.log(`Proxy written (${out}): /api -> ${url.origin}${stage}`);

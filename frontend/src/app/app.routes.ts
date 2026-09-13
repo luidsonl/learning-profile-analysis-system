@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { adminGuard, authGuard } from './core/auth/auth.guard';
+import { adminOrEducatorGuard, authGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -30,7 +30,7 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    canActivate: [authGuard, adminGuard],
+    canActivate: [authGuard, adminOrEducatorGuard],
     loadComponent: () => import('./features/admin/admin-area').then((m) => m.AdminArea),
   },
   {

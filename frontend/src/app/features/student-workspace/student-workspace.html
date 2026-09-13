@@ -178,5 +178,154 @@
         </div>
       </mat-card-content>
     </mat-card>
+
+    @if (isAccessManager()) {
+      <mat-card appearance="outlined" class="panel">
+        <mat-card-header>
+          <mat-card-title>Responsáveis</mat-card-title>
+          <mat-card-subtitle>Atribua ou remova responsáveis legais desta ficha.</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @if (guardianResultsError(); as message) {
+            <p class="error">{{ message }}</p>
+          }
+
+          <form class="inline-form" (ngSubmit)="searchGuardians()">
+            <mat-form-field appearance="outline" class="grow">
+              <mat-label>Buscar responsável por e-mail</mat-label>
+              <input matInput [value]="guardianSearch()" (input)="onGuardianSearchInput($any($event.target).value)" autocomplete="off" />
+            </mat-form-field>
+            <button
+              mat-flat-button
+              color="primary"
+              [disabled]="guardianBusy() !== null || guardianSearch().trim().length < 3"
+              type="submit"
+            >
+              <span>Buscar</span>
+              @if (guardianSearching()) {
+                <mat-spinner diameter="20" />
+              } @else {
+                <mat-icon>search</mat-icon>
+              }
+            </button>
+          </form>
+
+          @if (guardianSearchResults().length > 0) {
+            <div class="feed">
+              @for (hit of guardianSearchResults(); track hit.userId) {
+                <div class="feed-item feed-heading">
+                  <div>
+                    <h3>{{ hit.name }}</h3>
+                    <p>{{ hit.email }}</p>
+                  </div>
+                  <button
+                    mat-stroked-button
+                    [disabled]="guardianBusy() !== null || isGrantedFor(hit.userId)"
+                    (click)="grantGuardian(hit.userId)"
+                  >
+                    @if (guardianBusy() === hit.userId) {
+                      <mat-spinner diameter="20" />
+                    } @else {
+                      Atribuir
+                    }
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="feed">
+            @if (guardiansLoading()) {
+              <div class="state-content"><mat-spinner diameter="32" /></div>
+            } @else if (guardiansErrorMessage(); as message) {
+              <p class="error">{{ message }}</p>
+            } @else {
+              @if (guardians().length === 0) {
+                <p class="empty">Nenhum responsável atribuído ainda.</p>
+              } @else {
+                @for (guardian of guardians(); track guardian.userId) {
+                  <div class="feed-item feed-heading">
+                    <div>
+                      <h3>{{ guardian.name }}</h3>
+                      <p>
+                        {{ guardian.email }} · {{ guardian.relation }}
+                        · desde {{ guardian.grantedAt | date: "dd/MM/yyyy" }}
+                      </p>
+                    </div>
+                    <button
+                      mat-icon-button
+                      [matTooltip]="'Remover ' + guardian.name"
+                      [disabled]="guardianBusy() !== null"
+                      (click)="revokeGuardian(guardian.userId)"
+                      aria-label="Remover responsável"
+                    >
+                      <mat-icon>person_remove</mat-icon>
+                    </button>
+                  </div>
+                }
+              }
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="panel">
+        <mat-card-header>
+          <mat-card-title>Conta de acesso</mat-card-title>
+          <mat-card-subtitle>Vincule a conta auto-cadastrada do estudante a esta ficha.</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @if (student()?.studentUserId) {
+            <div class="feed">
+              <p class="empty">Esta ficha já possui uma conta de acesso vinculada.</p>
+            </div>
+          } @else {
+            @if (linkError(); as message) {
+              <p class="error">{{ message }}</p>
+            }
+
+            <div class="feed">
+              @if (pendingLoading()) {
+                <div class="state-content"><mat-spinner diameter="32" /></div>
+              } @else if (pendingErrorMessage(); as message) {
+                <p class="error">{{ message }}</p>
+              } @else {
+                @if (pendingAccounts().length === 0) {
+                  <p class="empty">Nenhuma conta de estudante aguardando vinculação.</p>
+                } @else {
+                  @for (account of pendingAccounts(); track account.userId) {
+                    <div class="feed-item feed-heading">
+                      <div>
+                        <h3>{{ account.name }}</h3>
+                        <p>
+                          {{ account.email }}
+                          @if (account.consentRequired === 'self') {
+                            · maior de idade (autoconsentimento)
+                          } @else {
+                            · consentimento de responsável/instituição
+                          }
+                        </p>
+                      </div>
+                      <button
+                        mat-flat-button
+                        color="primary"
+                        [disabled]="linkBusy() !== null"
+                        (click)="linkStudentAccount(account.userId)"
+                      >
+                        @if (linkBusy() === account.userId) {
+                          <mat-spinner diameter="20" />
+                        } @else {
+                          Vincular
+                        }
+                      </button>
+                    </div>
+                  }
+                }
+              }
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+    }
   </div>
 </section>

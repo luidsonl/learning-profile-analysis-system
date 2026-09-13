@@ -10,8 +10,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
-import { Observation, Recommendation, Student } from '../../core/api/types';
+import { GuardianEdge, GuardianSearchHit, Observation, PendingAccount, Recommendation, Student } from '../../core/api/types';
 import { AuthService } from '../../core/auth/auth.service';
 import { StudentsService } from '../../core/students/students.service';
 import { OBSERVATION_CATEGORY_LABELS } from '../../core/observations/observation-labels';
@@ -40,6 +41,7 @@ type RecommendationModel = Recommendation & { mutable: boolean };
     MatIconModule,
     MatChipsModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
   ],
   templateUrl: './student-workspace.html',
   styleUrl: './student-workspace.scss',
@@ -58,6 +60,38 @@ export class StudentWorkspace {
 
   readonly student = signal<Student | null>(null);
   readonly studentError = signal<string | null>(null);
+
+  // Access-management (educator/admin only): responsables assigned to the
+  // student and the linked self-registered student account.
+  readonly isAccessManager = computed(() => {
+    const role = this.auth.user()?.role;
+    return role === 'educator' || role === 'admin';
+  });
+
+  readonly guardianState = signal<SectionState>({ status: 'loading' });
+  readonly guardians = signal<GuardianEdge[]>([]);
+  readonly guardianSearch = signal('');
+  readonly guardianSearchResults = signal<GuardianSearchHit[]>([]);
+  readonly guardianSearching = signal(false);
+  readonly guardianBusy = signal<string | null>(null);
+  readonly guardianResultsError = signal<string | null>(null);
+
+  readonly pendingState = signal<SectionState>({ status: 'loading' });
+  readonly pendingAccounts = signal<PendingAccount[]>([]);
+  readonly linkBusy = signal<string | null>(null);
+  readonly linkError = signal<string | null>(null);
+
+  readonly guardiansLoading = computed(() => this.guardianState().status === 'loading');
+  readonly guardiansErrorMessage = computed(() => {
+    const s = this.guardianState();
+    return s.status === 'error' ? s.message : null;
+  });
+
+  readonly pendingLoading = computed(() => this.pendingState().status === 'loading');
+  readonly pendingErrorMessage = computed(() => {
+    const s = this.pendingState();
+    return s.status === 'error' ? s.message : null;
+  });
 
   readonly obsState = signal<SectionState>({ status: 'loading' });
   readonly obsList = signal<ObservationModel[]>([]);
@@ -108,6 +142,123 @@ export class StudentWorkspace {
     });
     this.loadObservations(id);
     this.loadRecommendations(id);
+    if (this.isAccessManager()) {
+      this.loadGuardians(id);
+      this.loadPendingAccounts();
+    }
+  }
+
+  private loadGuardians(id: string): void {
+    this.guardianState.set({ status: 'loading' });
+    this.students.guardians(id).subscribe({
+      next: (res) => {
+        this.guardians.set(res.data);
+        this.guardianState.set({ status: 'ready' });
+      },
+      error: () => this.guardianState.set({ status: 'error', message: 'Não foi possível carregar os responsáveis.' }),
+    });
+  }
+
+  private loadPendingAccounts(): void {
+    this.pendingState.set({ status: 'loading' });
+    this.auth.pendingAccounts().subscribe({
+      next: (res) => {
+        this.pendingAccounts.set(res.data);
+        this.pendingState.set({ status: 'ready' });
+      },
+      error: () =>
+        this.pendingState.set({ status: 'error', message: 'Não foi possível carregar as contas pendentes.' }),
+    });
+  }
+
+  onGuardianSearchInput(value: string): void {
+    this.guardianSearch.set(value);
+    if (value.trim().length < 3) {
+      this.guardianSearchResults.set([]);
+    }
+  }
+
+  isGrantedFor(userId: string): boolean {
+    return this.guardians().some((g) => g.userId === userId);
+  }
+
+  searchGuardians(): void {
+    const id = this.studentId();
+    const email = this.guardianSearch().trim();
+    if (!id || email.length < 3 || this.guardianBusy() !== null || this.guardianSearching()) {
+      return;
+    }
+    this.guardianSearching.set(true);
+    this.guardianResultsError.set(null);
+    this.students.searchGuardians(email).subscribe({
+      next: (res) => {
+        this.guardianSearchResults.set(res.data);
+        this.guardianSearching.set(false);
+      },
+      error: () => {
+        this.guardianSearching.set(false);
+        this.guardianResultsError.set('Não foi possível buscar responsáveis.');
+      },
+    });
+  }
+
+  grantGuardian(userId: string): void {
+    const id = this.studentId();
+    if (!id || this.guardianBusy() !== null) {
+      return;
+    }
+    this.guardianBusy.set(userId);
+    this.students.grantGuardian(id, userId).subscribe({
+      next: () => {
+        this.guardianBusy.set(null);
+        this.guardianSearch.set('');
+        this.guardianSearchResults.set([]);
+        this.loadGuardians(id);
+      },
+      error: () => {
+        this.guardianBusy.set(null);
+        this.guardianResultsError.set('Não foi possível atribuir o responsável.');
+      },
+    });
+  }
+
+  revokeGuardian(userId: string): void {
+    const id = this.studentId();
+    if (!id || this.guardianBusy() !== null) {
+      return;
+    }
+    this.guardianBusy.set(userId);
+    this.students.revokeGuardian(id, userId).subscribe({
+      next: () => {
+        this.guardianBusy.set(null);
+        this.loadGuardians(id);
+      },
+      error: () => {
+        this.guardianBusy.set(null);
+        this.guardianResultsError.set('Não foi possível remover o responsável.');
+      },
+    });
+  }
+
+  linkStudentAccount(userId: string): void {
+    const id = this.studentId();
+    if (!id || this.linkBusy() !== null) {
+      return;
+    }
+    this.linkBusy.set(userId);
+    this.students.linkStudentAccount(id, userId).subscribe({
+      next: () => {
+        this.linkBusy.set(null);
+        this.students.getStudent(id).subscribe({
+          next: (res) => this.student.set(res.student),
+        });
+        this.loadPendingAccounts();
+      },
+      error: () => {
+        this.linkBusy.set(null);
+        this.linkError.set('Não foi possível vincular a conta do estudante.');
+      },
+    });
   }
 
   private loadObservations(id: string): void {

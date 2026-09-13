@@ -62,7 +62,7 @@
             Estudantes
           </a>
         }
-        @if (auth.user()?.role === 'admin') {
+        @if (auth.user()?.role === 'admin' || auth.user()?.role === 'educator') {
           <a mat-list-item routerLink="/admin" routerLinkActive="active">
             Administração
           </a>
