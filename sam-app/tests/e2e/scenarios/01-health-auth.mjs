@@ -1,9 +1,14 @@
 import { api, expect, step } from "../helpers.mjs";
 import { TEST_FIXTURES } from "../fixtures.mjs";
+import { promoteToAdmin } from "../aws-cleanup.mjs";
 
-// The first educator to register becomes the initial admin (active); any later
-// educator and any guardian register `pending` and cannot sign in until an
-// admin/educator approves their account.
+// Registration/bootstrap:
+// - Clean table (no admin yet): the FIRST educator to register becomes the
+//   initial admin (active); later educators and guardians register `pending`.
+// - Staged mode (an admin already exists — e.g. real env users): the bootstrap
+//   is skipped; the fixture educator registers `pending` and is promoted to
+//   admin directly in the DB (promoteToAdmin), which api.test.mjs detects via
+//   ctx.stagedAdmin. Everything after the promotion is identical.
 //
 // Seeds ctx: adminId/adminToken, educatorId/educatorToken, guardianId/guardianToken.
 export default async (ctx) => {
@@ -13,11 +18,19 @@ export default async (ctx) => {
     expect("health returns ok", r.status === 200 && r.data.status === "ok", JSON.stringify(r.data));
   }
 
-  step("auth: register + first-educator bootstrap");
+  step("auth: register + admin bootstrap");
   {
     const a = await api("POST", "/auth/register", { body: { email: TEST_FIXTURES[0].email, name: TEST_FIXTURES[0].name, password: TEST_FIXTURES[0].password, role: TEST_FIXTURES[0].role } });
-    expect("first educator becomes admin (active)", a.status === 201 && a.data.user.role === "admin" && a.data.user.status === "active", JSON.stringify(a.data));
     ctx.adminId = a.data.user.userId;
+    if (ctx.stagedAdmin) {
+      // An admin already exists in this table, so the backend bootstrap cannot
+      // fire. The fixture educator registers pending and is promoted to admin
+      // directly in the DB (done below), then everything proceeds identically.
+      expect("fixture educator registers pending (staged admin)", a.status === 201 && a.data.user.role === "educator" && a.data.user.status === "pending", JSON.stringify(a.data));
+      await promoteToAdmin(ctx.adminId);
+    } else {
+      expect("first educator becomes admin (active)", a.status === 201 && a.data.user.role === "admin" && a.data.user.status === "active", JSON.stringify(a.data));
+    }
 
     const e = await api("POST", "/auth/register", { body: { email: TEST_FIXTURES[1].email, name: TEST_FIXTURES[1].name, password: TEST_FIXTURES[1].password, role: TEST_FIXTURES[1].role } });
     expect("later educator registers pending", e.status === 201 && e.data.user.role === "educator" && e.data.user.status === "pending", JSON.stringify(e.data));
@@ -46,10 +59,15 @@ export default async (ctx) => {
 
   step("auth: admin approves educator, educator approves guardian");
   {
-    // Pending educator accounts list (admin sees all roles).
+    // Pending educator accounts list (admin sees all roles). The table may
+    // already hold unrelated pending educators, so assert membership, not a
+    // clean-table count.
     const pendingEducators = await api("GET", "/admin/users?role=educator&status=pending", { token: ctx.adminToken });
-    expect("admin lists pending educators", pendingEducators.status === 200 && pendingEducators.data.count === 1, JSON.stringify(pendingEducators.data));
-    expect("admin list includes the pending educator", pendingEducators.data?.data?.[0]?.userId === ctx.educatorId, JSON.stringify(pendingEducators.data?.data));
+    expect(
+      "admin lists pending educators including the fixture educator",
+      pendingEducators.status === 200 && pendingEducators.data.count >= 1 && pendingEducators.data.data.some((u) => u.userId === ctx.educatorId),
+      JSON.stringify(pendingEducators.data),
+    );
 
     const approveE = await api("PATCH", `/admin/users/${ctx.educatorId}`, { token: ctx.adminToken, body: { status: "active" } });
     expect("admin approves educator", approveE.status === 200 && approveE.data.user.status === "active", JSON.stringify(approveE.data));

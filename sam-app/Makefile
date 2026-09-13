@@ -84,8 +84,10 @@ unit-test:
 #   make e2e-test FILTER=04      # bootstrap → ML inference only (01 → 04)
 #   make e2e-test FILTER=inference # same, by scenario label
 #   make e2e-inference           # shorthand (via the e2e-% rule below)
-# NOTE: the first educator must become admin, so the suite assumes a clean table
-# (run `make clean CONFIRM=yes` if a leftover admin breaks the bootstrap).
+# NOTE: no clean table required — if an admin already exists the suite uses a
+# staged admin (registers a fixture educator and promotes it to admin directly
+# in the DB), otherwise it exercises the "first educator -> admin" bootstrap.
+# The suite only ever creates/removes its own fixture data.
 e2e-test:
 	API_BASE=$$(aws cloudformation describe-stacks --stack-name $(STACK_NAME) \
 		--query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \

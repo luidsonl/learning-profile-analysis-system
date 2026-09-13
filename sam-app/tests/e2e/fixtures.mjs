@@ -5,7 +5,10 @@ import { cleanupStudent, cleanupUser, findStudentsByCreator, findUserByEmail } f
 // and never touches anything else in the table.
 //
 // Role/flow under the specs (auth.md / backend.md / lgpd.md):
-// - The FIRST educator to register becomes the initial admin (active).
+// - On a table with NO admin, the FIRST educator to register becomes the
+//   initial admin (active bootstrap). When an admin already exists, the suite
+//   switches to staged mode: ADMIN_EDUCATOR registers `pending` and is promoted
+//   to admin directly in the DB (see api.test.mjs + scenario 01).
 // - Later educators register as `pending` and are activated by an admin.
 // - Guardian accounts register as `pending` and are activated by an educator/admin.
 // - STUDENT accounts SELF-REGISTER via POST /api/auth/register (role: "student",
@@ -14,7 +17,7 @@ import { cleanupStudent, cleanupUser, findStudentsByCreator, findUserByEmail } f
 //   which approves it (pending -> active) and attributes the entity — consent-gated:
 //   adults (>= 18) self-consent; minors (< 18) need guardian or institution consent.
 export const TEST_FIXTURES = [
-  // First educator to register -> becomes admin (active bootstrap).
+  // Admin of the suite (bootstrap admin on a clean table; staged-promoted otherwise).
   { email: "admin.sistema@example.com", name: "Adriana Lopes", password: "senha12345", role: "educator" },
   // Common educator -> registers pending, then approved by the admin.
   { email: "prof.joao@example.com", name: "João Pereira", password: "senha12345", role: "educator" },

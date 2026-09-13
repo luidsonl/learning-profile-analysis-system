@@ -4,6 +4,7 @@ import {
   GetItemCommand,
   DeleteItemCommand,
   ScanCommand,
+  UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 
 const TABLE = process.env.TABLE_NAME || "learning-profile";
@@ -33,6 +34,23 @@ export async function deleteItem(pk, sk) {
   } catch {
     /* best effort */
   }
+}
+
+// Elevates a just-registered fixture educator to admin by updating its USER#
+// META directly. Used when an admin already exists in the table (staged mode)
+// so the suite does NOT depend on the "first educator -> admin" bootstrap —
+// the RoleStatus GSI keys derive from role/status on the META, so login and
+// admin lists pick the promotion up immediately.
+export async function promoteToAdmin(userId) {
+  await client.send(
+    new UpdateItemCommand({
+      TableName: TABLE,
+      Key: { PK: { S: `USER#${userId}` }, SK: { S: "META" } },
+      UpdateExpression: "SET #role = :admin, #st = :active",
+      ExpressionAttributeNames: { "#role": "role", "#st": "status" },
+      ExpressionAttributeValues: { ":admin": { S: "admin" }, ":active": { S: "active" } },
+    }),
+  );
 }
 
 export async function findUserByEmail(email) {

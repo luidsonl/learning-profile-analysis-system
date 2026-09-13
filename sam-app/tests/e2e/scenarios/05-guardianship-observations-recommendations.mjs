@@ -43,14 +43,23 @@ export default async (ctx) => {
     const restricted = hit.data.data[0];
     expect("search returns minimal identity fields only", Object.keys(restricted).sort().join(",") === "email,name,userId", JSON.stringify(restricted));
 
-    const badRole = await api("GET", "/users?role=educator&email=maria.", { token: ctx.educatorToken });
-    expect("educator-only role rejected", badRole.status === 400, JSON.stringify(badRole.data));
+    // Without a prefix the full active-guardian catalog is returned; the
+    // client-side name/email filter happens in the SPA (Acessos tab).
+    const all = await api("GET", "/users?role=guardian", { token: ctx.educatorToken });
+    expect(
+      "educator lists all active guardians without a prefix",
+      all.status === 200 && all.data.count >= 1 && all.data.data.some((g) => g.userId === ctx.guardianId),
+      JSON.stringify(all.data),
+    );
 
-    const shortPrefix = await api("GET", "/users?role=guardian&email=ma", { token: ctx.educatorToken });
-    expect("short email prefix rejected", shortPrefix.status === 400, JSON.stringify(shortPrefix.data));
+    const partial = await api("GET", "/users?role=guardian&email=ma", { token: ctx.educatorToken });
+    expect("partial prefix still matches guardians", partial.status === 200 && partial.data.data.some((g) => g.userId === ctx.guardianId), JSON.stringify(partial.data));
+
+    const ignoredRole = await api("GET", "/users?role=educator&email=maria.", { token: ctx.educatorToken });
+    expect("role param is ignored (always guardians)", ignoredRole.status === 200 && ignoredRole.data.data.some((g) => g.userId === ctx.guardianId), JSON.stringify(ignoredRole.data));
 
     const studentDenied = await api("GET", "/users?role=guardian&email=maria.", { token: ctx.studentToken });
-    expect("student cannot search guardians", studentDenied.status === 403, JSON.stringify(studentDenied.data));
+    expect("student cannot list/search guardians", studentDenied.status === 403, JSON.stringify(studentDenied.data));
   }
 
   step("observations");

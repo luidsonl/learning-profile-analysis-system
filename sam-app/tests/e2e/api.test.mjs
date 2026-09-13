@@ -67,21 +67,20 @@ const ctx = {};
 
 const cleanupErrors = [];
 
-// The suite assumes a clean table: the FIRST educator to register must become
-// the initial admin (auth.mjs hasAdmin bootstrap). If a leftover admin (not one
-// of our fixture emails) already exists, that bootstrap never fires and the
-// whole run fails in cascade. Fail fast with an actionable message instead.
-const assertCleanBootstrap = async () => {
+// The suite does NOT require a clean table. If an admin already exists (e.g.
+// real per-environment users), the "first educator -> admin" bootstrap cannot
+// fire; in that case scenario 01 registers a fixture educator and promotes it
+// to admin directly in the DB (promoteToAdmin), then the run proceeds. The
+// promoted account plus everything the suite creates are fixture-scoped and
+// removed by purgeFixtures afterwards.
+const detectStagedAdminMode = async () => {
   const fixtureEmails = new Set(TEST_FIXTURES.map((f) => f.email.toLowerCase()));
-  const stray = (await findAdmins()).find((a) => !fixtureEmails.has(a.email.toLowerCase()));
-  if (stray) {
-    console.error(
-      `\nERROR[preflight]: admin "${stray.email}" exists but is not an e2e fixture. ` +
-        `The suite requires a clean table (first educator -> initial admin). ` +
-        `Remove it manually or wipe the dev table: make clean CONFIRM=yes\n`,
-    );
-    process.exit(2);
+  const admins = await findAdmins();
+  const hasExistingAdmin = admins.some((a) => !fixtureEmails.has(a.email.toLowerCase()));
+  if (hasExistingAdmin) {
+    console.log(`Note: existing admin(s) detected -> staged-admin mode (${admins.map((a) => a.email).join(", ")}). The first-educator bootstrap is skipped.`);
   }
+  ctx.stagedAdmin = hasExistingAdmin;
 };
 
 try {
@@ -89,7 +88,7 @@ try {
   // previous crashed run). Students are removed only when their creator is a
   // fixture user — anything else in the table is left untouched.
   await purgeFixtures();
-  await assertCleanBootstrap();
+  await detectStagedAdminMode();
   for (const scenario of scenarios) {
     await scenario(ctx);
   }

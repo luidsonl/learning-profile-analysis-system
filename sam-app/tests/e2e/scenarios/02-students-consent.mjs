@@ -72,19 +72,27 @@ export default async (ctx) => {
     });
     expect("student registers for no-consent student", noConsentReg.status === 201, JSON.stringify(noConsentReg.data));
 
-    // Both self-registered accounts are now pending and discoverable for the link flow.
+    // Both self-registered accounts are now pending and discoverable for the
+    // link flow. The table may hold unrelated student accounts (incl. active
+    // linked ones from other environments), so assert membership/availability of
+    // the accounts THIS scenario created — never exact catalog counts.
     const catalogBefore = await api("GET", "/auth/student-accounts", { token: ctx.educatorToken });
     expect(
-      "educator lists pending student accounts (available)",
-      catalogBefore.status === 200 &&
-        catalogBefore.data.count === 2 &&
-        catalogBefore.data.data.some((a) => a.userId === ctx.studentAccountUserId && a.available === true) &&
+      "educator may list student accounts",
+      catalogBefore.status === 200 && catalogBefore.data.count >= 1,
+      JSON.stringify(catalogBefore.data),
+    );
+    expect(
+      "new pending accounts are available for linking",
+      catalogBefore.data.data.some((a) => a.userId === ctx.studentAccountUserId && a.available === true && a.linkedStudentId === null) &&
         catalogBefore.data.data.some((a) => a.userId === noConsentReg.data.user.userId && a.available === true),
       JSON.stringify(catalogBefore.data),
     );
     expect(
-      "minors flag guardian_institution consent on pending accounts",
-      catalogBefore.data.data.every((a) => a.consentRequired === "guardian_institution"),
+      "our minor accounts flag guardian_institution consent",
+      catalogBefore.data.data
+        .filter((a) => a.userId === ctx.studentAccountUserId || a.userId === noConsentReg.data.user.userId)
+        .every((a) => a.consentRequired === "guardian_institution"),
       JSON.stringify(catalogBefore.data),
     );
     const deniedCatalog = await api("GET", "/auth/student-accounts", { token: ctx.guardianToken });
@@ -108,10 +116,9 @@ export default async (ctx) => {
     // owns Ana Clara's profile, so the UI must show it as already-attributed.
     const catalogAfter = await api("GET", "/auth/student-accounts", { token: ctx.educatorToken });
     expect(
-      "linked account marked unavailable with its studentId",
+      "linked account marked unavailable with its studentId; unmatched pending remain available",
       catalogAfter.status === 200 &&
-        catalogAfter.data.count === 3 &&
-        catalogAfter.data.data.some((a) => a.userId === ctx.studentAccountUserId && a.available === false && a.linkedStudentId === ctx.studentId) &&
+        catalogAfter.data.data.some((a) => a.userId === ctx.studentAccountUserId && a.available === false && a.status === "active" && a.linkedStudentId === ctx.studentId) &&
         catalogAfter.data.data.some((a) => a.userId === noConsentReg.data.user.userId && a.available === true) &&
         catalogAfter.data.data.some((a) => a.userId === dupReg.data.user.userId && a.available === true),
       JSON.stringify(catalogAfter.data),
