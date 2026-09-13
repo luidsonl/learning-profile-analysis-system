@@ -4,7 +4,7 @@ title: Backend
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-09-12
+lastReviewed: 2026-09-13
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -76,9 +76,9 @@ requiredBy:
 ### Forms
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `GET /api/forms?audience=` | any | List forms available to the persona (served from code). Each definition declares `result` metadata — `hasInference` (does this form feed the bundled ML model / produce an async `PRED#`?) and `type` (`none` / `label` / `percentage` — how the outcome is presented). **No business rules in the database — this is how the client learns whether to poll and how to render the result** | in-memory registry |
+| `GET /api/forms?audience=` | any | List forms (served from code). **Any persona — including the student themselves — sees every curated form**; the `?audience=` filter only narrows by who *administers* the form. Each definition declares `result` metadata — `hasInference` (does this form feed the bundled ML model / produce an async `PRED#`?) and `type` (`none` / `label` / `percentage` — how the outcome is presented). **No business rules in the database — this is how the client learns whether to poll and how to render the result** | in-memory registry |
 | `GET /api/forms/:formId` | scoped | Form definition (read-only) | in-memory registry |
-| `POST /api/students/:id/forms/:formId/responses` | persona of the form **or any persona acting for the student** (student-audience forms like `vark` may be filled by the student's own account, a guardian or educator acting for them, or an admin) | Submit responses (idempotent via `requestId`); the submission is stored **immediately** — classification/inference is a separate step | `SUBMISSION#` only — classification is a separate step |
+| `POST /api/students/:id/forms/:formId/responses` | any persona acting for the student, or the student themselves about their **own** linked profile (a non-`student` subsumes `guardian`/`educator`/`admin`; the subject may fill any form — audience only marks who is expected to *administer* it) | Submit responses (idempotent via `requestId`); the submission is stored **immediately** — classification/inference is a separate step | `SUBMISSION#` only — classification is a separate step |
 | `GET /api/students/:id/forms/:formId/responses` | scoped | Submission history; each item rides along its `assessment` (deterministic classification, once run) and ML `prediction` (once inference lands) | Query `SUBMISSION#<formId>#` prefix + `ASSESS#`/`PRED#` lookups keyed by submission |
 | `GET /api/students/:id/submissions` | scoped | Submissions across all forms (newest first) | Query `SUBMISSION#` prefix on `STUDENT#` |
 
@@ -150,7 +150,7 @@ requiredBy:
 | Student account (self-register / link) | ✗ | link + approve (scoped) | self-register (pending self-service); linked ⇒ own | ✓ |
 | User management (approval/RBAC) | ✗ | approve guardian/student (status only) | ✗ | ✓ (full, incl. edit birthDate) |
 | Consent | assigned students | followed (grant/revoke, institution basis) | own (self_consent, **only if ≥18**) | ✓ |
-| Forms (fill) | anamnesis, vark (assistido) | socioemotional, behavior-checklist, vark (assistido) | vark | ✓ all |
+| Forms (fill) | anamnesis, vark (assistido) | socioemotional, behavior-checklist, vark (assistido) | all (own profile) | ✓ all |
 | Observations | assigned (read-only) | write/remove | own (read-only) | write/remove |
 | Assessments / Predict | assigned students | followed | own (full payload) | ✓ |
 | Recommendations | assigned (approved) | propose/approve | own (published) | ✓ |

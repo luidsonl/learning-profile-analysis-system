@@ -554,8 +554,10 @@ paths:
       tags: [Forms]
       summary: List form definitions
       description: |
-        Filtered by `audience` when given (`guardian`, `educator`, `student`).
-        Students only see forms with `audience: student`.
+        Every authenticated persona — including a student about their own
+        profile — sees all curated forms. The `audience` query filter only
+        narrows by who *administers* the form (`guardian`, `educator`,
+        `student`).
       security:
         - bearerAuth: []
       operationId: listForms
@@ -581,7 +583,7 @@ paths:
     get:
       tags: [Forms]
       summary: Get a form definition (read-only)
-      description: 'Students can only access forms with `audience: student`.'
+      description: 'Any persona can fetch any curated form; a student is only ever scoped to their own profile for acting on submissions.'
       security:
         - bearerAuth: []
       operationId: getForm

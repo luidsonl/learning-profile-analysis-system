@@ -4,7 +4,7 @@ title: Frontend (Angular SPA)
 type: spec
 status: proposed
 since: 2026-09-10
-lastReviewed: 2026-09-10
+lastReviewed: 2026-09-13
 dependsOn:
   - architecture
   - auth
@@ -92,8 +92,8 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 | `/me` | student | Own self-view: profile, submissions, predictions, observations, reports | `studentRoleGuard`; renders **restricted self-service area** while `pending`/unlinked (`studentId == null`) |
 | `/students` | guardian, educator, admin | List in-scope students | `guardianEducatorAdminGuard` |
 | `/students/:id` | scoped | Student detail shell + tabs (profile, submissions/predictions, recommendations, observations, consent, audit) | `scopedStudentGuard`; admin adds audit tab |
-| `/students/:id/forms/:formId` | form persona | Fill a form (dynamic renderer) | audience check from `GET /api/forms` |
-| `/avaliacoes` | scoped | Step 1 — pick the student (see *Assessment Workspace*) | `authGuard` |
+| `/students/:id/forms/:formId` | scoped | Fill a form (dynamic renderer) | subject may open any curated form about themselves |
+| `/avaliacoes` | scoped | Step 1 — pick the student (see *Assessment Workspace*) | `authGuard` + `skipStudentSelectorGuard` (student ⇒ redirect to own profile) |
 | `/avaliacoes/:studentId` | scoped | Step 2 — pick the form | `authGuard`; deep link from the student list skips step 1 |
 | `/avaliacoes/:studentId/:formId` | scoped | Step 3 — submissions/results + *Enviar nova avaliação* | `authGuard` |
 | `/admin/users` | admin, educator | User management (approve/deny/promote/delete/reset) | `adminOrEducatorGuard`; role/status conditional UI; role selector only for staff (guardian/student roles are fixed — no selector) |
@@ -125,8 +125,8 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 
 Filling and reviewing assessments is a **three-screen flow**, one action per screen, with a steps indicator linking back:
 
-1. **Pick the student** (`/avaliacoes`) — a card list, one "Selecionar" action per student. Educator: every student in scope (all they follow); guardian: only assigned students; **student: no choice, their own linked profile is shown** (a `null` link → "conta não vinculada" hint). The student list's *Aplicar avaliação* deep-links here with the student pre-chosen.
-2. **Pick the form** (`/avaliacoes/:studentId`) — a card per form from `GET /api/forms` (only `vark` ships today); the header shows who is being assessed.
+1. **Pick the student** (`/avaliacoes`) — a card list, one "Selecionar" action per student. Educator: every student in scope (all they follow); guardian: only assigned students; **student: there is no chooser at all** — `skipStudentSelectorGuard` (see *Routes*) redirects a linked student straight to `/avaliacoes/:ownStudentId`, since their own attributed profile is the only possible target; an unlinked student (`studentId == null`) stays on the selector with the "conta não vinculada" hint. The student list's *Aplicar avaliação* deep-links here with the student pre-chosen.
+2. **Pick the form** (`/avaliacoes/:studentId`) — a card per form from `GET /api/forms` (all four curated forms: `vark`, `anamnesis`, `socioemotional`, `behavior-checklist` — a student may fill **any** of them about themselves); the header shows who is being assessed.
 3. **Submissions & results** (`/avaliacoes/:studentId/:formId`) — submission history from `GET /api/students/:id/forms/:formId/responses`: each row shows the deterministic assessment label/scores, the async ML prediction (for `type: label` **only the profile text**; for `type: percentage` scores + confidence + model version) once it lands, and expandable answers. **Result semantics come from the served form definition** (`result.hasInference` + `result.type`) — forms that declare no inference show no prediction UI and are **never polled**; the prediction is rendered by `result.type`: a definitive **label** (e.g. VARK profile — no percentages) or a **percentage** form. A row whose prediction is still pending shows an inline **"Resultado em geração"** spinner; the screen **auto-polls** the newest pending submission (`PredictionPollingService.pollFor`) so the result appears without a manual refresh — even when navigating straight into a form that was filled earlier. A toolbar **"Enviar nova avaliação"** reveals a generic questionnaire (`FormAssessment`, embedded, `[studentId]`/`[formId]`) that emits `(accepted)` when the API stores the submission — the fill screen **hides the previous results**, and on acceptance the screen collapses back so the refreshed history (including the pending new row) becomes visible — and `(predicted)` when the async prediction lands.
 
 Avaliações are reachable from the **student ficha** (`/estudantes/:id`): the ficha `mat-tab-group` no longer embeds an assessment tab — an **"avaliações"** action button at the end of the tab strip deep-links to `/avaliacoes/:studentId`. This is the single entry point for filling/reviewing forms about a student; the workspace flow is the same for every persona (educator, guardian or the linked student themselves).
@@ -165,7 +165,7 @@ Derived from the RBAC matrix — the SPA shows only these actions, each wired to
 
 - **guardian**: own profile; list/edit assigned students; fill `anamnesis` + assist `vark`; view their submissions, predictions, recommendations (approved), reports; consent for minors; student audit trail.
 - **educator**: create/follow/assign students; fill `socioemotional` + `behavior-checklist` + assist `vark`; observations (write); recommendations (propose/approve); approve/deny `guardian`/`student` accounts; consent (institution basis); reports; no audit tab.
-- **student**: self-register (`pending`, restricted self-service until linked); after link: edit own profile, fill `vark`, full self-view of own entity; observations read-only; recommendations published-only; reports (generate/list/download, never delete); **no audit trail, no raw model internals**.
+- **student**: self-register (`pending`, restricted self-service until linked); after link: edit own profile, fill **any** form about themselves (all four curated forms) and see the stored submissions/results, full self-view of own entity; observations read-only; recommendations published-only; reports (generate/list/download, never delete); **no audit trail, no raw model internals**.
 - **admin**: everything above including full user management (promote/demote, reset password, delete, adjust `birthDate`), audit, all forms.
 
 ## Error Handling & User Feedback
