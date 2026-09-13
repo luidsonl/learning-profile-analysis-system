@@ -35,7 +35,12 @@ export class PredictionPollingService {
     this.router.events.pipe(skipWhile((event) => !(event instanceof NavigationStart))).subscribe(() => this.stop());
   }
 
-  submit(opts: { studentId: string; formId: string; answers: Record<string, number>; requestId: string }): void {
+  submit(opts: {
+    studentId: string;
+    formId: string;
+    answers: Record<string, string | number | string[]>;
+    requestId: string;
+  }): void {
     this.stop();
     this.state$.set({ status: 'processing', submissionId: null });
 

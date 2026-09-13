@@ -103,4 +103,10 @@ describe('VarkAssessment', () => {
     expect(arg.answers).toEqual({ q01: 5 });
     expect(arg.requestId).toBeTruthy();
   });
+
+  it('prevents the native form submission to avoid a page reload', () => {
+    const event = { preventDefault: vi.fn() } as unknown as SubmitEvent;
+    fixture.componentInstance.submit(event);
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
 });

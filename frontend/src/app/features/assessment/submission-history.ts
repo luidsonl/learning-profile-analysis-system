@@ -13,7 +13,7 @@ import { StudentsService } from '../../core/students/students.service';
 import { ROLE_LABELS } from '../../core/users/user-labels';
 import { VARK_LABELS } from '../../core/vark/vark-labels';
 import { PredictionScores } from '../../shared/ui/prediction-scores/prediction-scores';
-import { VarkAssessment } from './vark-assessment';
+import { FormAssessment } from './form-assessment';
 import { AssessmentSteps } from './steps';
 
 type BlockState =
@@ -36,7 +36,7 @@ type BlockState =
     MatProgressSpinnerModule,
     AssessmentSteps,
     PredictionScores,
-    VarkAssessment,
+    FormAssessment,
   ],
   templateUrl: './submission-history.html',
   styleUrl: './submission-history.scss',
@@ -103,11 +103,14 @@ export class SubmissionHistory {
     });
   }
 
-  // A submission just completed: collapse the questionnaire and refresh the
-  // history so the new row appears (its prediction lands asynchronously and
-  // shows up as "aguardando análise" until then).
-  onSubmitted(): void {
-    this.filling.set(false);
+  // The questionnaire accepted the submission: refresh the history so the new
+  // row appears; the prediction (where a model exists) lands asynchronously
+  // and the subsequent refresh reveals it.
+  onAccepted(): void {
+    this.loadHistory();
+  }
+
+  onPredicted(): void {
     this.loadHistory();
   }
 

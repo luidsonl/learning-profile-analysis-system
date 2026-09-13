@@ -69,9 +69,11 @@ const responseItem = {
 describe('SubmissionHistory', () => {
   let fixture: ComponentFixture<SubmissionHistory>;
   let responsesSpy: ReturnType<typeof vi.fn>;
+  let pollingState: ReturnType<typeof signal<import('../../core/predictions/prediction-polling.service').PollState>>;
 
   beforeEach(() => {
     responsesSpy = vi.fn(() => of({ data: [responseItem], count: 1 }));
+    pollingState = signal({ status: 'idle' });
     TestBed.configureTestingModule({
       imports: [SubmissionHistory],
       providers: [
@@ -92,7 +94,7 @@ describe('SubmissionHistory', () => {
         },
         {
           provide: PredictionPollingService,
-          useValue: { state: signal({ status: 'idle' }), submit: vi.fn(), retry: vi.fn(), reset: vi.fn() },
+          useValue: { state: pollingState, submit: vi.fn(), retry: vi.fn(), reset: vi.fn() },
         },
         provideRouter([]),
         provideAnimations(),
@@ -128,13 +130,31 @@ describe('SubmissionHistory', () => {
     openButton.click();
     fixture.detectChanges();
 
-    expect(el.textContent).toContain('Avaliação de perfil');
+    expect(el.textContent).toContain('Enviar formulário');
 
     const cancelButton = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Cancelar')) as HTMLButtonElement;
     cancelButton.click();
     fixture.detectChanges();
 
-    expect(el.textContent).not.toContain('Avaliação de perfil');
+    expect(el.textContent).not.toContain('Enviar formulário');
+  });
+
+  it('refreshes the history once the API accepts the submission', async () => {
+    await mount();
+    expect(responsesSpy).toHaveBeenCalledTimes(1);
+
+    const openButton = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((b) => b.textContent?.includes('Enviar nova avaliação')) as HTMLButtonElement;
+    openButton.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    pollingState.set({ status: 'processing', submissionId: 'sub9' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(responsesSpy).toHaveBeenCalledTimes(2);
   });
 
   it('empty history prompts the first fill', async () => {

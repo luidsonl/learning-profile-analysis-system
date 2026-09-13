@@ -127,22 +127,24 @@ Filling and reviewing assessments is a **three-screen flow**, one action per scr
 
 1. **Pick the student** (`/avaliacoes`) — a card list, one "Selecionar" action per student. Educator: every student in scope (all they follow); guardian: only assigned students; **student: no choice, their own linked profile is shown** (a `null` link → "conta não vinculada" hint). The student list's *Aplicar avaliação* deep-links here with the student pre-chosen.
 2. **Pick the form** (`/avaliacoes/:studentId`) — a card per form from `GET /api/forms` (only `vark` ships today); the header shows who is being assessed.
-3. **Submissions & results** (`/avaliacoes/:studentId/:formId`) — submission history from `GET /api/students/:id/forms/:formId/responses`: each row shows the deterministic assessment label/scores, the async ML prediction (label, scores, confidence, model version) once it lands, and expandable answers. A toolbar **"Enviar nova avaliação"** reveals the questionnaire in place (embedded `VarkAssessment`, `[studentId]`/`[formId]` + `(submitted)` output); on submit the panel collapses and the history refreshes, so the new submission appears with "aguardando análise" until its prediction lands.
+3. **Submissions & results** (`/avaliacoes/:studentId/:formId`) — submission history from `GET /api/students/:id/forms/:formId/responses`: each row shows the deterministic assessment label/scores, the async ML prediction (label, scores, confidence, model version) once it lands, and expandable answers. A toolbar **"Enviar nova avaliação"** reveals a generic questionnaire (`FormAssessment`, embedded, `[studentId]`/`[formId]`) that emits `(accepted)` when the API stores the submission — the history refreshes so the new row appears (with "aguardando análise" until the prediction lands, for forms with a bundled model) — and `(predicted)` when the async prediction arrives. If the user submits by clicking **"Enviar formulário"**, the handler calls `preventDefault()`: the page never reloads (an `ngSubmit` without it does a native GET that aborts the POST).
 
 **Forms Renderer**
 
-The SPA renders form definitions from `GET /api/forms/:formId` into a dynamic form built on design-system controls:
+The SPA renders form definitions from `GET /api/forms/:formId` into a dynamic form (`FormAssessment` in `features/assessment/`) built on design-system controls:
 
 | API question type | Renderer control |
 |-------------------|------------------|
-| single choice | radio group |
-| multiple choice | checkbox group |
-| Likert scale | segmented button / slider with scale labels |
-| text | text input / textarea |
-| number | number input with validation |
-| date | date picker (pt-BR format) |
+| single choice | radio group (`mat-radio-group`) |
+| multiple choice | checkbox group (`mat-checkbox`) |
+| Likert scale | radio group over the scale values (1–5) |
+| text | textarea (`matInput`), free-length |
+| number | number input (`matInput type="number"`) |
+| date | date input (`matInput type="date"`), ISO `yyyy-mm-dd` value |
 
-- Validation comes from the form definition plus client-side complement (required, ranges); server errors surface inline via field-level error display.
+- Validation is client-side complement over the definition (non-empty answers; values stored as-is — the API accepts strings, numbers and arrays per question). Server errors surface inline via the polling state (retry action preserves the same `requestId`).
+- The submit button stays disabled until every question is answered; while the request is in flight the questionnaire shows a **processing card**, and once the API accepts the submission a **success card** ("Formulário enviado com sucesso!") replaces it.
+- Only forms with a bundled ML model (`vark` today) keep polling after acceptance; other forms stop immediately and rely on the history refresh.
 - The dynamic renderer is part of the [design system](./design-system.md) (reused by future forms).
 - `requestId` is generated per submission attempt; a retry reuses the same value (idempotency).
 

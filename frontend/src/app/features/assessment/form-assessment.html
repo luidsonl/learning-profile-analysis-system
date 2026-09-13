@@ -1,0 +1,149 @@
+<section class="questionnaire">
+  @if (form(); as def) {
+    <header class="questionnaire-header">
+      <h2>{{ def.form.name }}</h2>
+      <p>{{ def.form.description }}</p>
+    </header>
+  }
+
+  @if (failMessage(); as message) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <mat-icon color="warn" aria-hidden="true" class="state-icon">error</mat-icon>
+        <p>{{ message }}</p>
+        <button mat-flat-button color="primary" (click)="polling.retry()">Tentar novamente</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (isProcessing() && !done()) {
+    <mat-card appearance="outlined" class="state-card">
+      <mat-card-content class="state-content">
+        <mat-spinner diameter="40" />
+        <h2>Enviando…</h2>
+        <p>O formulário está sendo registrado.</p>
+      </mat-card-content>
+    </mat-card>
+  } @else if (done()) {
+    <mat-card appearance="outlined" class="state-card success-card">
+      <mat-card-content class="state-content">
+        <mat-icon aria-hidden="true" class="state-icon success-icon">check_circle</mat-icon>
+        <h2>Formulário enviado com sucesso!</h2>
+        <p>
+          As respostas foram registradas na lista de envios abaixo.
+          @if (predicts()) {
+            A análise automática aparece em instantes.
+          }
+        </p>
+        <button mat-stroked-button (click)="reset()">Preencher outro formulário</button>
+      </mat-card-content>
+    </mat-card>
+  } @else if (form(); as def) {
+    <form (ngSubmit)="submit($event)">
+      @for (section of def.form.sections; track section.id) {
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>{{ section.title }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            @for (question of section.questions; track question.id) {
+              <div class="question">
+                <p class="question-text">{{ question.text }}</p>
+
+                @switch (question.type) {
+                  @case ('single') {
+                    <mat-radio-group
+                      [value]="answers()[question.id]"
+                      (change)="onAnswer(question.id, $event.value)"
+                    >
+                      @for (option of question.options ?? []; track option) {
+                        <mat-radio-button [value]="option">{{ option }}</mat-radio-button>
+                      }
+                    </mat-radio-group>
+                  }
+
+                  @case ('likert') {
+                    <mat-radio-group
+                      [value]="answers()[question.id]"
+                      (change)="onAnswer(question.id, $event.value)"
+                    >
+                      @for (option of question.options ?? []; track option) {
+                        <mat-radio-button [value]="option">{{ option }}</mat-radio-button>
+                      }
+                    </mat-radio-group>
+                  }
+
+                  @case ('multiple') {
+                    <div class="option-list">
+                      @for (option of question.options ?? []; track option) {
+                        <mat-checkbox
+                          [checked]="isMultipleChecked(question.id, option)"
+                          (change)="onToggleMultiple(question.id, option, $event.checked)"
+                        >
+                          {{ option }}
+                        </mat-checkbox>
+                      }
+                    </div>
+                  }
+
+                  @case ('date') {
+                    <mat-form-field appearance="outline">
+                      <input
+                        matInput
+                        type="date"
+                        [value]="answers()[question.id]"
+                        (input)="onTextInput(question.id, $event)"
+                      />
+                    </mat-form-field>
+                  }
+
+                  @case ('number') {
+                    <mat-form-field appearance="outline">
+                      <input
+                        matInput
+                        type="number"
+                        [value]="answers()[question.id]"
+                        (input)="onNumberInput(question.id, $event)"
+                      />
+                    </mat-form-field>
+                  }
+
+                  @case ('text') {
+                    <mat-form-field appearance="outline" class="text-field">
+                      <textarea
+                        matInput
+                        rows="2"
+                        [value]="answers()[question.id]"
+                        (input)="onTextInput(question.id, $event)"
+                      ></textarea>
+                    </mat-form-field>
+                  }
+                }
+              </div>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <div class="submit-row">
+        <span class="progress-hint">
+          @if (!allAnswered()) {
+            {{ answeredCount() }} de {{ totalQuestions() }} respondidas
+          }
+        </span>
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          [disabled]="!allAnswered()"
+        >
+          Enviar formulário
+        </button>
+      </div>
+    </form>
+  } @else {
+    <mat-card appearance="outlined">
+      <mat-card-content class="state-content">
+        <p>Carregando questionário…</p>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

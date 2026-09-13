@@ -103,7 +103,10 @@ export class VarkAssessment {
     this.answers.update((current) => ({ ...current, [questionId]: value }));
   }
 
-  submit(): void {
+  submit(event?: Event): void {
+    // Without preventDefault the native form does a GET to the current URL and
+    // reloads the page, aborting the request (observed in the deployed SPA).
+    event?.preventDefault();
     const studentId = this.scopeStudentId();
     const formId = this.formId();
     if (!studentId || !this.allAnswered()) {

@@ -49,7 +49,7 @@
     </mat-card>
   } @else {
     @if (form(); as form) {
-      <form class="questionnaire" (ngSubmit)="submit()">
+      <form class="questionnaire" (ngSubmit)="submit($event)">
         @for (section of form.form.sections; track section.id) {
           <mat-card appearance="outlined">
             <mat-card-header>
