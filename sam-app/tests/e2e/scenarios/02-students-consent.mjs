@@ -67,10 +67,12 @@ export default async (ctx) => {
     // A minor cannot be linked without consent already granted on the entity.
     const noConsentChild = await api("POST", "/students", { token: ctx.educatorToken, body: { name: "Sem Consentimento", birthDate: "2017-05-01" } });
     ctx.noConsentChildId = noConsentChild.data.studentId;
+    // Student accounts do NOT declare an age (the ficha is the age authority) —
+    // registering without birthDate must succeed.
     const noConsentReg = await api("POST", "/auth/register", {
-      body: { email: "sem.consentimento@example.com", name: "Sem Consentimento", password: "senha12345", role: "student", birthDate: "2017-05-01" },
+      body: { email: "sem.consentimento@example.com", name: "Sem Consentimento", password: "senha12345", role: "student" },
     });
-    expect("student registers for no-consent student", noConsentReg.status === 201, JSON.stringify(noConsentReg.data));
+    expect("student registers without birthDate (age lives on the ficha)", noConsentReg.status === 201, JSON.stringify(noConsentReg.data));
 
     // Regression: a student account can ONLY become active through the link
     // endpoint. A manual `active` via the admin users API would create an orphan
@@ -100,10 +102,10 @@ export default async (ctx) => {
       JSON.stringify(catalogBefore.data),
     );
     expect(
-      "our minor accounts flag guardian_institution consent",
+      "catalog entries carry no consent fields (consent belongs to the ficha)",
       catalogBefore.data.data
         .filter((a) => a.userId === ctx.studentAccountUserId || a.userId === noConsentReg.data.user.userId)
-        .every((a) => a.consentRequired === "guardian_institution"),
+        .every((a) => a.consentRequired === undefined),
       JSON.stringify(catalogBefore.data),
     );
     const deniedCatalog = await api("GET", "/auth/student-accounts", { token: ctx.guardianToken });
@@ -111,6 +113,15 @@ export default async (ctx) => {
 
     const sFail = await api("POST", `/students/${ctx.noConsentChildId}/accounts/${noConsentReg.data.user.userId}/link`, { token: ctx.educatorToken, body: {} });
     expect("link blocked without consent (minor)", sFail.status === 409 && sFail.data.error.code === "consent_required", JSON.stringify(sFail.data));
+
+    // Adulthood is decided by the FICHA's birth date: an ADULT entity links
+    // even when neither consent nor the account's age exist (self-consent).
+    const adultEntity = await api("POST", "/students", { token: ctx.educatorToken, body: { name: "Adulto Casual", birthDate: "2000-01-01" } });
+    const adultReg = await api("POST", "/auth/register", {
+      body: { email: "adulto.casual@example.com", name: "Adulto Casual", password: "senha12345", role: "student" },
+    });
+    const adultLink = await api("POST", `/students/${adultEntity.data.studentId}/accounts/${adultReg.data.user.userId}/link`, { token: ctx.educatorToken, body: {} });
+    expect("adult entity (≥18) links without prior consent", adultLink.status === 200, JSON.stringify(adultLink.data));
 
     // Educator links Ana Clara's self-account, approving it (pending -> active).
     const acc = await api("POST", `/students/${ctx.studentId}/accounts/${ctx.studentAccountUserId}/link`, { token: ctx.educatorToken, body: {} });

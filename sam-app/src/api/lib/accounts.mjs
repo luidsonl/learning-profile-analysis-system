@@ -1,19 +1,13 @@
-import { ageFromRecord } from "./age.mjs";
-
 // Pure helpers shared by the account-discovery endpoints (GET /auth/student-accounts
 // and GET /users). Kept free of DynamoDB so the decision logic unit-tests the same
 // way the rest of the codebase does.
 
-export const consentRequired = (user, minAge) =>
-  ageFromRecord(user) >= minAge ? "self" : "guardian_institution";
-
-export const toStudentAccountDto = (user, minAge) => ({
+export const toStudentAccountDto = (user) => ({
   userId: user.userId,
   name: user.name,
   email: user.email,
   birthDate: user.birthDate,
   createdAt: user.createdAt,
-  consentRequired: consentRequired(user, minAge),
 });
 
 // Catalog of every student account an educator may need to act on. A `pending`
@@ -24,11 +18,13 @@ export const toStudentAccountDto = (user, minAge) => ({
 // is an orphan (previously activated by a manual approval, now blocked by
 // `PATCH /admin/users`); it has no profile attributed, so it remains linkable
 // and the link self-heals it into a proper attributed account.
-export const selectStudentAccounts = (items, minAge) =>
+// Consent is decided on the STUDENT entity, never on the account (age authority
+// is the ficha, see specs/lgpd.md) — so the catalog carries no consent fields.
+export const selectStudentAccounts = (items) =>
   items
     .filter((u) => (u.status === "pending" || u.status === "active") && u.userId)
     .map((u) => ({
-      ...toStudentAccountDto(u, minAge),
+      ...toStudentAccountDto(u),
       status: u.status,
       linkedStudentId: u.linkedStudentId ?? null,
       available: !u.linkedStudentId,

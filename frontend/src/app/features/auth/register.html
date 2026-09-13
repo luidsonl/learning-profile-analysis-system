@@ -47,12 +47,9 @@
 
       @if (isStudent) {
         <mat-form-field appearance="outline">
-          <mat-label>Data de nascimento</mat-label>
+          <mat-label>Data de nascimento (opcional)</mat-label>
           <input matInput type="date" formControlName="birthDate" />
-          <mat-hint>Necessária para verificar a idade e o consentimento (LGPD).</mat-hint>
-          @if (form.controls.birthDate.hasError('required') && form.controls.birthDate.touched) {
-            <mat-error>Informe a data de nascimento.</mat-error>
-          }
+          <mat-hint>Opicional. Sua idade e o consentimento são definidos na ficha na escola.</mat-hint>
         </mat-form-field>
       }
 

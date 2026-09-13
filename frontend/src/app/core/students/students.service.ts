@@ -3,6 +3,9 @@ import { inject, Injectable } from '@angular/core';
 
 import {
   AssessmentsList,
+  ConsentResponse,
+  ConsentSetRequest,
+  ConsentSetResponse,
   GuardianListResponse,
   GuardianSearchResponse,
   ObservationCreateRequest,
@@ -63,6 +66,14 @@ export class StudentsService {
 
   revokeGuardian(id: string, userId: string) {
     return this.http.delete<never>(`/api/students/${id}/guardians/${userId}`);
+  }
+
+  consent(id: string) {
+    return this.http.get<ConsentResponse>(`/api/students/${id}/consent`);
+  }
+
+  setConsent(id: string, body: ConsentSetRequest) {
+    return this.http.post<ConsentSetResponse>(`/api/students/${id}/consent`, body);
   }
 
   predictions(id: string, form?: string) {

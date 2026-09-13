@@ -46,12 +46,13 @@ const register = async (event) => {
   const role = body.role || "guardian";
   assert(["guardian", "educator", "student"].includes(role), "invalid_role", "Role must be educator, guardian or student");
   if (role === "student") {
-    // Self-registration records the birth date as an age-verification data point
-    // (LGPD art. 14 §5º + ECA Digital). The legal basis for consent is decided
-    // from that date: adult (>= MIN_SELF_CONSENT_AGE) may self-consent later;
-    // a minor relies on guardian/institution consent.
-    requireKeys(body, ["birthDate"]);
-    assert(Number.isFinite(Date.parse(body.birthDate)), "invalid_birthDate", "birthDate is not a valid date");
+    // Student accounts do not declare an age: age authority is the STUDENT
+    // entity (ficha) they will later be linked to, and consent is granted on
+    // that entity (specs/lgpd.md). `birthDate` is optional and, when provided,
+    // stored purely as optional self-reported metadata — never a consent gate.
+    if (body.birthDate !== undefined) {
+      assert(Number.isFinite(Date.parse(body.birthDate)), "invalid_birthDate", "birthDate is not a valid date");
+    }
   }
 
   // Approval-gated accounts. Educators and guardians start `pending` and can
@@ -88,7 +89,7 @@ const register = async (event) => {
     GSI2PK: { S: `USER#ROLE#${effectiveRole}` },
     GSI2SK: { S: `USER#${userId}#${status}` },
   };
-  if (role === "student") {
+  if (role === "student" && body.birthDate) {
     const age = computeAge(body.birthDate);
     item.birthDate = { S: body.birthDate };
     item.age = { N: String(age) };
@@ -232,7 +233,7 @@ const studentAccounts = async (event, ctx) => {
       u.linkedStudentId = await getOwnStudentId(u.userId);
     }
   }
-  const data = selectStudentAccounts(items, MIN_SELF_CONSENT_AGE);
+  const data = selectStudentAccounts(items);
   return ok({ data, count: data.length });
 };
 

@@ -32,6 +32,7 @@ const updateSpy = vi.fn(() => of({ studentId: 's1', recoId: 'r1' }));
 const grantSpy = vi.fn(() => of({}));
 const revokeSpy = vi.fn(() => of({}));
 const linkSpy = vi.fn(() => of({}));
+const setConsentSpy = vi.fn(() => of({ studentId: 's1', consentVersion: '1.0', status: 'active', legalBasis: 'institution_authorization' }));
 const searchSpy = vi.fn(() =>
   of({
     data: [
@@ -58,6 +59,8 @@ const studentsStub = {
   grantGuardian: grantSpy,
   revokeGuardian: revokeSpy,
   linkStudentAccount: linkSpy,
+  consent: () => of({ current: { version: null, status: 'not_granted', consentAt: null, consentBy: null, legalBasis: null, grantedByRole: null }, history: [] }),
+  setConsent: setConsentSpy,
   deleteStudent: deleteSpy,
 };
 
@@ -66,16 +69,16 @@ const authStub = {
   studentAccounts: () =>
     of({
       data: [
-        { userId: 'sid1', name: 'Pedro Alves', email: 'pedro@example.com', birthDate: '2011-09-30', createdAt: '2026-08-01T00:00:00Z', consentRequired: 'guardian_institution', status: 'pending', available: true, linkedStudentId: null },
-        { userId: 'sid2', name: 'Camila Rocha', email: 'camila@example.com', birthDate: '1995-03-01', createdAt: '2026-07-01T00:00:00Z', consentRequired: 'self', status: 'active', available: false, linkedStudentId: 's9' },
+        { userId: 'sid1', name: 'Pedro Alves', email: 'pedro@example.com', birthDate: '2011-09-30', createdAt: '2026-08-01T00:00:00Z', status: 'pending', available: true, linkedStudentId: null },
+        { userId: 'sid2', name: 'Camila Rocha', email: 'camila@example.com', birthDate: '1995-03-01', createdAt: '2026-07-01T00:00:00Z', status: 'active', available: false, linkedStudentId: 's9' },
       ],
       count: 2,
     }),
 };
 
 // Tab order for an access manager (educator/admin): 0 Dados, 1 Perfil,
-// 2 Avaliação, 3 Observações, 4 Recomendações, 5 Acessos. Tab content is lazy,
-// so text assertions must select the tab first.
+// 2 Avaliação, 3 Observações, 4 Recomendações, 5 Consentimento, 6 Acessos.
+// Tab content is lazy, so text assertions must select the tab first.
 function selectTab(fixture: ComponentFixture<StudentWorkspace>, index: number): void {
   fixture.componentInstance.selectedTabIndex.set(index);
   fixture.detectChanges();
@@ -141,14 +144,14 @@ describe('StudentWorkspace', () => {
   });
 
   it('renders the responsable management panel for an educator', () => {
-    selectTab(fixture, 5);
+    selectTab(fixture, 6);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Responsáveis');
     expect(text).toContain('Maria da Silva');
   });
 
   it('renders the guardian catalog with client-side filter', () => {
-    selectTab(fixture, 5);
+    selectTab(fixture, 6);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('João Pereira');
     expect(filteredGuardianCount(fixture)).toBe(2);
@@ -158,8 +161,21 @@ describe('StudentWorkspace', () => {
     expect(filteredGuardianCount(fixture)).toBe(1);
   });
 
-  it('renders available accounts and accounts that cannot be reused', () => {
+  it('renders the LGPD consent tab with a grant form', () => {
     selectTab(fixture, 5);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Consentimento LGPD');
+    expect(text).toContain('Conceder consentimento');
+  });
+
+  it('grants consent from the form', () => {
+    fixture.componentInstance.consentForm.setValue({ version: '1.0', legalBasis: 'institution_authorization' });
+    fixture.componentInstance.submitConsent('active');
+    expect(setConsentSpy).toHaveBeenCalledWith('s1', { consentVersion: '1.0', status: 'active', legalBasis: 'institution_authorization' });
+  });
+
+  it('renders available accounts and accounts that cannot be reused', () => {
+    selectTab(fixture, 6);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Conta de acesso');
     expect(text).toContain('Pedro Alves');
@@ -183,7 +199,7 @@ describe('StudentWorkspace', () => {
       });
     fixture.componentRef.setInput('studentId', 's2');
     fixture.detectChanges();
-    selectTab(fixture, 5);
+    selectTab(fixture, 6);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('pedro@example.com');
     expect(text).toContain('conta de acesso vinculada');

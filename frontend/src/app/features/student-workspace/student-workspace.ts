@@ -17,11 +17,12 @@ import { Router } from '@angular/router';
 import { VarkAssessment } from '../assessment/vark-assessment';
 import { StudentProfileView } from '../profile/student-profile-view';
 import { StudentForm } from '../../shared/ui/student-form/student-form';
-import { GuardianEdge, GuardianSearchHit, Observation, Recommendation, Student, StudentAccount } from '../../core/api/types';
+import { GuardianEdge, GuardianSearchHit, Observation, Recommendation, Student, StudentAccount, ConsentCurrent, ConsentHistoryEntry, LegalBasis } from '../../core/api/types';
 import { AuthService } from '../../core/auth/auth.service';
 import { StudentsService } from '../../core/students/students.service';
 import { OBSERVATION_CATEGORY_LABELS } from '../../core/observations/observation-labels';
 import { RECOMMENDATION_STATUS_LABELS } from '../../core/recommendations/recommendation-labels';
+import { readApiError } from '../../core/errors/api-error';
 
 type SectionState =
   | { status: 'loading' }
@@ -30,6 +31,18 @@ type SectionState =
 
 type ObservationModel = Observation & { deletable: boolean };
 type RecommendationModel = Recommendation & { mutable: boolean };
+
+const CONSENT_STATUS_LABELS: Record<string, string> = {
+  not_granted: 'Não concedido',
+  active: 'Concedido (ativo)',
+  revoked: 'Revogado',
+};
+
+const LEGAL_BASIS_LABELS: Record<string, string> = {
+  guardian: 'Responsável legal',
+  institution_authorization: 'Autorização da instituição',
+  self_consent: 'Autoconsentimento (maior de idade)',
+};
 
 // Centralized student ficha: every management action lives in tabs on this one
 // page — data + removal, VARK profile, assessment, observations,
@@ -130,6 +143,28 @@ export class StudentWorkspace {
     return s.status === 'error' ? s.message : null;
   });
 
+  // LGPD consent is granted on the student ENTITY (the ficha — the age
+  // authority); the linked account carries no age or consent. Anyone scoped to
+  // the ficha (educator/admin/guardian) may manage it.
+  readonly consentState = signal<SectionState>({ status: 'loading' });
+  readonly consentCurrent = signal<ConsentCurrent | null>(null);
+  readonly consentHistory = signal<ConsentHistoryEntry[]>([]);
+  readonly consentBusy = signal(false);
+  readonly consentError = signal<string | null>(null);
+
+  readonly consentLoading = computed(() => this.consentState().status === 'loading');
+  readonly consentErrorMessage = computed(() => {
+    const s = this.consentState();
+    return s.status === 'error' ? s.message : null;
+  });
+
+  readonly consentForm = this.fb.group({
+    version: ['1.0', Validators.required],
+    // Defaults by role: a guardian consents in their own name; an educator or
+    // admin consents as the institution (specs/lgpd.md).
+    legalBasis: [this.defaultConsentBasis(), Validators.required],
+  });
+
   // Accounts that can still be linked to a ficha (pending, no profile attributed).
   readonly availableAccounts = computed(() => this.studentAccounts().filter((a) => a.available));
 
@@ -185,6 +220,7 @@ export class StudentWorkspace {
     });
     this.loadObservations(id);
     this.loadRecommendations(id);
+    this.loadConsent(id);
     if (this.isAccessManager()) {
       this.loadGuardians(id);
       this.loadGuardianCatalog();
@@ -259,6 +295,58 @@ export class StudentWorkspace {
     return this.guardians().some((g) => g.userId === userId);
   }
 
+  defaultConsentBasis(): LegalBasis {
+    return this.auth.user()?.role === 'guardian' ? 'guardian' : 'institution_authorization';
+  }
+
+  consentStatusLabel(status: string | null | undefined): string {
+    return CONSENT_STATUS_LABELS[status ?? 'not_granted'] ?? status ?? 'Não concedido';
+  }
+
+  legalBasisLabel(basis: string | null | undefined): string {
+    return LEGAL_BASIS_LABELS[basis ?? ''] ?? basis ?? '—';
+  }
+
+  private loadConsent(id: string): void {
+    this.consentState.set({ status: 'loading' });
+    this.students.consent(id).subscribe({
+      next: (res) => {
+        this.consentCurrent.set(res.current);
+        this.consentHistory.set(res.history);
+        this.consentState.set({ status: 'ready' });
+      },
+      error: () => this.consentState.set({ status: 'error', message: 'Não foi possível carregar o consentimento.' }),
+    });
+  }
+
+  submitConsent(status: 'active' | 'revoked'): void {
+    const id = this.studentId();
+    const form = this.consentForm;
+    const basis = (form.value.legalBasis as LegalBasis | undefined) ?? this.defaultConsentBasis();
+    // Keeps the current basis when revoking (revocation references the same term).
+    const legalBasis = status === 'revoked' ? (this.consentCurrent()?.legalBasis ?? basis) : basis;
+    if (!id || form.invalid || this.consentBusy()) {
+      return;
+    }
+    this.consentBusy.set(true);
+    this.consentError.set(null);
+    this.students.setConsent(id, {
+      consentVersion: form.value.version ?? '1.0',
+      status,
+      legalBasis,
+    }).subscribe({
+      next: () => {
+        this.consentBusy.set(false);
+        form.reset({ version: '1.0', legalBasis: this.defaultConsentBasis() });
+        this.loadConsent(id);
+      },
+      error: (err) => {
+        this.consentBusy.set(false);
+        this.consentError.set(readApiError(err, 'Não foi possível atualizar o consentimento.').pt);
+      },
+    });
+  }
+
   onGuardianFilterInput(value: string): void {
     this.guardianFilter.set(value);
   }
@@ -313,9 +401,9 @@ export class StudentWorkspace {
         });
         this.loadStudentAccounts();
       },
-      error: () => {
+      error: (err) => {
         this.linkBusy.set(null);
-        this.linkError.set('Não foi possível vincular a conta do estudante.');
+        this.linkError.set(readApiError(err, 'Não foi possível vincular a conta do estudante.').pt);
       },
     });
   }

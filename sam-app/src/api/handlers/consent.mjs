@@ -5,7 +5,6 @@ import { requireKeys, assert } from "../lib/validate.mjs";
 import { requireAuth } from "../lib/session.mjs";
 import { auditStudent, assertScopeStudent } from "../lib/scope.mjs";
 import { getStudent } from "./students.mjs";
-import { getUser } from "../lib/auth.mjs";
 import { ageFromRecord, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
 
 const LEGAL_BASES = ["guardian", "institution_authorization", "self_consent"];
@@ -15,12 +14,13 @@ const canSetConsent = async (studentId, ctx, legalBasis) => {
   // may set/revoke consent. A linked ADULT student (>= MIN_SELF_CONSENT_AGE)
   // may `self_consent` on their own entity; a minor (< 18) never consents for
   // themselves (specs/lgpd.md). assertScopeStudent resolves the student's own
-  // edge, so the adult gate runs for the student role only.
+  // edge, so the adult gate runs for the student role only. Adulthood is
+  // decided by the STUDENT entity's birth date (age authority = the ficha).
   if (ctx.role === "admin") return true;
   if (ctx.role === "student") {
     if (legalBasis !== "self_consent") return false;
-    const user = await getUser(ctx.userId);
-    if (!user || ageFromRecord(user) < MIN_SELF_CONSENT_AGE) return false;
+    const student = await getStudent(studentId);
+    if (!student || ageFromRecord(student) < MIN_SELF_CONSENT_AGE) return false;
     try {
       await assertScopeStudent(studentId, ctx);
       return true;

@@ -248,6 +248,105 @@
       </ng-template>
     </mat-tab>
 
+    <mat-tab label="Consentimento">
+      <ng-template matTabContent>
+        <mat-card appearance="outlined" class="panel">
+          <mat-card-header>
+            <mat-card-title>Consentimento LGPD</mat-card-title>
+            <mat-card-subtitle>
+              Consentimento relacionado à ficha (a idade do estudante e a autorização de tratamento de dados vivem aqui, não na conta de acesso).
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            @if (consentLoading()) {
+              <div class="state-content"><mat-spinner diameter="32" /></div>
+            } @else if (consentErrorMessage(); as message) {
+              <p class="error">{{ message }}</p>
+            } @else {
+              @if (consentCurrent(); as current) {
+                <div class="consent-status">
+                  <mat-chip-set>
+                    <mat-chip [class.consent-active]="current.status === 'active'">
+                      {{ consentStatusLabel(current.status) }}
+                    </mat-chip>
+                  </mat-chip-set>
+                  <p>
+                    {{ legalBasisLabel(current.legalBasis) }}
+                    @if (current.status === 'active' && current.consentAt) {
+                      · concedido em {{ current.consentAt | date: "dd/MM/yyyy 'às' HH:mm" }}
+                    }
+                  </p>
+                </div>
+              }
+
+              @if (consentError(); as message) {
+                <p class="error">{{ message }}</p>
+              }
+
+              @if (consentCurrent()?.status !== 'active') {
+                <form [formGroup]="consentForm" (ngSubmit)="submitConsent('active')" class="consent-form">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Versão do termo</mat-label>
+                    <input matInput formControlName="version" autocomplete="off" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Base legal</mat-label>
+                    <mat-select formControlName="legalBasis">
+                      <mat-option value="guardian">Responsável legal</mat-option>
+                      <mat-option value="institution_authorization">Autorização da instituição</mat-option>
+                      <mat-option value="self_consent">Autoconsentimento (maior de idade)</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <button mat-flat-button color="primary" type="submit" [disabled]="consentBusy()">
+                    <span>Conceder consentimento</span>
+                    @if (consentBusy()) {
+                      <mat-spinner diameter="20" />
+                    } @else {
+                      <mat-icon>verified_user</mat-icon>
+                    }
+                  </button>
+                </form>
+              } @else {
+                <button
+                  mat-stroked-button
+                  color="warn"
+                  (click)="submitConsent('revoked')"
+                  [disabled]="consentBusy()"
+                >
+                  @if (consentBusy()) {
+                    <mat-spinner diameter="20" />
+                  } @else {
+                    Revogar consentimento
+                  }
+                </button>
+              }
+
+              @if (consentHistory().length > 0) {
+                <h3 class="subsection-title">Histórico de consentimento</h3>
+                <div class="feed">
+                  @for (entry of consentHistory(); track entry.createdAt) {
+                    <div class="feed-item feed-heading">
+                      <div>
+                        <h3>
+                          {{ consentStatusLabel(entry.status) }} ·
+                          versão {{ entry.version }}
+                        </h3>
+                        <p>{{ entry.createdAt | date: "dd/MM/yyyy 'às' HH:mm" }}</p>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="empty">Nenhum registro de consentimento ainda.</p>
+              }
+            }
+          </mat-card-content>
+        </mat-card>
+      </ng-template>
+    </mat-tab>
+
     @if (isAccessManager()) {
       <mat-tab label="Acessos">
         <ng-template matTabContent>
@@ -387,14 +486,7 @@
                           <div class="feed-item feed-heading">
                             <div>
                               <h3>{{ account.name }}</h3>
-                              <p>
-                                {{ account.email }}
-                                @if (account.consentRequired === 'self') {
-                                  · maior de idade (autoconsentimento)
-                                } @else {
-                                  · consentimento de responsável/instituição
-                                }
-                              </p>
+                              <p>{{ account.email }} · conta de estudante (auto-cadastrada)</p>
                             </div>
                             <button
                               mat-flat-button

@@ -45,7 +45,7 @@ requiredBy:
 ### Auth
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `POST /api/auth/register` | public | Create guardian/educator account (first educator → admin bootstrap; others `pending`) **or self-register a student account** (`role: "student"`, starts `pending`, `birthDate` recorded for age-based LGPD) | `USER#` + `EMAIL#` reservation + `AUDIT#USER#` (txn) |
+| `POST /api/auth/register` | public | Create guardian/educator account (first educator → admin bootstrap; others `pending`) **or self-register a student account** (`role: "student"`, starts `pending`, `birthDate` **optional** — the account declares no age; the age authority is the ficha, see [LGPD](./lgpd.md)) | `USER#` + `EMAIL#` reservation + `AUDIT#USER#` (txn) |
 | `POST /api/auth/login` | public | Issue session token | `SESSION#` (GSI1 lookup) |
 | `POST /api/auth/logout` | any | Revoke current session | delete `SESSION#` |
 | `GET /api/auth/me` | any | Current user + role + scoped student count | `USER#<id>/META` |
@@ -63,7 +63,7 @@ requiredBy:
 | `POST /api/students/:id/follow` | educator | Follow a student | `FOLLOW#` + `EDUCATOR#` + `AUDIT#` (txn) |
 | `DELETE /api/students/:id/follow` | educator | Unfollow | reverse txn |
 | `POST /api/students/:id/student-account` | — | **Removed** — student accounts are **self-registered** via `POST /api/auth/register` (`role: "student"`); educators no longer create them | — |
-| `POST /api/students/:id/accounts/:userId/link` | educator (followed), admin | **Link** an existing self-registered student account to this student entity: approves it (`pending → active`) and attributes the entity (`studentUserId`, edges) — consent-gated (adult ≥18 self-consents; minor needs guardian/institution); `at most one` account per entity and entity per account | `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>` + `STUDENT#<c>/META` (set `studentUserId`) + flip `USER#<s>/META.status` + `AUDIT#STUDENT#<c>` (txn) |
+| `POST /api/students/:id/accounts/:userId/link` | educator (followed), admin | **Link** an existing self-registered student account to this student entity: approves it (`pending → active`) and attributes the entity (`studentUserId`, edges) — consent-gated by the **entity's** age (adult entity ≥18 self-consents; minor needs guardian/institution consent on the ficha); `at most one` account per entity and entity per account | `USER#<s>/STUDENT#<c>` + `STUDENT#<c>/LOGIN#<s>` + `STUDENT#<c>/META` (set `studentUserId`) + flip `USER#<s>/META.status` + `AUDIT#STUDENT#<c>` (txn) |
 | `GET /api/students/:id/guardians` | scoped | Guardians of this student | `STUDENT#<c>/GUARDIAN#` prefix |
 | `GET /api/students/:id/educators` | scoped | Educators following this student | `STUDENT#<c>/EDUCATOR#` prefix |
 
@@ -71,7 +71,7 @@ requiredBy:
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
 | `GET /api/students/:id/consent` | scoped, admin | Current consent + history (incl. `legalBasis`, `grantedByRole`) | `CONSENT#` prefix |
-| `POST /api/students/:id/consent` | guardian (of the student, via `GUARD#`), educator (followed), admin, **linked adult student (≥18, `self_consent`, own entity)** | Grant/revoke versioned consent; `legalBasis: guardian|institution_authorization|self_consent`; minors (<18) never self-consent | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
+| `POST /api/students/:id/consent` | guardian (of the student, via `GUARD#`), educator (followed), admin, **linked adult student (`self_consent`, own entity)** | Grant/revoke versioned consent on the **student entity**; `legalBasis: guardian|institution_authorization|self_consent`; minors (<18, by the **entity's** age) never self-consent | `CONSENT#<v>#<ts>` + `META` + `AUDIT#` (txn) |
 
 ### Forms
 | Method & Path | Roles | Description | Schema items |
@@ -178,7 +178,7 @@ The API is exercised via the deployed stack; there is no local Lambda/DynamoDB e
 
 - `make e2e-test` runs the **full e2e suite** (`sam-app/tests/e2e/`) against the deployed API — scenarios run **in order and share state** through `ctx` (tokens, student ids, submission ids), and the suite cleans only its own fixtures.
 - **Optional filter** `make e2e-test FILTER=<id|name>` runs **a contiguous prefix** `01 → <matched scenario>` of the suite. Because each scenario reuses `ctx` seeded by the ones before it, only a prefix can run in isolation; everything after the matched scenario is skipped. `FILTER` accepts the two-digit id (`FILTER=04`) or a case-insensitive name substring (`FILTER=inference`, or the shorthand `make e2e-inference`) — e.g. filtering the **ML inference** scenario (`04-ml-inference.mjs`: vark submission → async inference → `PRED#` read-back) still runs the bootstrap first (auth/consent/forms). `inferencia` aliases `inference`; an unknown filter aborts with the list of valid ids.
-- **Clean-table precondition**: the first educator to register becomes the initial admin (auth `hasAdmin` bootstrap), so the suite requires a table with **no admin before it starts**. The runner has a **preflight check** (`findAdmins`) that fails fast with an actionable message when a leftover non-fixture admin blocks that bootstrap. Reset the dev table with `make clean CONFIRM=yes`.
+- **Staged-admin mode** (no clean-table requirement): the first educator to register becomes the initial admin (auth `hasAdmin` bootstrap), so the suite normally needs an **admin-free** table. Detection: if a non-fixture admin already exists, the runner sets `ctx.stagedAdmin` and **promotes a fixture educator** via a direct DynamoDB role flip instead of asserting the bootstrap — the suite then runs against a live table with existing users and still cleans only its own fixtures. Reset the dev table with `make clean CONFIRM=yes` only for a from-scratch bootstrap run.
 
 ---
 

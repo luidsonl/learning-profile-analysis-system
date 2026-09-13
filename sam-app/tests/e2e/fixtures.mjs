@@ -12,10 +12,12 @@ import { cleanupStudent, cleanupUser, findStudentsByCreator, findUserByEmail } f
 // - Later educators register as `pending` and are activated by an admin.
 // - Guardian accounts register as `pending` and are activated by an educator/admin.
 // - STUDENT accounts SELF-REGISTER via POST /api/auth/register (role: "student",
-//   birthDate for LGPD age eligibility), starting `pending`. An educator (or admin)
-//   LINKs the account to a student entity via POST /students/:id/accounts/:userId/link,
-//   which approves it (pending -> active) and attributes the entity — consent-gated:
-//   adults (>= 18) self-consent; minors (< 18) need guardian or institution consent.
+//   birthDate OPTIONAL — the account declares no age), starting `pending`. An
+//   educator (or admin) LINKs the account to a student entity via
+//   POST /students/:id/accounts/:userId/link, which approves it (pending ->
+//   active) and attributes the entity — consent-gated by the ENTITY's age:
+//   adult entities (>= 18) self-consent; minor entities (< 18) need guardian or
+//   institution consent granted on the ficha first.
 export const TEST_FIXTURES = [
   // Admin of the suite (bootstrap admin on a clean table; staged-promoted otherwise).
   { email: "admin.sistema@example.com", name: "Adriana Lopes", password: "senha12345", role: "educator" },
@@ -37,6 +39,7 @@ export const TEST_FIXTURES = [
 export const AUXILIARY_TEST_EMAILS = [
   "sem.consentimento@example.com", // s02: no-consent minor
   "ana2@example.com", // s02: at-most-one duplicate account try
+  "adulto.casual@example.com", // s02: adult entity self-consent link
   "rafael.nao@example.com", // s09: guardian-cannot-link account try
 ];
 

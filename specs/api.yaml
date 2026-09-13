@@ -182,10 +182,10 @@ paths:
         linked to a ficha it turns `active` and already owns a profile
         (`linkedStudentId` set, `available: false`) — such an account can never
         be used again (at-most-one in both directions, see
-        `POST /students/{id}/accounts/{userId}/link`). Each entry carries the
-        consent gate the link would apply: `self` for adults (>= `MIN_SELF_CONSENT_AGE`)
-        or `guardian_institution` for minors (< 18, requires guardian/institution
-        consent already granted).
+        `POST /students/{id}/accounts/{userId}/link`). Accounts carry no age or
+        consent information: the age authority and LGPD consent live on the
+        student ENTITY — the ficha decides whether the link needs active consent
+        (minor < `MIN_SELF_CONSENT_AGE`) or self-consents (adult).
       security:
         - bearerAuth: []
       operationId: listStudentAccounts
@@ -460,9 +460,10 @@ paths:
       description: |
         Only an educator who follows the student or an admin. Approves the account
         (`pending → active`), attributes the entity (`studentUserId`) and is
-        consent-gated: an adult (>= 18) self-consents; a minor (< 18) requires
-        guardian/institution consent already granted. At most one account per
-        profile and one profile per account.
+        consent-gated by the STUDENT ENTITY's age: an adult entity (>= 18)
+        self-consents; a minor entity (< 18) requires guardian/institution
+        consent already granted on the ficha (the account holds no age).
+        At most one account per profile and one profile per account.
       security:
         - bearerAuth: []
       operationId: linkStudentAccount
@@ -1319,7 +1320,9 @@ components:
         birthDate:
           type: string
           format: date
-          description: 'Required when `role: student` (LGPD age verification).'
+          description: |
+            Optional self-reported metadata always accepted. NOT required —
+            the age authority and consent live on the student entity (ficha).
       example:
         email: maria.responsavel@example.com
         name: Maria da Silva
@@ -1381,7 +1384,7 @@ components:
 
     StudentAccount:
       type: object
-      required: [userId, name, email, birthDate, createdAt, consentRequired, status, available, linkedStudentId]
+      required: [userId, name, email, createdAt, status, available, linkedStudentId]
       properties:
         userId:
           type: string
@@ -1393,13 +1396,13 @@ components:
         birthDate:
           type: string
           format: date
-          description: Age verification; drives the consent gate on link.
+          nullable: true
+          description: |
+            Optional self-reported metadata. NEVER a consent gate: the age
+            authority and consent live on the student ENTITY (ficha).
         createdAt:
           type: string
           format: date-time
-        consentRequired:
-          type: string
-          enum: [self, guardian_institution]
         status:
           type: string
           enum: [pending, active]
@@ -1416,10 +1419,6 @@ components:
           type: string
           nullable: true
           description: 'Student entity already owned by the account, or `null` when unlinked.'
-          description: |
-            `self` when the student already qualifies for self-consent (adult,
-            >= `MIN_SELF_CONSENT_AGE`); `guardian_institution` when the minor
-            needs guardian or institution consent granted before linking.
 
     GuardianSearchResponse:
       type: object
@@ -1464,10 +1463,13 @@ components:
         birthDate:
           type: string
           format: date
+          description: Optional self-reported metadata (never a consent gate).
         age:
           type: integer
+          description: Informational only; the ficha is the age authority for consent.
         consentEligible:
           type: boolean
+          description: Informational only; consent is decided on the student ENTITY.
 
     # ── Students ────────────────────────────────────────────────────────────
     StudentCreateRequest:

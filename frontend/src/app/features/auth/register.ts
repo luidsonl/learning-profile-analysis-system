@@ -56,9 +56,6 @@ export class Register {
   }
 
   onSubmit(): void {
-    if (this.isStudent && !this.form.controls.birthDate.value) {
-      this.form.controls.birthDate.setErrors({ required: true });
-    }
     this.form.markAllAsTouched();
     if (this.form.invalid) {
       return;

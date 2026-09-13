@@ -121,8 +121,10 @@ const linkStudentAccount = async (event, ctx) => {
 
   // Consent gates the link: an adult (>= MIN_SELF_CONSENT_AGE) self-consents;
   // a minor (< 18) requires guardian/institution consent already granted on the
-  // entity (specs/auth.md + lgpd.md — age decided from the account's birth date).
-  const adult = ageFromRecord(account) >= MIN_SELF_CONSENT_AGE;
+  // entity (specs/auth.md + lgpd.md). Adult vs minor is decided from the
+  // STUDENT entity's birth date (age authority = the ficha) — the account holds
+  // no age and never gates consent.
+  const adult = ageFromRecord(student) >= MIN_SELF_CONSENT_AGE;
   if (!adult && student.consentStatus !== "active") {
     throw new HttpError(409, "consent_required", "Active consent is required before linking a minor student's account");
   }

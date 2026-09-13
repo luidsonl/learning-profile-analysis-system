@@ -44,15 +44,12 @@ export interface MeResponse {
   studentId: string | null;
 }
 
-export type ConsentRequired = 'self' | 'guardian_institution';
-
 export interface StudentAccount {
   userId: string;
   name: string;
   email: string;
-  birthDate: string;
+  birthDate?: string;
   createdAt: string;
-  consentRequired: ConsentRequired;
   status: 'pending' | 'active';
   available: boolean;
   linkedStudentId: string | null;
@@ -245,6 +242,43 @@ export interface StudentUpdateRequest {
 export interface StudentUpdateResponse {
   studentId: string;
   updated: string[];
+}
+
+export type ConsentStatus = 'not_granted' | 'active' | 'revoked';
+export type LegalBasis = 'guardian' | 'institution_authorization' | 'self_consent';
+
+export interface ConsentCurrent {
+  version: string | null;
+  status: ConsentStatus;
+  consentAt: string | null;
+  consentBy: string | null;
+  legalBasis: LegalBasis | null;
+  grantedByRole: Role | null;
+}
+
+export interface ConsentHistoryEntry {
+  version: string;
+  status: 'active' | 'revoked';
+  grantedBy: string;
+  createdAt: string;
+}
+
+export interface ConsentResponse {
+  current: ConsentCurrent;
+  history: ConsentHistoryEntry[];
+}
+
+export interface ConsentSetRequest {
+  consentVersion: string;
+  status: 'active' | 'revoked';
+  legalBasis: LegalBasis;
+}
+
+export interface ConsentSetResponse {
+  studentId: string;
+  consentVersion: string;
+  status: 'active' | 'revoked';
+  legalBasis: LegalBasis;
 }
 
 export interface SubmissionSummary {

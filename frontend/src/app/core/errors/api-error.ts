@@ -31,6 +31,13 @@ const PT_BY_CODE: Record<string, string> = {
   weak_password: 'A senha deve ter ao menos 8 caracteres.',
   no_changes: 'Nenhuma alteração informada.',
   email_in_use: 'Já existe uma conta com este e-mail.',
+  // User-management → student-account link flow (guardianship.mjs / admin.mjs)
+  link_required: 'Contas de estudante são ativadas apenas pelo vínculo, não por aprovação manual.',
+  consent_required: 'É necessário consentimento ativo antes de vincular a conta de um menor. Conceda o consentimento na ficha e tente novamente.',
+  account_already_linked: 'Esta conta de acesso já está vinculada a um perfil e não pode ser usada.',
+  student_account_exists: 'Esta ficha já possui uma conta de acesso vinculada.',
+  student_account_not_found: 'Conta de estudante não encontrada.',
+  linked_student_not_found: 'Perfil não encontrado para vincular a conta.',
 };
 
 // Maps the API's uniform error envelope
