@@ -17,6 +17,16 @@
   margin-block-start: var(--space-2);
 }
 
+.assessment-action {
+  margin-block-start: var(--space-2);
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+}
+
 .tab-stack {
   display: flex;
   flex-direction: column;

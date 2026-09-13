@@ -13,7 +13,7 @@ import { PredictionPollingService } from '../../core/predictions/prediction-poll
 import { StudentsService } from '../../core/students/students.service';
 import { ROLE_LABELS } from '../../core/users/user-labels';
 import { VARK_LABELS } from '../../core/vark/vark-labels';
-import { PredictionScores } from '../../shared/ui/prediction-scores/prediction-scores';
+import { PredictionScores, ScoreFormat } from '../../shared/ui/prediction-scores/prediction-scores';
 import { FormAssessment } from './form-assessment';
 import { AssessmentSteps } from './steps';
 
@@ -75,6 +75,15 @@ export class SubmissionHistory {
     this.formsState()?.find((form) => form.formId === this.formId()) ?? null,
   );
 
+  // Result semantics come from the served form definition: whether an async
+  // inference (bundled ML model) exists at all and how to present the outcome.
+  readonly formResult = computed(() => this.selectedForm()?.result ?? null);
+  readonly formHasInference = computed(() => this.formResult()?.hasInference ?? false);
+  readonly resultIsPercentage = computed(() => this.formResult()?.type === 'percentage');
+  readonly scoresFormat = computed<ScoreFormat>(() =>
+    this.resultIsPercentage() ? 'percentage' : 'ratio',
+  );
+
   constructor() {
     // Route params bind after construction: react to both of them.
     effect(() => {
@@ -99,6 +108,8 @@ export class SubmissionHistory {
     // (e.g. navigating straight into a form that was filled before) is polled
     // automatically so the result appears without a manual refresh. When the
     // poll turns ready the history reloads and the row reveals the prediction.
+    // Only forms that declare hasInference are pollable — others never produce
+    // a prediction, so skipping them avoids an endless idle→poll loop.
     effect(() => {
       const state = this.polling.state();
 
@@ -110,7 +121,7 @@ export class SubmissionHistory {
         return;
       }
 
-      if (state.status !== 'idle') {
+      if (state.status !== 'idle' || !this.formHasInference()) {
         return;
       }
       const pending = this.history().find((item) => !item.prediction);
@@ -138,14 +149,17 @@ export class SubmissionHistory {
     });
   }
 
-  // The questionnaire accepted the submission: refresh the history so the new
-  // row appears; the prediction (where a model exists) lands asynchronously
-  // and the subsequent refresh reveals it.
+  // The questionnaire accepted the submission: leave the fill screen so the
+  // refreshed history (including the pending row) becomes visible; the
+  // prediction, where a model exists, lands asynchronously and the subsequent
+  // refresh reveals it.
   onAccepted(): void {
+    this.filling.set(false);
     this.loadHistory();
   }
 
   onPredicted(): void {
+    this.filling.set(false);
     this.loadHistory();
   }
 

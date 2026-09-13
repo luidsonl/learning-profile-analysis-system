@@ -6,6 +6,7 @@ const valid = {
   formId: "my-form",
   name: "My Form",
   audience: "student",
+  result: { hasInference: false, type: "none" },
   sections: [
     { id: "s1", title: "Section 1", questions: [{ id: "x1", type: "likert", text: "Question?", options: [1, 2, 3] }] },
   ],
@@ -66,4 +67,31 @@ test("accepts text/date/number without options", () => {
     { id: "n1", type: "number", text: "Number" },
   ];
   assert.deepEqual(validateFormDefinition(d), []);
+});
+
+test("result is required", () => {
+  const d = JSON.parse(JSON.stringify(valid));
+  delete d.result;
+  assert.ok(validateFormDefinition(d).some((e) => e.includes("result is required")));
+});
+
+test("result.hasInference must be a boolean", () => {
+  const d = JSON.parse(JSON.stringify(valid));
+  d.result = { hasInference: "yes", type: "none" };
+  assert.ok(validateFormDefinition(d).some((e) => e.includes("result.hasInference")));
+});
+
+test("rejects unknown result type", () => {
+  const d = JSON.parse(JSON.stringify(valid));
+  d.result = { hasInference: true, type: "guessing" };
+  assert.ok(validateFormDefinition(d).some((e) => e.includes("result.type")));
+});
+
+test("accepts inferred label and percentage results", () => {
+  const label = JSON.parse(JSON.stringify(valid));
+  label.result = { hasInference: true, type: "label" };
+  assert.deepEqual(validateFormDefinition(label), []);
+  const pct = JSON.parse(JSON.stringify(valid));
+  pct.result = { hasInference: true, type: "percentage" };
+  assert.deepEqual(validateFormDefinition(pct), []);
 });

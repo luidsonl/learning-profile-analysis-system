@@ -1810,10 +1810,39 @@ components:
           type: string
         scale:
           type: string
+        result:
+          $ref: "#/components/schemas/FormResultMetadata"
         sections:
           type: array
           items:
             $ref: "#/components/schemas/FormSection"
+
+    FormResultMetadata:
+      type: object
+      required:
+        - hasInference
+        - type
+      description: >
+        Declared per form definition by the code-defined forms engine. The
+        client interprets it to decide whether an async inference (bundled ML
+        model → PRED#) exists and how to present that outcome.
+      properties:
+        hasInference:
+          type: boolean
+          description: >
+            Whether this form feeds a bundled ML model and therefore produces a
+            prediction asynchronously (pollable). Forms that declare false are
+            stored and answered immediately — no prediction UI or polling.
+        type:
+          type: string
+          enum: [none, label, percentage]
+          description: >
+            How the outcome is presented: definitive result label (a single
+            profile, e.g. VARK — rendered as text only, no score breakdown), a
+            percentage (score bars + confidence), or none at all.
+      example:
+        hasInference: true
+        type: label
 
     FormSection:
       type: object

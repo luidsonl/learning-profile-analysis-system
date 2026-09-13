@@ -31,13 +31,13 @@
           <div class="generating-row">
             <mat-spinner diameter="20" />
             <span>
-              Gerando resultado — o perfil calculado aparece na lista de envios abaixo assim que a análise terminar.
+              Gerando resultado — o resultado aparece na lista de envios assim que a análise terminar.
             </span>
           </div>
         } @else if (predicts()) {
-          <p>Resultado gerado! O perfil calculado aparece na lista de envios abaixo.</p>
+          <p>Resultado gerado! O resultado aparece na lista de envios.</p>
         } @else {
-          <p>As respostas foram registradas na lista de envios abaixo.</p>
+          <p>As respostas foram registradas na lista de envios.</p>
         }
         <button mat-stroked-button (click)="reset()">Preencher outro formulário</button>
       </mat-card-content>

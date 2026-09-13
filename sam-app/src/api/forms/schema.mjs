@@ -1,5 +1,6 @@
 export const QUESTION_TYPES = ["likert", "single", "multiple", "text", "date", "number"];
 export const AUDIENCES = ["guardian", "educator", "student"];
+export const RESULT_TYPES = ["none", "label", "percentage"];
 
 export const validateFormDefinition = (def) => {
   const errors = [];
@@ -9,6 +10,14 @@ export const validateFormDefinition = (def) => {
   }
   if (typeof def.name !== "string" || !def.name.trim()) errors.push("name is required");
   if (!AUDIENCES.includes(def.audience)) errors.push(`audience must be one of ${AUDIENCES.join(", ")}`);
+  if (!def.result || typeof def.result !== "object") {
+    errors.push("result is required: { hasInference: boolean, type: one of RESULT_TYPES }");
+  } else {
+    if (typeof def.result.hasInference !== "boolean") errors.push("result.hasInference must be a boolean");
+    if (!RESULT_TYPES.includes(def.result.type)) {
+      errors.push(`result.type must be one of ${RESULT_TYPES.join(", ")}`);
+    }
+  }
   if (!Array.isArray(def.sections) || def.sections.length === 0) errors.push("at least one section is required");
 
   const seen = new Set();

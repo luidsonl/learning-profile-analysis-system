@@ -104,12 +104,9 @@
             <mat-list-item>
               <span class="list-title">
                 {{ formatLabel(prediction.label) }}
-                <span class="list-confidence">
-                  confiança {{ (prediction.confidence * 100).toFixed(0) }}%
-                </span>
               </span>
               <span class="list-subtitle">
-                {{ formatDate(prediction.createdAt) }} · modelo {{ prediction.modelVersion }}
+                {{ formatDate(prediction.createdAt) }} · modelo {{ prediction.modelVersion }} · método {{ prediction.method }}
               </span>
             </mat-list-item>
           }

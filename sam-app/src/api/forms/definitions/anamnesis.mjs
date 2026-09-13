@@ -4,6 +4,7 @@ export const anamnesisDefinition = {
   name: "Anamnese",
   audience: "guardian",
   description: "Entrevista inicial de anamnese preenchida pelo responsável.",
+  result: { hasInference: false, type: "none" },
   sections: [
     {
       id: "development",

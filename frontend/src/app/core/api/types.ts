@@ -115,6 +115,13 @@ export interface FormQuestion {
   example?: string;
 }
 
+export type FormResultType = 'none' | 'label' | 'percentage';
+
+export interface FormResultMetadata {
+  hasInference: boolean;
+  type: FormResultType;
+}
+
 export interface FormSection {
   id: string;
   title: string;
@@ -129,6 +136,7 @@ export interface FormDefinition {
   audience: Audience;
   description: string;
   scale?: string;
+  result: FormResultMetadata;
   sections: FormSection[];
 }
 

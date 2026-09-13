@@ -7,6 +7,7 @@ export const socioemotionalDefinition = {
   audience: "educator",
   description: "Avaliação socioemocional observada pelo educador.",
   scale: "1–5 (raramente ... quase sempre)",
+  result: { hasInference: false, type: "none" },
   sections: [
     {
       id: "socioemotional",

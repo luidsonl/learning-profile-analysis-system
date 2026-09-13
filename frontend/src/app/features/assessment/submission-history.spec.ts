@@ -16,6 +16,7 @@ const varkForm = {
   name: 'VARK',
   audience: 'student',
   description: 'Questionário VARK',
+  result: { hasInference: true, type: 'label' },
   sections: [
     {
       id: 'reading',
@@ -32,6 +33,16 @@ const varkForm = {
       ],
     },
   ],
+};
+
+const anamnesisForm = {
+  formId: 'anamnesis',
+  version: 1,
+  name: 'Anamnese',
+  audience: 'guardian',
+  description: 'Anamnese',
+  result: { hasInference: false, type: 'none' },
+  sections: [],
 };
 
 const responseItem = {
@@ -94,7 +105,7 @@ describe('SubmissionHistory', () => {
         {
           provide: FormsService,
           useValue: {
-            listForms: () => of({ data: [varkForm], count: 1 }),
+            listForms: () => of({ data: [varkForm, anamnesisForm], count: 2 }),
             getForm: () => of({ form: varkForm }),
           },
         },
@@ -109,9 +120,9 @@ describe('SubmissionHistory', () => {
     fixture = TestBed.createComponent(SubmissionHistory);
   });
 
-  const mount = async () => {
+  const mount = async (formId = 'vark') => {
     fixture.componentRef.setInput('studentId', 's1');
-    fixture.componentRef.setInput('formId', 'vark');
+    fixture.componentRef.setInput('formId', formId);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -123,9 +134,36 @@ describe('SubmissionHistory', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Ana Lima');
     expect(el.textContent).toContain('Perfil: Cinestésico');
-    expect(el.textContent).toContain('Confiança 81%');
     expect(el.textContent).toContain('Classificação: Cinestésico');
+    expect(el.textContent).not.toContain('modelo');
+    expect(el.textContent).not.toContain('%');
     expect(responsesSpy).toHaveBeenCalledWith('s1', 'vark');
+  });
+
+  it('hides the previous results while a new assessment is being filled', async () => {
+    await mount();
+
+    const openButton = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Enviar nova avaliação'),
+    ) as HTMLButtonElement;
+    openButton.click();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Enviar formulário');
+    expect(el.textContent).not.toContain('Perfil: Cinestésico');
+    expect(el.textContent).not.toContain('Aguardando análise');
+  });
+
+  it('does not poll nor render prediction UI for forms without inference', async () => {
+    responsesSpy.mockReturnValue(of({ data: [{ ...pendingItem, prediction: null }], count: 1 }));
+    await mount('anamnesis');
+
+    expect(pollForSpy).not.toHaveBeenCalled();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('Aguardando análise');
+    expect(el.textContent).not.toContain('Resultado em geração');
+    expect(el.textContent).not.toContain('Perfil:');
   });
 
   it('reveals the questionnaire on "Enviar nova avaliação" and collapses on cancel', async () => {

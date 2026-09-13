@@ -8,9 +8,12 @@ export default async (ctx) => {
     const all = await api("GET", "/forms", { token: ctx.studentToken });
     expect("student lists forms", all.status === 200 && all.data.data.length === 1 && all.data.data[0].formId === "vark", JSON.stringify(all.data));
     expect("form definition served from code with version", all.data.data[0].version === 1 && Array.isArray(all.data.data[0].sections), JSON.stringify(all.data.data[0]));
+    expect("vark declares result metadata (async inference, definitive label)", all.data.data[0].result?.hasInference === true && all.data.data[0].result?.type === "label", JSON.stringify(all.data.data[0]));
 
     const guardianForms = await api("GET", "/forms", { token: ctx.guardianToken });
     expect("guardian sees all forms", guardianForms.status === 200 && guardianForms.data.count === 4, JSON.stringify(guardianForms.data));
+    const anamnesis = guardianForms.data.data.find((f) => f.formId === "anamnesis");
+    expect("anamnesis declares no inference", anamnesis?.result?.hasInference === false && anamnesis?.result?.type === "none", JSON.stringify(anamnesis));
 
     const one = await api("GET", "/forms/vark", { token: ctx.studentToken });
     expect("get single form definition", one.status === 200 && one.data.form.formId === "vark", JSON.stringify(one.data));

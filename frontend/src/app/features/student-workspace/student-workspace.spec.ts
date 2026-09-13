@@ -77,8 +77,9 @@ const authStub = {
 };
 
 // Tab order for an access manager (educator/admin): 0 Dados, 1 Perfil,
-// 2 Avaliação, 3 Observações, 4 Recomendações, 5 Consentimento, 6 Acessos.
-// Tab content is lazy, so text assertions must select the tab first.
+// 2 Observações, 3 Recomendações, 4 Consentimento, 5 Acessos. The assessment
+// flow moved to the dedicated /avaliacoes workspace (botão "avaliações" fora
+// do tab-group). Tab content is lazy, so text assertions must select first.
 function selectTab(fixture: ComponentFixture<StudentWorkspace>, index: number): void {
   fixture.componentInstance.selectedTabIndex.set(index);
   fixture.detectChanges();
@@ -111,6 +112,14 @@ describe('StudentWorkspace', () => {
     expect(text).toContain('Remover estudante');
   });
 
+  it('links to the assessment workspace instead of an in-ficha tab', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const link = [...el.querySelectorAll('a')].find((a) => a.textContent?.includes('avaliações')) as HTMLAnchorElement;
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe('/avaliacoes/s1');
+    expect(el.textContent).not.toContain('Avaliação de perfil');
+  });
+
   it('removes the student from the data tab', () => {
     fixture.componentInstance.askDelete();
     fixture.detectChanges();
@@ -120,13 +129,13 @@ describe('StudentWorkspace', () => {
   });
 
   it('renders observations for the student', () => {
-    selectTab(fixture, 3);
+    selectTab(fixture, 2);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Foco mantido em leitura.');
   });
 
   it('renders proposed recommendations with a propose form', () => {
-    selectTab(fixture, 4);
+    selectTab(fixture, 3);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Leitura em voz alta');
     expect(text).toContain('Proposta');
@@ -144,14 +153,14 @@ describe('StudentWorkspace', () => {
   });
 
   it('renders the responsable management panel for an educator', () => {
-    selectTab(fixture, 6);
+    selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Responsáveis');
     expect(text).toContain('Maria da Silva');
   });
 
   it('renders the guardian catalog with client-side filter', () => {
-    selectTab(fixture, 6);
+    selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('João Pereira');
     expect(filteredGuardianCount(fixture)).toBe(2);
@@ -162,7 +171,7 @@ describe('StudentWorkspace', () => {
   });
 
   it('renders the LGPD consent tab with a grant form', () => {
-    selectTab(fixture, 5);
+    selectTab(fixture, 4);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Consentimento LGPD');
     expect(text).toContain('Conceder consentimento');
@@ -175,7 +184,7 @@ describe('StudentWorkspace', () => {
   });
 
   it('renders available accounts and accounts that cannot be reused', () => {
-    selectTab(fixture, 6);
+    selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Conta de acesso');
     expect(text).toContain('Pedro Alves');
@@ -199,7 +208,7 @@ describe('StudentWorkspace', () => {
       });
     fixture.componentRef.setInput('studentId', 's2');
     fixture.detectChanges();
-    selectTab(fixture, 6);
+    selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('pedro@example.com');
     expect(text).toContain('conta de acesso vinculada');

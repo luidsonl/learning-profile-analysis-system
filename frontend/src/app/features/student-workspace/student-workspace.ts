@@ -12,9 +12,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
-import { VarkAssessment } from '../assessment/vark-assessment';
 import { StudentProfileView } from '../profile/student-profile-view';
 import { StudentForm } from '../../shared/ui/student-form/student-form';
 import { GuardianEdge, GuardianSearchHit, Observation, Recommendation, Student, StudentAccount, ConsentCurrent, ConsentHistoryEntry, LegalBasis } from '../../core/api/types';
@@ -45,8 +44,10 @@ const LEGAL_BASIS_LABELS: Record<string, string> = {
 };
 
 // Centralized student ficha: every management action lives in tabs on this one
-// page — data + removal, VARK profile, assessment, observations,
-// recommendations and access (responsables + linked account).
+// page — data + removal, VARK profile, observations, recommendations and
+// access (responsables + linked account). Assessments moved out to the
+// dedicated `/avaliacoes/:studentId` workspace, linked via an "avaliações"
+// button at the end of the tab strip.
 @Component({
   selector: 'app-student-workspace',
   imports: [
@@ -64,9 +65,9 @@ const LEGAL_BASIS_LABELS: Record<string, string> = {
     MatChipsModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    RouterLink,
     StudentForm,
     StudentProfileView,
-    VarkAssessment,
   ],
   templateUrl: './student-workspace.html',
   styleUrl: './student-workspace.scss',

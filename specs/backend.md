@@ -76,7 +76,7 @@ requiredBy:
 ### Forms
 | Method & Path | Roles | Description | Schema items |
 |---------------|-------|-------------|--------------|
-| `GET /api/forms?audience=` | any | List forms available to the persona (served from code) | in-memory registry |
+| `GET /api/forms?audience=` | any | List forms available to the persona (served from code). Each definition declares `result` metadata — `hasInference` (does this form feed the bundled ML model / produce an async `PRED#`?) and `type` (`none` / `label` / `percentage` — how the outcome is presented). **No business rules in the database — this is how the client learns whether to poll and how to render the result** | in-memory registry |
 | `GET /api/forms/:formId` | scoped | Form definition (read-only) | in-memory registry |
 | `POST /api/students/:id/forms/:formId/responses` | persona of the form **or any persona acting for the student** (student-audience forms like `vark` may be filled by the student's own account, a guardian or educator acting for them, or an admin) | Submit responses (idempotent via `requestId`); the submission is stored **immediately** — classification/inference is a separate step | `SUBMISSION#` only — classification is a separate step |
 | `GET /api/students/:id/forms/:formId/responses` | scoped | Submission history; each item rides along its `assessment` (deterministic classification, once run) and ML `prediction` (once inference lands) | Query `SUBMISSION#<formId>#` prefix + `ASSESS#`/`PRED#` lookups keyed by submission |

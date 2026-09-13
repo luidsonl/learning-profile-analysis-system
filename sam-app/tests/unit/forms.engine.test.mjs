@@ -8,6 +8,8 @@ test("all registered definitions are valid", () => {
   assert.ok(defs.length >= 4);
   for (const def of defs) {
     assert.deepEqual(validateFormDefinition(def), [], `form ${def.formId} invalid`);
+    assert.ok(def.result, `form ${def.formId} must declare result metadata`);
+    assert.equal(typeof def.result.hasInference, "boolean", `form ${def.formId} result.hasInference`);
   }
 });
 

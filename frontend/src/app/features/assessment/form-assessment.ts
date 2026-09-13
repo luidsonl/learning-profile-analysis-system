@@ -16,16 +16,11 @@ import { PredictionPollingService } from '../../core/predictions/prediction-poll
 
 export type AnswerValue = string | number | string[];
 
-// Forms that carry a bundled ML model and therefore produce a PRED# item (the
-// inference Lambda routes by formId; only `vark` ships today). Other forms are
-// stored and answered immediately — there is nothing to poll for asynchronously.
-const PREDICTING_FORMS = ['vark'];
-
 // Generic questionnaire renderer: reads the form definition via GET /forms/:id
 // and renders every question type (single/multiple/likert/text/date/number).
 // The submission is stored immediately (idempotent via requestId); on acceptance
-// the parent refreshes the history, and forms with a bundled model keep polling
-// for the async prediction.
+// the parent refreshes the history, and forms that declare `result.hasInference`
+// in their served definition keep polling for the async prediction.
 @Component({
   selector: 'app-form-assessment',
   imports: [
@@ -63,7 +58,8 @@ export class FormAssessment {
   private acceptedAnnounced = false;
   private predictedAnnounced = false;
 
-  readonly predicts = computed(() => PREDICTING_FORMS.includes(this.formId()));
+  // Served metadata: does the form carry a bundled ML model (async PRED#)?
+  readonly predicts = computed(() => this.form()?.form.result.hasInference ?? false);
 
   readonly questions = computed(() => {
     const def = this.form();

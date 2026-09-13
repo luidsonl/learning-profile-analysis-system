@@ -74,12 +74,6 @@
       </ng-template>
     </mat-tab>
 
-    <mat-tab label="Avaliação">
-      <ng-template matTabContent>
-        <app-vark-assessment [studentId]="studentId()" />
-      </ng-template>
-    </mat-tab>
-
     <mat-tab label="Observações">
       <ng-template matTabContent>
         <mat-card appearance="outlined" class="panel">
@@ -531,4 +525,11 @@
       </mat-tab>
     }
   </mat-tab-group>
+
+  <div class="assessment-action">
+    <a mat-stroked-button [routerLink]="['/avaliacoes', studentId()]">
+      <mat-icon>fact_check</mat-icon>
+      avaliações
+    </a>
+  </div>
 </section>

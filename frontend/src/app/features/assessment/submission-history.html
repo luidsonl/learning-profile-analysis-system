@@ -25,7 +25,7 @@
       <mat-card-header>
         <mat-card-title>Nova avaliação</mat-card-title>
         <mat-card-subtitle>
-          Preencha o questionário. O resultado da análise automática aparece na lista abaixo.
+          Preencha o questionário. O resultado da análise automática aparece na lista de envios.
         </mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
@@ -42,88 +42,94 @@
     </mat-card>
   }
 
-  @switch (block().status) {
-    @case ('loading') {
-      <div class="state-content"><mat-spinner diameter="32" /></div>
-    }
-    @case ('error') {
-      <div class="state-content">
-        <p class="error">{{ errorMessage() }}</p>
-        <button mat-stroked-button (click)="loadHistory()">Tentar novamente</button>
-      </div>
-    }
-    @case ('ready') {
-      @if (history().length === 0) {
-        <p class="empty">
-          Nenhum envio ainda. Clique em "Enviar nova avaliação" para gerar a primeira avaliação.
-        </p>
-      } @else {
-        <div class="feed">
-          @for (item of history(); track item.submissionId) {
-            <mat-card appearance="outlined" class="submission">
-              <mat-card-content>
-                <div class="submission-head">
-                  <mat-chip-set>
-                    <mat-chip [class.result-chip]="!!item.prediction">
-                      @if (item.prediction; as prediction) {
-                        Perfil: {{ formatLabel(prediction.label) }}
-                      } @else {
-                        Aguardando análise
-                      }
-                    </mat-chip>
-                  </mat-chip-set>
-                  <span class="submission-meta">
-                    Envio em {{ item.createdAt | date: "dd/MM/yyyy 'às' HH:mm" }}
-                    @if (item.submittedByRole) {
-                      · {{ roleLabel(item.submittedByRole) }}
-                    }
-                  </span>
-                </div>
-
-                @if (!item.prediction) {
-                  <div class="pending-indicator">
-                    <mat-progress-spinner diameter="18" mode="indeterminate" aria-label="Gerando resultado" />
-                    <span>Resultado em geração — aparece aqui automaticamente.</span>
-                  </div>
-                }
-
-                @if (item.prediction; as prediction) {
-                  <prediction-scores [scores]="prediction.scores" />
-                  <p class="confidence">
-                    Confiança {{ confidence(prediction) }} · modelo {{ prediction.modelVersion }}
-                  </p>
-                }
-
-                @if (item.assessment; as assessment) {
-                  <p class="assessment-line">
-                    <mat-icon aria-hidden="true">assessment</mat-icon>
-                    Classificação: {{ formatLabel(assessment.label) }}
-                    @if (hasScores(assessment.scores)) {
-                      ({{ assessment.method }})
-                    }
-                  </p>
-                }
-
-                @if (answeredQuestions(item).length > 0) {
-                  <mat-expansion-panel class="answers-panel" hideToggle>
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>Respostas desta avaliação</mat-panel-title>
-                      <mat-panel-description>versão {{ item.formVersion }}</mat-panel-description>
-                    </mat-expansion-panel-header>
-                    <div class="answer-list">
-                      @for (question of answeredQuestions(item); track question.id) {
-                        <div class="answer-row">
-                          <span>{{ question.text }}</span>
-                          <strong>{{ item.answers[question.id] }}</strong>
-                        </div>
-                      }
-                    </div>
-                  </mat-expansion-panel>
-                }
-              </mat-card-content>
-            </mat-card>
-          }
+  @if (!filling()) {
+    @switch (block().status) {
+      @case ('loading') {
+        <div class="state-content"><mat-spinner diameter="32" /></div>
+      }
+      @case ('error') {
+        <div class="state-content">
+          <p class="error">{{ errorMessage() }}</p>
+          <button mat-stroked-button (click)="loadHistory()">Tentar novamente</button>
         </div>
+      }
+      @case ('ready') {
+        @if (history().length === 0) {
+          <p class="empty">
+            Nenhum envio ainda. Clique em "Enviar nova avaliação" para gerar a primeira avaliação.
+          </p>
+        } @else {
+          <div class="feed">
+            @for (item of history(); track item.submissionId) {
+              <mat-card appearance="outlined" class="submission">
+                <mat-card-content>
+                  <div class="submission-head">
+                    @if (formHasInference()) {
+                      <mat-chip-set>
+                        <mat-chip [class.result-chip]="!!item.prediction">
+                          @if (item.prediction; as prediction) {
+                            Perfil: {{ formatLabel(prediction.label) }}
+                          } @else {
+                            Aguardando análise
+                          }
+                        </mat-chip>
+                      </mat-chip-set>
+                    }
+                    <span class="submission-meta">
+                      Envio em {{ item.createdAt | date: "dd/MM/yyyy 'às' HH:mm" }}
+                      @if (item.submittedByRole) {
+                        · {{ roleLabel(item.submittedByRole) }}
+                      }
+                    </span>
+                  </div>
+
+                  @if (formHasInference() && !item.prediction) {
+                    <div class="pending-indicator">
+                      <mat-progress-spinner diameter="18" mode="indeterminate" aria-label="Gerando resultado" />
+                      <span>Resultado em geração — aparece aqui automaticamente.</span>
+                    </div>
+                  }
+
+                  @if (item.prediction; as prediction) {
+                    @if (resultIsPercentage()) {
+                      <prediction-scores [scores]="prediction.scores" [format]="scoresFormat()" />
+                      <p class="confidence">
+                        Confiança {{ confidence(prediction) }} · modelo {{ prediction.modelVersion }}
+                      </p>
+                    }
+                  }
+
+                  @if (item.assessment; as assessment) {
+                    <p class="assessment-line">
+                      <mat-icon aria-hidden="true">assessment</mat-icon>
+                      Classificação: {{ formatLabel(assessment.label) }}
+                      @if (hasScores(assessment.scores)) {
+                        ({{ assessment.method }})
+                      }
+                    </p>
+                  }
+
+                  @if (answeredQuestions(item).length > 0) {
+                    <mat-expansion-panel class="answers-panel" hideToggle>
+                      <mat-expansion-panel-header>
+                        <mat-panel-title>Respostas desta avaliação</mat-panel-title>
+                        <mat-panel-description>versão {{ item.formVersion }}</mat-panel-description>
+                      </mat-expansion-panel-header>
+                      <div class="answer-list">
+                        @for (question of answeredQuestions(item); track question.id) {
+                          <div class="answer-row">
+                            <span>{{ question.text }}</span>
+                            <strong>{{ item.answers[question.id] }}</strong>
+                          </div>
+                        }
+                      </div>
+                    </mat-expansion-panel>
+                  }
+                </mat-card-content>
+              </mat-card>
+            }
+          </div>
+        }
       }
     }
   }

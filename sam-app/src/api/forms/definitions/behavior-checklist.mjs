@@ -7,6 +7,7 @@ export const behaviorChecklistDefinition = {
   audience: "educator",
   description: "Checklist comportamental observado em sala de aula.",
   scale: "1–5 (raramente ... quase sempre)",
+  result: { hasInference: false, type: "none" },
   sections: [
     {
       id: "behavior",

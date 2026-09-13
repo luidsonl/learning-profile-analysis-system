@@ -15,6 +15,7 @@ const mixedForm = {
     name: 'Anamnese',
     audience: 'guardian',
     description: 'Anamnese',
+    result: { hasInference: false, type: 'none' },
     sections: [
       {
         id: 'sec1',
@@ -33,6 +34,16 @@ const mixedForm = {
   },
 };
 
+// The vark definition serves result metadata declaring an async inference.
+const varkLikeForm = {
+  form: {
+    ...mixedForm.form,
+    formId: 'vark',
+    name: 'VARK',
+    result: { hasInference: true, type: 'label' },
+  },
+};
+
 describe('FormAssessment', () => {
   let fixture: ComponentFixture<FormAssessment>;
   let pollingState: ReturnType<typeof signal<PollState>>;
@@ -44,7 +55,7 @@ describe('FormAssessment', () => {
     await TestBed.configureTestingModule({
       imports: [FormAssessment],
       providers: [
-        { provide: FormsService, useValue: { getForm: () => of(mixedForm) } },
+        { provide: FormsService, useValue: { getForm: (id: string) => of(id === 'vark' ? varkLikeForm : mixedForm) } },
         {
           provide: PredictionPollingService,
           useValue: {
@@ -134,6 +145,8 @@ describe('FormAssessment', () => {
     expect(accepted).toHaveBeenCalledTimes(1);
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Formulário enviado com sucesso!');
+    // Forms without inference never promise an async result.
+    expect(text).not.toContain('Gerando resultado');
   });
 
   it('emits predicted when the prediction lands (predicting forms)', async () => {

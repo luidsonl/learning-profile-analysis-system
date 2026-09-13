@@ -7,6 +7,7 @@ export const varkDefinition = {
   audience: "student",
   description: "Questionário VARK — como você prefere aprender?",
   scale: "1–5 (discordo totalmente ... concordo totalmente)",
+  result: { hasInference: true, type: "label" },
   sections: [
     {
       id: "reading",
