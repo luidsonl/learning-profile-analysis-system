@@ -1,6 +1,12 @@
 <nav class="steps" aria-label="Etapas da avaliação">
   @if (step() > 1) {
-    <a class="done" routerLink="/avaliacoes">1. Estudante</a>
+    @if (isStudent()) {
+      <span class="done">1. Meu perfil</span>
+    } @else {
+      <a class="done" routerLink="/avaliacoes">1. Estudante</a>
+    }
+  } @else if (isStudent()) {
+    <span class="current">1. Meu perfil</span>
   } @else {
     <span class="current">1. Estudante</span>
   }

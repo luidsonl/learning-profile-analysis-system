@@ -26,3 +26,17 @@ export const adminOrEducatorGuard: CanActivateFn = async () => {
   }
   return router.createUrlTree(['/']);
 };
+
+// A student has exactly one target profile — the one attributed to them — so
+// the `/avaliacoes` step-1 selector is skipped: the student is sent straight
+// to `/avaliacoes/:ownStudentId` (form selection). An unlinked student stays
+// on `/avaliacoes` where the "conta não vinculada" hint lives.
+export const skipStudentSelectorGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (auth.user()?.role !== 'student') {
+    return true;
+  }
+  const ownId = auth.studentId();
+  return ownId ? router.createUrlTree(['/avaliacoes', ownId]) : true;
+};

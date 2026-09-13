@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import { AuthService } from '../../core/auth/auth.service';
 import { FormsService } from '../../core/forms/forms.service';
 import { StudentsService } from '../../core/students/students.service';
 import { SelectForm } from './select-form';
@@ -35,6 +36,7 @@ describe('SelectForm', () => {
           },
         },
         provideRouter([]),
+        { provide: AuthService, useValue: { user: () => ({ role: 'educator' }) } },
       ],
     });
     fixture = TestBed.createComponent(SelectForm);

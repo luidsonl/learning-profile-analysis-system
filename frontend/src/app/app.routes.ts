@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { adminOrEducatorGuard, authGuard } from './core/auth/auth.guard';
+import { adminOrEducatorGuard, authGuard, skipStudentSelectorGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -10,7 +10,7 @@ export const routes: Routes = [
   },
   {
     path: 'avaliacoes',
-    canActivate: [authGuard],
+    canActivate: [authGuard, skipStudentSelectorGuard],
     loadComponent: () => import('./features/assessment/select-student').then((m) => m.SelectStudent),
   },
   {
