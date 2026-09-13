@@ -32,7 +32,15 @@ const updateSpy = vi.fn(() => of({ studentId: 's1', recoId: 'r1' }));
 const grantSpy = vi.fn(() => of({}));
 const revokeSpy = vi.fn(() => of({}));
 const linkSpy = vi.fn(() => of({}));
-const searchSpy = vi.fn(() => of({ data: [{ userId: 'gu2', name: 'João Souza', email: 'joao@example.com' }], count: 1 }));
+const searchSpy = vi.fn(() =>
+  of({
+    data: [
+      { userId: 'gu1', name: 'Maria da Silva', email: 'maria@example.com' },
+      { userId: 'gu2', name: 'João Pereira', email: 'joao@example.com' },
+    ],
+    count: 2,
+  }),
+);
 const deleteSpy = vi.fn(() => of(undefined));
 
 const studentsStub = {
@@ -55,7 +63,14 @@ const studentsStub = {
 
 const authStub = {
   user: () => ({ userId: 'u1', role: 'educator' }),
-  pendingAccounts: () => of({ data: [{ userId: 'sid1', name: 'Pedro Alves', email: 'pedro@example.com', birthDate: '2011-09-30', createdAt: '2026-08-01T00:00:00Z', consentRequired: 'guardian_institution' }], count: 1 }),
+  studentAccounts: () =>
+    of({
+      data: [
+        { userId: 'sid1', name: 'Pedro Alves', email: 'pedro@example.com', birthDate: '2011-09-30', createdAt: '2026-08-01T00:00:00Z', consentRequired: 'guardian_institution', status: 'pending', available: true, linkedStudentId: null },
+        { userId: 'sid2', name: 'Camila Rocha', email: 'camila@example.com', birthDate: '1995-03-01', createdAt: '2026-07-01T00:00:00Z', consentRequired: 'self', status: 'active', available: false, linkedStudentId: 's9' },
+      ],
+      count: 2,
+    }),
 };
 
 // Tab order for an access manager (educator/admin): 0 Dados, 1 Perfil,
@@ -64,6 +79,10 @@ const authStub = {
 function selectTab(fixture: ComponentFixture<StudentWorkspace>, index: number): void {
   fixture.componentInstance.selectedTabIndex.set(index);
   fixture.detectChanges();
+}
+
+function filteredGuardianCount(fixture: ComponentFixture<StudentWorkspace>): number {
+  return fixture.componentInstance.filteredGuardians().length;
 }
 
 describe('StudentWorkspace', () => {
@@ -128,11 +147,23 @@ describe('StudentWorkspace', () => {
     expect(text).toContain('Maria da Silva');
   });
 
-  it('renders the account-link panel with pending student accounts', () => {
+  it('renders the guardian catalog with client-side filter', () => {
+    selectTab(fixture, 5);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('João Pereira');
+    expect(filteredGuardianCount(fixture)).toBe(2);
+
+    fixture.componentInstance.onGuardianFilterInput('joao');
+    fixture.detectChanges();
+    expect(filteredGuardianCount(fixture)).toBe(1);
+  });
+
+  it('renders available accounts and accounts that cannot be reused', () => {
     selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Conta de acesso');
     expect(text).toContain('Pedro Alves');
+    expect(text).toContain('não pode ser usada');
   });
 
   it('shows the linked student account identity when present', () => {
@@ -168,14 +199,12 @@ describe('StudentWorkspace', () => {
     expect(revokeSpy).toHaveBeenCalledWith('s1', 'gu1');
   });
 
-  it('links a pending student account', () => {
+  it('links an available student account', () => {
     fixture.componentInstance.linkStudentAccount('sid1');
     expect(linkSpy).toHaveBeenCalledWith('s1', 'sid1');
   });
 
-  it('searches responsables by email', () => {
-    fixture.componentInstance.guardianSearch.set('maria@example.com');
-    fixture.componentInstance.searchGuardians();
-    expect(searchSpy).toHaveBeenCalledWith('maria@example.com');
+  it('loads the whole guardian catalog on open', () => {
+    expect(searchSpy).toHaveBeenCalledWith('');
   });
 });

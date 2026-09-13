@@ -171,29 +171,31 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
-  /auth/pending-accounts:
+  /auth/student-accounts:
     get:
       tags: [Auth]
-      summary: List self-registered student accounts awaiting link
+      summary: List student accounts (link catalog, with availability)
       description: |
-        Educators and admins only. Returns every `student` account with status
-        `pending` (self-registered, `studentId` null), newest first. Each entry
-        carries the consent gate that `POST /students/{id}/accounts/{userId}/link`
-        would apply to that account: `self` for adults (>= `MIN_SELF_CONSENT_AGE`,
-        self-consents on link) or `guardian_institution` for minors (< 18, requires
-        guardian/institution consent already granted). This is the discovery
-        mechanism for the educator link flow; the link itself stays permissioned
-        at `POST /students/{id}/accounts/{userId}/link`.
+        Educators and admins only. Returns the catalog of every `student`
+        account, newest first. Self-registered accounts still waiting for the
+        link flow have status `pending` (`available: true`); once an account is
+        linked to a ficha it turns `active` and already owns a profile
+        (`linkedStudentId` set, `available: false`) — such an account can never
+        be used again (at-most-one in both directions, see
+        `POST /students/{id}/accounts/{userId}/link`). Each entry carries the
+        consent gate the link would apply: `self` for adults (>= `MIN_SELF_CONSENT_AGE`)
+        or `guardian_institution` for minors (< 18, requires guardian/institution
+        consent already granted).
       security:
         - bearerAuth: []
-      operationId: listPendingStudentAccounts
+      operationId: listStudentAccounts
       responses:
         "200":
-          description: Pending student accounts
+          description: Student accounts catalog
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PendingAccountsResponse"
+                $ref: "#/components/schemas/StudentAccountsResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -202,28 +204,29 @@ paths:
   /users:
     get:
       tags: [Auth]
-      summary: Search guardian accounts
+      summary: List or search guardian accounts
       description: |
-        Educators (in scope) and admins only. Prefix (case-insensitive) search on
-        guardian account email to pick the `userId` for granting guardianship
-        (`POST /students/{id}/guardians`). Returns minimal identity fields only
-        (`userId`, `name`, `email`) — no birthDate, accountability or status.
+        Educators and admins only. Lists every active guardian account
+        (identity only: `userId`, `name`, `email`) with an optional
+        case-insensitive email-prefix filter; without `email` the whole guardian
+        catalog is returned and further name/email filtering is done client-side.
+        Used to pick the `userId` for granting guardianship
+        (`POST /students/{id}/guardians`).
       security:
         - bearerAuth: []
       operationId: searchGuardians
       parameters:
         - name: role
           in: query
-          required: true
+          required: false
           schema:
             type: string
             enum: [guardian]
         - name: email
           in: query
-          required: true
+          required: false
           schema:
             type: string
-            minLength: 3
       responses:
         "200":
           description: Matching guardian accounts
@@ -1366,19 +1369,19 @@ components:
           nullable: true
           description: 'Linked student entity id (null while `pending`/unlinked).'
 
-    PendingAccountsResponse:
+    StudentAccountsResponse:
       type: object
       properties:
         data:
           type: array
           items:
-            $ref: "#/components/schemas/PendingAccount"
+            $ref: "#/components/schemas/StudentAccount"
         count:
           type: number
 
-    PendingAccount:
+    StudentAccount:
       type: object
-      required: [userId, name, email, birthDate, createdAt, consentRequired]
+      required: [userId, name, email, birthDate, createdAt, consentRequired, status, available, linkedStudentId]
       properties:
         userId:
           type: string
@@ -1397,6 +1400,16 @@ components:
         consentRequired:
           type: string
           enum: [self, guardian_institution]
+        status:
+          type: string
+          enum: [pending, active]
+        available:
+          type: boolean
+          description: '`true` while the account can still be linked to a ficha.'
+        linkedStudentId:
+          type: string
+          nullable: true
+          description: 'Student entity already owned by the account, or `null` when unlinked.'
           description: |
             `self` when the student already qualifies for self-consent (adult,
             >= `MIN_SELF_CONSENT_AGE`); `guardian_institution` when the minor

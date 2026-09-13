@@ -17,7 +17,7 @@ import { Router } from '@angular/router';
 import { VarkAssessment } from '../assessment/vark-assessment';
 import { StudentProfileView } from '../profile/student-profile-view';
 import { StudentForm } from '../../shared/ui/student-form/student-form';
-import { GuardianEdge, GuardianSearchHit, Observation, PendingAccount, Recommendation, Student } from '../../core/api/types';
+import { GuardianEdge, GuardianSearchHit, Observation, Recommendation, Student, StudentAccount } from '../../core/api/types';
 import { AuthService } from '../../core/auth/auth.service';
 import { StudentsService } from '../../core/students/students.service';
 import { OBSERVATION_CATEGORY_LABELS } from '../../core/observations/observation-labels';
@@ -89,14 +89,17 @@ export class StudentWorkspace {
 
   readonly guardianState = signal<SectionState>({ status: 'loading' });
   readonly guardians = signal<GuardianEdge[]>([]);
-  readonly guardianSearch = signal('');
-  readonly guardianSearchResults = signal<GuardianSearchHit[]>([]);
-  readonly guardianSearching = signal(false);
   readonly guardianBusy = signal<string | null>(null);
   readonly guardianResultsError = signal<string | null>(null);
 
-  readonly pendingState = signal<SectionState>({ status: 'loading' });
-  readonly pendingAccounts = signal<PendingAccount[]>([]);
+  // Catalog of every registered guardian account; filtered client-side by the
+  // educator (name or email) so assigning a responsable is one click away.
+  readonly guardianCatalogState = signal<SectionState>({ status: 'loading' });
+  readonly guardianCatalog = signal<GuardianSearchHit[]>([]);
+  readonly guardianFilter = signal('');
+
+  readonly studentAccountState = signal<SectionState>({ status: 'loading' });
+  readonly studentAccounts = signal<StudentAccount[]>([]);
   readonly linkBusy = signal<string | null>(null);
   readonly linkError = signal<string | null>(null);
 
@@ -106,11 +109,32 @@ export class StudentWorkspace {
     return s.status === 'error' ? s.message : null;
   });
 
-  readonly pendingLoading = computed(() => this.pendingState().status === 'loading');
-  readonly pendingErrorMessage = computed(() => {
-    const s = this.pendingState();
+  readonly guardianCatalogLoading = computed(() => this.guardianCatalogState().status === 'loading');
+  readonly guardianCatalogErrorMessage = computed(() => {
+    const s = this.guardianCatalogState();
     return s.status === 'error' ? s.message : null;
   });
+
+  readonly filteredGuardians = computed(() => {
+    const q = this.guardianFilter().trim().toLowerCase();
+    const all = this.guardianCatalog();
+    if (!q) {
+      return all;
+    }
+    return all.filter((g) => g.name.toLowerCase().includes(q) || g.email.toLowerCase().includes(q));
+  });
+
+  readonly studentAccountLoading = computed(() => this.studentAccountState().status === 'loading');
+  readonly studentAccountErrorMessage = computed(() => {
+    const s = this.studentAccountState();
+    return s.status === 'error' ? s.message : null;
+  });
+
+  // Accounts that can still be linked to a ficha (pending, no profile attributed).
+  readonly availableAccounts = computed(() => this.studentAccounts().filter((a) => a.available));
+
+  // Accounts that already own a student profile — they can never be used again.
+  readonly unavailableAccounts = computed(() => this.studentAccounts().filter((a) => !a.available));
 
   readonly obsState = signal<SectionState>({ status: 'loading' });
   readonly obsList = signal<ObservationModel[]>([]);
@@ -163,7 +187,8 @@ export class StudentWorkspace {
     this.loadRecommendations(id);
     if (this.isAccessManager()) {
       this.loadGuardians(id);
-      this.loadPendingAccounts();
+      this.loadGuardianCatalog();
+      this.loadStudentAccounts();
     }
   }
 
@@ -204,47 +229,38 @@ export class StudentWorkspace {
     });
   }
 
-  private loadPendingAccounts(): void {
-    this.pendingState.set({ status: 'loading' });
-    this.auth.pendingAccounts().subscribe({
+  // Catalog of every registered guardian; the client-side filter keeps the
+  // list current without a round-trip per keystroke.
+  private loadGuardianCatalog(): void {
+    this.guardianCatalogState.set({ status: 'loading' });
+    this.students.searchGuardians('').subscribe({
       next: (res) => {
-        this.pendingAccounts.set(res.data);
-        this.pendingState.set({ status: 'ready' });
+        this.guardianCatalog.set(res.data);
+        this.guardianCatalogState.set({ status: 'ready' });
       },
       error: () =>
-        this.pendingState.set({ status: 'error', message: 'Não foi possível carregar as contas pendentes.' }),
+        this.guardianCatalogState.set({ status: 'error', message: 'Não foi possível carregar os responsáveis cadastrados.' }),
     });
   }
 
-  onGuardianSearchInput(value: string): void {
-    this.guardianSearch.set(value);
-    if (value.trim().length < 3) {
-      this.guardianSearchResults.set([]);
-    }
+  private loadStudentAccounts(): void {
+    this.studentAccountState.set({ status: 'loading' });
+    this.auth.studentAccounts().subscribe({
+      next: (res) => {
+        this.studentAccounts.set(res.data);
+        this.studentAccountState.set({ status: 'ready' });
+      },
+      error: () =>
+        this.studentAccountState.set({ status: 'error', message: 'Não foi possível carregar as contas de estudante.' }),
+    });
   }
 
   isGrantedFor(userId: string): boolean {
     return this.guardians().some((g) => g.userId === userId);
   }
 
-  searchGuardians(): void {
-    const id = this.studentId();
-    const email = this.guardianSearch().trim();
-    if (!id || email.length < 3 || this.guardianBusy() !== null || this.guardianSearching()) {
-      return;
-    }
-    this.guardianSearching.set(true);
-    this.guardianResultsError.set(null);
-    this.students.searchGuardians(email).subscribe({
-      next: (res) => {
-        this.guardianSearchResults.set(res.data);
-        this.guardianSearching.set(false);
-      },
-      error: () => {
-        this.guardianSearching.set(false);
-        this.guardianResultsError.set('Não foi possível buscar responsáveis.');
-      },
-    });
+  onGuardianFilterInput(value: string): void {
+    this.guardianFilter.set(value);
   }
 
   grantGuardian(userId: string): void {
@@ -256,8 +272,6 @@ export class StudentWorkspace {
     this.students.grantGuardian(id, userId).subscribe({
       next: () => {
         this.guardianBusy.set(null);
-        this.guardianSearch.set('');
-        this.guardianSearchResults.set([]);
         this.loadGuardians(id);
       },
       error: () => {
@@ -297,7 +311,7 @@ export class StudentWorkspace {
         this.students.getStudent(id).subscribe({
           next: (res) => this.student.set(res.student),
         });
-        this.loadPendingAccounts();
+        this.loadStudentAccounts();
       },
       error: () => {
         this.linkBusy.set(null);

@@ -46,17 +46,20 @@ export interface MeResponse {
 
 export type ConsentRequired = 'self' | 'guardian_institution';
 
-export interface PendingAccount {
+export interface StudentAccount {
   userId: string;
   name: string;
   email: string;
   birthDate: string;
   createdAt: string;
   consentRequired: ConsentRequired;
+  status: 'pending' | 'active';
+  available: boolean;
+  linkedStudentId: string | null;
 }
 
-export interface PendingAccountsResponse {
-  data: PendingAccount[];
+export interface StudentAccountsResponse {
+  data: StudentAccount[];
   count: number;
 }
 

@@ -145,11 +145,11 @@ Resources:
             RestApiId: !Ref Api
             Path: /auth/me
             Method: GET
-        PendingAccounts:
+        StudentAccounts:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /auth/pending-accounts
+            Path: /auth/student-accounts
             Method: GET
 
   StudentsFunction:

@@ -6,10 +6,10 @@ import {
   LoginRequest,
   LoginResponse,
   MeResponse,
-  PendingAccountsResponse,
   PublicUser,
   RegisterRequest,
   RegisterResponse,
+  StudentAccountsResponse,
 } from '../api/types';
 
 const TOKEN_KEY = 'lp_auth_token';
@@ -43,8 +43,8 @@ export class AuthService {
     return this.http.post<RegisterResponse>('/api/auth/register', payload);
   }
 
-  pendingAccounts() {
-    return this.http.get<PendingAccountsResponse>('/api/auth/pending-accounts');
+  studentAccounts() {
+    return this.http.get<StudentAccountsResponse>('/api/auth/student-accounts');
   }
 
   me() {

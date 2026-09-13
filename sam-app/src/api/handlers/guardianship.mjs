@@ -205,13 +205,13 @@ const listEducators = async (event, ctx) => {
 
 const searchGuardians = async (event, ctx) => {
   if (!["educator", "admin"].includes(ctx.role)) {
-    throw new HttpError(403, "forbidden", "Only educators and admins can search guardian accounts");
+    throw new HttpError(403, "forbidden", "Only educators and admins can list guardian accounts");
   }
-  assert(qparam(event, "role") === "guardian", "invalid_role", "role must be guardian");
   const email = (qparam(event, "email") || "").trim().toLowerCase();
-  assert(email.length >= 3, "invalid_email", "email prefix must have at least 3 characters");
-  // GSI2 groups every guardian; match the email prefix in-memory. Only active
-  // guardians can receive guardianship — pending/denied accounts are excluded.
+  // GSI2 groups every guardian; the email prefix narrows the in-memory match.
+  // Omitting `email` lists every active guardian account (name/email filter is
+  // then done client-side). Only active guardians can receive guardianship —
+  // pending/denied accounts are excluded.
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,

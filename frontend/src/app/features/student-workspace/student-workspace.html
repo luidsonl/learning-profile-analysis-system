@@ -262,49 +262,54 @@
                   <p class="error">{{ message }}</p>
                 }
 
-                <form class="inline-form" (ngSubmit)="searchGuardians()">
+                <form class="inline-form">
                   <mat-form-field appearance="outline" class="grow">
-                    <mat-label>Buscar responsável por e-mail</mat-label>
-                    <input matInput [value]="guardianSearch()" (input)="onGuardianSearchInput($any($event.target).value)" autocomplete="off" />
+                    <mat-label>Filtrar responsáveis cadastrados</mat-label>
+                    <input
+                      matInput
+                      [value]="guardianFilter()"
+                      (input)="onGuardianFilterInput($any($event.target).value)"
+                      autocomplete="off"
+                    />
+                    <mat-icon matPrefix>search</mat-icon>
                   </mat-form-field>
-                  <button
-                    mat-flat-button
-                    color="primary"
-                    [disabled]="guardianBusy() !== null || guardianSearch().trim().length < 3"
-                    type="submit"
-                  >
-                    <span>Buscar</span>
-                    @if (guardianSearching()) {
-                      <mat-spinner diameter="20" />
-                    } @else {
-                      <mat-icon>search</mat-icon>
-                    }
-                  </button>
                 </form>
 
-                @if (guardianSearchResults().length > 0) {
-                  <div class="feed">
-                    @for (hit of guardianSearchResults(); track hit.userId) {
-                      <div class="feed-item feed-heading">
-                        <div>
-                          <h3>{{ hit.name }}</h3>
-                          <p>{{ hit.email }}</p>
-                        </div>
-                        <button
-                          mat-stroked-button
-                          [disabled]="guardianBusy() !== null || isGrantedFor(hit.userId)"
-                          (click)="grantGuardian(hit.userId)"
-                        >
-                          @if (guardianBusy() === hit.userId) {
-                            <mat-spinner diameter="20" />
+                <div class="feed">
+                  @if (guardianCatalogLoading()) {
+                    <div class="state-content"><mat-spinner diameter="32" /></div>
+                  } @else if (guardianCatalogErrorMessage(); as message) {
+                    <p class="error">{{ message }}</p>
+                  } @else {
+                    @if (filteredGuardians().length === 0) {
+                      <p class="empty">Nenhum responsável cadastrado nesse filtro.</p>
+                    } @else {
+                      @for (hit of filteredGuardians(); track hit.userId) {
+                        <div class="feed-item feed-heading">
+                          <div>
+                            <h3>{{ hit.name }}</h3>
+                            <p>{{ hit.email }}</p>
+                          </div>
+                          @if (isGrantedFor(hit.userId)) {
+                            <span class="assigned-label">Atribuído</span>
                           } @else {
-                            Atribuir
+                            <button
+                              mat-stroked-button
+                              [disabled]="guardianBusy() !== null"
+                              (click)="grantGuardian(hit.userId)"
+                            >
+                              @if (guardianBusy() === hit.userId) {
+                                <mat-spinner diameter="20" />
+                              } @else {
+                                Atribuir
+                              }
+                            </button>
                           }
-                        </button>
-                      </div>
+                        </div>
+                      }
                     }
-                  </div>
-                }
+                  }
+                </div>
 
                 <div class="feed">
                   @if (guardiansLoading()) {
@@ -368,16 +373,17 @@
                     <p class="error">{{ message }}</p>
                   }
 
+                  <h3 class="subsection-title">Contas disponíveis para vincular</h3>
                   <div class="feed">
-                    @if (pendingLoading()) {
+                    @if (studentAccountLoading()) {
                       <div class="state-content"><mat-spinner diameter="32" /></div>
-                    } @else if (pendingErrorMessage(); as message) {
+                    } @else if (studentAccountErrorMessage(); as message) {
                       <p class="error">{{ message }}</p>
                     } @else {
-                      @if (pendingAccounts().length === 0) {
+                      @if (availableAccounts().length === 0 && unavailableAccounts().length === 0) {
                         <p class="empty">Nenhuma conta de estudante aguardando vinculação.</p>
                       } @else {
-                        @for (account of pendingAccounts(); track account.userId) {
+                        @for (account of availableAccounts(); track account.userId) {
                           <div class="feed-item feed-heading">
                             <div>
                               <h3>{{ account.name }}</h3>
@@ -404,9 +410,27 @@
                             </button>
                           </div>
                         }
+                        @if (availableAccounts().length === 0) {
+                          <p class="empty">Nenhuma conta disponível para vincular.</p>
+                        }
                       }
                     }
                   </div>
+
+                  @if (unavailableAccounts().length > 0) {
+                    <h3 class="subsection-title">Contas com perfil já atribuído</h3>
+                    <div class="feed">
+                      @for (account of unavailableAccounts(); track account.userId) {
+                        <div class="feed-item feed-heading muted">
+                          <div>
+                            <h3>{{ account.name }}</h3>
+                            <p>{{ account.email }}</p>
+                          </div>
+                          <span class="assigned-label">Já vinculada — não pode ser usada</span>
+                        </div>
+                      }
+                    </div>
+                  }
                 }
               </mat-card-content>
             </mat-card>

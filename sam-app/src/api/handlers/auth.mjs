@@ -7,7 +7,7 @@ import { requireAuth } from "../lib/session.mjs";
 import { writeAudit, getOwnStudentId } from "../lib/scope.mjs";
 import { computeAge, MIN_SELF_CONSENT_AGE } from "../lib/age.mjs";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
-import { selectPendingAccounts } from "../lib/accounts.mjs";
+import { selectStudentAccounts } from "../lib/accounts.mjs";
 
 // True if at least one admin account exists (GSI2 `RoleStatus`).
 const hasAdmin = async () => {
@@ -209,12 +209,15 @@ const me = async (event, ctx) => {
   return ok(payload);
 };
 
-const pendingAccounts = async (event, ctx) => {
+const studentAccounts = async (event, ctx) => {
   if (!["educator", "admin"].includes(ctx.role)) {
-    throw new HttpError(403, "forbidden", "Only educators and admins can list pending student accounts");
+    throw new HttpError(403, "forbidden", "Only educators and admins can list student accounts");
   }
-  // All student accounts live under GSI2 (USER#ROLE#student); the pending ones
-  // are the self-registered accounts not yet linked by an educator.
+  // All student accounts live under GSI2 (USER#ROLE#student). The catalog
+  // covers both the still-available self-registered accounts (`pending` ->
+  // `available: true`) and the ones already linked to a ficha (`active` ->
+  // `available: false`, owns a `linkedStudentId`) — the UI must show those as
+  // unusable for the link flow.
   const res = await client.send(
     new CMD.query({
       TableName: TABLE,
@@ -223,10 +226,13 @@ const pendingAccounts = async (event, ctx) => {
       ExpressionAttributeValues: { ":pk": { S: "USER#ROLE#student" } },
     }),
   );
-  const data = selectPendingAccounts(
-    (res.Items || []).map((item) => unmarshall(item)),
-    MIN_SELF_CONSENT_AGE,
-  );
+  const items = (res.Items || []).map((item) => unmarshall(item));
+  for (const u of items) {
+    if (u.status === "active") {
+      u.linkedStudentId = await getOwnStudentId(u.userId);
+    }
+  }
+  const data = selectStudentAccounts(items, MIN_SELF_CONSENT_AGE);
   return ok({ data, count: data.length });
 };
 
@@ -246,8 +252,8 @@ export const lambdaHandler = async (event) => {
         return await logout(event, ctx);
       case "GET /auth/me":
         return await me(event, ctx);
-      case "GET /auth/pending-accounts":
-        return await pendingAccounts(event, ctx);
+      case "GET /auth/student-accounts":
+        return await studentAccounts(event, ctx);
       default:
         throw new HttpError(404, "not_found", "Route not found");
     }

@@ -73,22 +73,22 @@ export default async (ctx) => {
     expect("student registers for no-consent student", noConsentReg.status === 201, JSON.stringify(noConsentReg.data));
 
     // Both self-registered accounts are now pending and discoverable for the link flow.
-    const pendingBefore = await api("GET", "/auth/pending-accounts", { token: ctx.educatorToken });
+    const catalogBefore = await api("GET", "/auth/student-accounts", { token: ctx.educatorToken });
     expect(
-      "educator lists pending student accounts",
-      pendingBefore.status === 200 &&
-        pendingBefore.data.count === 2 &&
-        pendingBefore.data.data.some((a) => a.userId === ctx.studentAccountUserId) &&
-        pendingBefore.data.data.some((a) => a.userId === noConsentReg.data.user.userId),
-      JSON.stringify(pendingBefore.data),
+      "educator lists pending student accounts (available)",
+      catalogBefore.status === 200 &&
+        catalogBefore.data.count === 2 &&
+        catalogBefore.data.data.some((a) => a.userId === ctx.studentAccountUserId && a.available === true) &&
+        catalogBefore.data.data.some((a) => a.userId === noConsentReg.data.user.userId && a.available === true),
+      JSON.stringify(catalogBefore.data),
     );
     expect(
       "minors flag guardian_institution consent on pending accounts",
-      pendingBefore.data.data.every((a) => a.consentRequired === "guardian_institution"),
-      JSON.stringify(pendingBefore.data),
+      catalogBefore.data.data.every((a) => a.consentRequired === "guardian_institution"),
+      JSON.stringify(catalogBefore.data),
     );
-    const deniedPending = await api("GET", "/auth/pending-accounts", { token: ctx.guardianToken });
-    expect("guardian cannot list pending accounts", deniedPending.status === 403, JSON.stringify(deniedPending.data));
+    const deniedCatalog = await api("GET", "/auth/student-accounts", { token: ctx.guardianToken });
+    expect("guardian cannot list student accounts", deniedCatalog.status === 403, JSON.stringify(deniedCatalog.data));
 
     const sFail = await api("POST", `/students/${ctx.noConsentChildId}/accounts/${noConsentReg.data.user.userId}/link`, { token: ctx.educatorToken, body: {} });
     expect("link blocked without consent (minor)", sFail.status === 409 && sFail.data.error.code === "consent_required", JSON.stringify(sFail.data));
@@ -104,17 +104,17 @@ export default async (ctx) => {
     const s2 = await api("POST", `/students/${ctx.studentId}/accounts/${dupReg.data.user.userId}/link`, { token: ctx.educatorToken, body: {} });
     expect("at-most-one account per entity enforced", s2.status === 409, JSON.stringify(s2.data));
 
-    // The linked account left the pending pool; the no-consent and the
-    // duplicate (never-linked) registrations remain.
-    const pendingAfter = await api("GET", "/auth/pending-accounts", { token: ctx.educatorToken });
+    // The linked account stays in the catalog but is no longer available: it now
+    // owns Ana Clara's profile, so the UI must show it as already-attributed.
+    const catalogAfter = await api("GET", "/auth/student-accounts", { token: ctx.educatorToken });
     expect(
-      "linked account dropped from pending list",
-      pendingAfter.status === 200 &&
-        pendingAfter.data.count === 2 &&
-        !pendingAfter.data.data.some((a) => a.userId === ctx.studentAccountUserId) &&
-        pendingAfter.data.data.some((a) => a.userId === noConsentReg.data.user.userId) &&
-        pendingAfter.data.data.some((a) => a.userId === dupReg.data.user.userId),
-      JSON.stringify(pendingAfter.data),
+      "linked account marked unavailable with its studentId",
+      catalogAfter.status === 200 &&
+        catalogAfter.data.count === 3 &&
+        catalogAfter.data.data.some((a) => a.userId === ctx.studentAccountUserId && a.available === false && a.linkedStudentId === ctx.studentId) &&
+        catalogAfter.data.data.some((a) => a.userId === noConsentReg.data.user.userId && a.available === true) &&
+        catalogAfter.data.data.some((a) => a.userId === dupReg.data.user.userId && a.available === true),
+      JSON.stringify(catalogAfter.data),
     );
   }
 
