@@ -29,14 +29,15 @@ import { VARK_LABELS, VARK_DESCRIPTIONS } from '../../core/vark/vark-labels';
 })
 export class VarkAssessment {
   // Optional route param (educator/guardian acting for a student); falls back
-  // to the own studentId for a linked student's self-assessment.
-  readonly routeStudentId = input<string>();
+  // to the own studentId for a linked student's self-assessment. The input name
+  // must match the route param so withComponentInputBinding binds it.
+  readonly studentId = input<string>();
 
   private readonly forms = inject(FormsService);
   private readonly auth = inject(AuthService);
   readonly polling = inject(PredictionPollingService);
 
-  readonly scopeStudentId = computed(() => this.routeStudentId() ?? this.auth.studentId() ?? undefined);
+  readonly scopeStudentId = computed(() => this.studentId() ?? this.auth.studentId() ?? undefined);
 
   readonly form = toSignal(this.forms.getForm('vark'), { initialValue: undefined });
 

@@ -44,6 +44,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/student-create/student-create').then((m) => m.StudentCreate),
   },
   {
+    path: 'estudantes/:studentId/editar',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/student-edit/student-edit').then((m) => m.StudentEdit),
+  },
+  {
     path: 'estudantes/:studentId',
     canActivate: [authGuard],
     loadComponent: () => import('./features/student-workspace/student-workspace').then((m) => m.StudentWorkspace),

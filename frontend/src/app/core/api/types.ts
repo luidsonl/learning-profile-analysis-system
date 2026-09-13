@@ -224,6 +224,11 @@ export interface StudentCreateResponse {
 
 export interface StudentUpdateRequest {
   name?: string;
+  birthDate?: string;
+  gender?: string;
+  grade?: string;
+  school?: string;
+  specialNeeds?: string[];
 }
 
 export interface StudentUpdateResponse {

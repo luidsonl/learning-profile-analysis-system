@@ -24,7 +24,7 @@ describe('StudentProfile', () => {
     });
     await TestBed.configureTestingModule({ imports: [StudentProfile] }).compileComponents();
     fixture = TestBed.createComponent(StudentProfile);
-    fixture.componentRef.setInput('routeStudentId', 's9');
+    fixture.componentRef.setInput('studentId', 's9');
     fixture.detectChanges();
   });
 

@@ -29,19 +29,29 @@ const recommendation = {
 
 const proposeSpy = vi.fn(() => of({ studentId: 's1', recoId: 'r2' }));
 const updateSpy = vi.fn(() => of({ studentId: 's1', recoId: 'r1' }));
+const grantSpy = vi.fn(() => of({}));
+const revokeSpy = vi.fn(() => of({}));
+const linkSpy = vi.fn(() => of({}));
+const searchSpy = vi.fn(() => of({ data: [{ userId: 'gu2', name: 'João Souza', email: 'joao@example.com' }], count: 1 }));
 
 const studentsStub = {
-  getStudent: () => of({ student: { studentId: 's1', name: 'Ana Lima', grade: '6º ano', status: 'active' } }),
+  getStudent: () => of({ student: { studentId: 's1', name: 'Ana Lima', grade: '6º ano', status: 'active', createdBy: 'u1', createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' } }),
   observations: () => of({ data: [observation], count: 1 }),
   recommendations: () => of({ data: [recommendation], count: 1 }),
   addObservation: () => of({}),
   deleteObservation: () => of({}),
   proposeRecommendation: proposeSpy,
   updateRecommendation: updateSpy,
+  guardians: () => of({ data: [{ userId: 'gu1', name: 'Maria da Silva', email: 'maria@example.com', relation: 'guardian', grantedAt: '2026-08-01T00:00:00Z' }] }),
+  searchGuardians: searchSpy,
+  grantGuardian: grantSpy,
+  revokeGuardian: revokeSpy,
+  linkStudentAccount: linkSpy,
 };
 
 const authStub = {
-  user: () => ({ userId: 'u1' }),
+  user: () => ({ userId: 'u1', role: 'educator' }),
+  pendingAccounts: () => of({ data: [{ userId: 'sid1', name: 'Pedro Alves', email: 'pedro@example.com', birthDate: '2011-09-30', createdAt: '2026-08-01T00:00:00Z', consentRequired: 'guardian_institution' }], count: 1 }),
 };
 
 describe('StudentWorkspace', () => {
@@ -81,5 +91,38 @@ describe('StudentWorkspace', () => {
   it('can approve a proposed recommendation', () => {
     fixture.componentInstance.updateRecommendation('r1', { status: 'approved' });
     expect(updateSpy).toHaveBeenCalledWith('s1', 'r1', { status: 'approved' });
+  });
+
+  it('renders the responsable management panel for an educator', () => {
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Responsáveis');
+    expect(text).toContain('Maria da Silva');
+  });
+
+  it('renders the account-link panel with pending student accounts', () => {
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Conta de acesso');
+    expect(text).toContain('Pedro Alves');
+  });
+
+  it('grants a responsable to the student', () => {
+    fixture.componentInstance.grantGuardian('gu2');
+    expect(grantSpy).toHaveBeenCalledWith('s1', 'gu2');
+  });
+
+  it('revokes a responsable from the student', () => {
+    fixture.componentInstance.revokeGuardian('gu1');
+    expect(revokeSpy).toHaveBeenCalledWith('s1', 'gu1');
+  });
+
+  it('links a pending student account', () => {
+    fixture.componentInstance.linkStudentAccount('sid1');
+    expect(linkSpy).toHaveBeenCalledWith('s1', 'sid1');
+  });
+
+  it('searches responsables by email', () => {
+    fixture.componentInstance.guardianSearch.set('maria@example.com');
+    fixture.componentInstance.searchGuardians();
+    expect(searchSpy).toHaveBeenCalledWith('maria@example.com');
   });
 });
