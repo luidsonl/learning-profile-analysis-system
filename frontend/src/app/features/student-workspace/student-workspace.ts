@@ -10,8 +10,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { Router } from '@angular/router';
 
+import { VarkAssessment } from '../assessment/vark-assessment';
+import { StudentProfileView } from '../profile/student-profile-view';
+import { StudentForm } from '../../shared/ui/student-form/student-form';
 import { GuardianEdge, GuardianSearchHit, Observation, PendingAccount, Recommendation, Student } from '../../core/api/types';
 import { AuthService } from '../../core/auth/auth.service';
 import { StudentsService } from '../../core/students/students.service';
@@ -26,6 +31,9 @@ type SectionState =
 type ObservationModel = Observation & { deletable: boolean };
 type RecommendationModel = Recommendation & { mutable: boolean };
 
+// Centralized student ficha: every management action lives in tabs on this one
+// page — data + removal, VARK profile, assessment, observations,
+// recommendations and access (responsables + linked account).
 @Component({
   selector: 'app-student-workspace',
   imports: [
@@ -35,6 +43,7 @@ type RecommendationModel = Recommendation & { mutable: boolean };
     MatInputModule,
     MatSelectModule,
     MatListModule,
+    MatTabsModule,
     DatePipe,
     KeyValuePipe,
     MatButtonModule,
@@ -42,16 +51,22 @@ type RecommendationModel = Recommendation & { mutable: boolean };
     MatChipsModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    StudentForm,
+    StudentProfileView,
+    VarkAssessment,
   ],
   templateUrl: './student-workspace.html',
   styleUrl: './student-workspace.scss',
 })
 export class StudentWorkspace {
-  readonly studentId = input<string>();
+  readonly studentId = input.required<string>();
 
   private readonly auth = inject(AuthService);
   private readonly students = inject(StudentsService);
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
+
+  readonly selectedTabIndex = signal(0);
 
   readonly annotations = computed(() => ({
     observations: OBSERVATION_CATEGORY_LABELS,
@@ -67,6 +82,10 @@ export class StudentWorkspace {
     const role = this.auth.user()?.role;
     return role === 'educator' || role === 'admin';
   });
+
+  readonly confirmDelete = signal(false);
+  readonly deleteBusy = signal(false);
+  readonly deleteError = signal<string | null>(null);
 
   readonly guardianState = signal<SectionState>({ status: 'loading' });
   readonly guardians = signal<GuardianEdge[]>([]);
@@ -146,6 +165,32 @@ export class StudentWorkspace {
       this.loadGuardians(id);
       this.loadPendingAccounts();
     }
+  }
+
+  askDelete(): void {
+    this.confirmDelete.set(true);
+    this.deleteError.set(null);
+  }
+
+  cancelDelete(): void {
+    this.confirmDelete.set(false);
+    this.deleteError.set(null);
+  }
+
+  deleteStudent(): void {
+    const id = this.studentId();
+    if (!id || this.deleteBusy()) {
+      return;
+    }
+    this.deleteBusy.set(true);
+    this.deleteError.set(null);
+    this.students.deleteStudent(id).subscribe({
+      next: () => void this.router.navigate(['/estudantes']).catch(() => undefined),
+      error: () => {
+        this.deleteBusy.set(false);
+        this.deleteError.set('Não foi possível remover o estudante.');
+      },
+    });
   }
 
   private loadGuardians(id: string): void {

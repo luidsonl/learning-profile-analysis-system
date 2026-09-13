@@ -33,11 +33,14 @@ const grantSpy = vi.fn(() => of({}));
 const revokeSpy = vi.fn(() => of({}));
 const linkSpy = vi.fn(() => of({}));
 const searchSpy = vi.fn(() => of({ data: [{ userId: 'gu2', name: 'João Souza', email: 'joao@example.com' }], count: 1 }));
+const deleteSpy = vi.fn(() => of(undefined));
 
 const studentsStub = {
   getStudent: () => of({ student: { studentId: 's1', name: 'Ana Lima', grade: '6º ano', status: 'active', createdBy: 'u1', createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' } }),
   observations: () => of({ data: [observation], count: 1 }),
   recommendations: () => of({ data: [recommendation], count: 1 }),
+  assessments: () => of({ data: [], count: 0 }),
+  predictions: () => of({ data: [], count: 0 }),
   addObservation: () => of({}),
   deleteObservation: () => of({}),
   proposeRecommendation: proposeSpy,
@@ -47,12 +50,21 @@ const studentsStub = {
   grantGuardian: grantSpy,
   revokeGuardian: revokeSpy,
   linkStudentAccount: linkSpy,
+  deleteStudent: deleteSpy,
 };
 
 const authStub = {
   user: () => ({ userId: 'u1', role: 'educator' }),
   pendingAccounts: () => of({ data: [{ userId: 'sid1', name: 'Pedro Alves', email: 'pedro@example.com', birthDate: '2011-09-30', createdAt: '2026-08-01T00:00:00Z', consentRequired: 'guardian_institution' }], count: 1 }),
 };
+
+// Tab order for an access manager (educator/admin): 0 Dados, 1 Perfil,
+// 2 Avaliação, 3 Observações, 4 Recomendações, 5 Acessos. Tab content is lazy,
+// so text assertions must select the tab first.
+function selectTab(fixture: ComponentFixture<StudentWorkspace>, index: number): void {
+  fixture.componentInstance.selectedTabIndex.set(index);
+  fixture.detectChanges();
+}
 
 describe('StudentWorkspace', () => {
   let fixture: ComponentFixture<StudentWorkspace>;
@@ -71,12 +83,28 @@ describe('StudentWorkspace', () => {
     fixture.detectChanges();
   });
 
+  it('renders the data tab with a remove action for an educator', () => {
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Dados do estudante');
+    expect(text).toContain('Remover estudante');
+  });
+
+  it('removes the student from the data tab', () => {
+    fixture.componentInstance.askDelete();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Excluir permanentemente');
+    fixture.componentInstance.deleteStudent();
+    expect(deleteSpy).toHaveBeenCalledWith('s1');
+  });
+
   it('renders observations for the student', () => {
+    selectTab(fixture, 3);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Foco mantido em leitura.');
   });
 
   it('renders proposed recommendations with a propose form', () => {
+    selectTab(fixture, 4);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Leitura em voz alta');
     expect(text).toContain('Proposta');
@@ -94,12 +122,14 @@ describe('StudentWorkspace', () => {
   });
 
   it('renders the responsable management panel for an educator', () => {
+    selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Responsáveis');
     expect(text).toContain('Maria da Silva');
   });
 
   it('renders the account-link panel with pending student accounts', () => {
+    selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Conta de acesso');
     expect(text).toContain('Pedro Alves');
@@ -122,6 +152,7 @@ describe('StudentWorkspace', () => {
       });
     fixture.componentRef.setInput('studentId', 's2');
     fixture.detectChanges();
+    selectTab(fixture, 5);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('pedro@example.com');
     expect(text).toContain('conta de acesso vinculada');

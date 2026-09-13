@@ -13,9 +13,13 @@
   color: var(--sys-on-surface-variant);
 }
 
-.panels {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+.tabs {
+  margin-block-start: var(--space-2);
+}
+
+.tab-stack {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 
@@ -23,6 +27,28 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.danger-zone {
+  border-color: var(--sys-error);
+}
+
+.danger-zone mat-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.danger-text {
+  margin: 0;
+}
+
+.danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .inline-form {

@@ -39,6 +39,10 @@ export class StudentsService {
     return this.http.patch<StudentUpdateResponse>(`/api/students/${id}`, body);
   }
 
+  deleteStudent(id: string) {
+    return this.http.delete<void>(`/api/students/${id}`);
+  }
+
   linkStudentAccount(id: string, userId: string) {
     return this.http.post<never>(`/api/students/${id}/accounts/${userId}/link`, {});
   }

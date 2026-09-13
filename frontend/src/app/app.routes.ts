@@ -24,11 +24,6 @@ export const routes: Routes = [
     loadComponent: () => import('./features/profile/meu-perfil').then((m) => m.MeuPerfil),
   },
   {
-    path: 'perfil/:studentId',
-    canActivate: [authGuard],
-    loadComponent: () => import('./features/profile/student-profile').then((m) => m.StudentProfile),
-  },
-  {
     path: 'admin',
     canActivate: [authGuard, adminOrEducatorGuard],
     loadComponent: () => import('./features/admin/admin-area').then((m) => m.AdminArea),
@@ -42,11 +37,6 @@ export const routes: Routes = [
     path: 'estudantes/novo',
     canActivate: [authGuard],
     loadComponent: () => import('./features/student-create/student-create').then((m) => m.StudentCreate),
-  },
-  {
-    path: 'estudantes/:studentId/editar',
-    canActivate: [authGuard],
-    loadComponent: () => import('./features/student-edit/student-edit').then((m) => m.StudentEdit),
   },
   {
     path: 'estudantes/:studentId',

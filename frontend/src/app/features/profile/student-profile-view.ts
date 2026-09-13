@@ -22,7 +22,8 @@ type ProfileState =
 
 // Presentational student profile: VARK info, scores, assessments and
 // predictions for one student. Used by "Meu perfil" (own, linked account) and
-// by the routed /perfil/:studentId page (an educator/guardian acting on behalf).
+// as the "Perfil de aprendizagem" tab of the student ficha (educator/guardian
+// acting on behalf).
 @Component({
   selector: 'app-student-profile-view',
   imports: [
