@@ -4,7 +4,7 @@ title: Backend
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-09-13
+lastReviewed: 2026-09-26
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -20,7 +20,7 @@ requiredBy:
 
 ## Conventions
 
-- **Base path**: everything is prefixed `/api` (e.g. `POST /api/auth/login`). CloudFront routes `/*` → SPA (when reintroduced), `/api/*` → API Gateway.
+- **Base path**: everything is prefixed `/api` (e.g. `POST /api/auth/login`). CloudFront routes `/*` → the SPA, `/api/*` → API Gateway.
 - **Auth**: `Authorization: Bearer <token>` on all authenticated routes (see [Authentication](./auth.md)).
 - **Responses**: `200/201` JSON body for data; empty `204` for deletes.
 - **Errors**: uniform envelope
@@ -49,6 +49,8 @@ requiredBy:
 | `POST /api/auth/login` | public | Issue session token | `SESSION#` (GSI1 lookup) |
 | `POST /api/auth/logout` | any | Revoke current session | delete `SESSION#` |
 | `GET /api/auth/me` | any | Current user + role + scoped student count | `USER#<id>/META` |
+| `GET /api/auth/student-accounts` | educator, admin | **Link catalog**: every `student` account with `status` + `available` + `linkedStudentId` (pending → `available: true`; linked → `active` + `available: false`, unusable). Accounts carry no age/consent data — the entity's ficha decides the consent gate | Query `GSI2 RoleStatus` on `USER#ROLE#student` |
+| `GET /api/users?email=` | educator, admin | **Guardian catalog**: every active guardian identity (`userId`, `name`, `email`), optional case-insensitive email-prefix filter; without it the full catalog is returned and further filtering is client-side. Used to pick the `userId` for `POST /students/:id/guardians` | Query `GSI2 RoleStatus` on `USER#ROLE#guardian` |
 
 ### Students & guardianship
 | Method & Path | Roles | Description | Schema items |

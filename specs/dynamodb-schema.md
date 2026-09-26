@@ -4,7 +4,7 @@ title: DynamoDB Schema
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-29
+lastReviewed: 2026-09-26
 dependsOn:
   - architecture
 requiredBy:
@@ -36,7 +36,7 @@ requiredBy:
 | Table name | `learning-profile` |
 | Key | `PK` (String, HASH) · `SK` (String, RANGE) |
 | GSI1 `Lookup` | `GSI1PK` (HASH) · `GSI1SK` (RANGE) — inverted lookups: session-by-token, report-by-id, and export/analytics partitions per form/profile/category |
-| GSI2 `RoleStatus` | `GSI2PK` (HASH) · `GSI2SK` (RANGE) — listing: users by role, forms by audience, models by status, students by status |
+| GSI2 `RoleStatus` | `GSI2PK` (HASH) · `GSI2SK` (RANGE) — listing: **users** by role and status (`GSI2PK = USER#ROLE#<role>`, `GSI2SK = USER#<userId>#<status>` — admin/educator catalogs, the `hasAdmin()` bootstrap check) and **active students** (`GSI2PK = STUDENT#STATUS#<status>`) |
 | TTL | `ttl` attribute — sessions (and report artifacts when retention applies) |
 | Encryption | AWS-owned KMS key (default) |
 
@@ -52,7 +52,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | PK | SK | Attributes |
 |----|----|-----------|
 | `USER#<userId>` | `META` | `userId`, `email` (normalized), `name`, `role` (`guardian|educator|student|admin`), `status` (`active|pending|denied`), `birthDate` (optional — age verification / LGPD), `age` (derived), `consentEligible` (age-based: `self_consent` allowed only if ≥ `MIN_SELF_CONSENT_AGE`), `createdAt`, `updatedAt` |
-| `USER#<userId>` | `META` | GSI2PK `ROLE#<role>`, GSI2SK `USER#<userId>#<status>` |
+| `USER#<userId>` | `META` | GSI2PK `USER#ROLE#<role>`, GSI2SK `USER#<userId>#<status>` |
 
 > **Approval flow**: registration writes `USER#ROLE#<role>` on GSI2. `hasAdmin()` (register bootstrap + delete/last-admin guards) scans `USER#ROLE#admin`; `admin` lists users by role/status via GSI2. Setting status `pending|active|denied` rewrites `GSI2PK`/`GSI2SK` atomically.
 
@@ -174,7 +174,7 @@ All GSI items carry `GSI1PK`/`GSI1SK` (or `GSI2PK`/`GSI2SK`) duplicate attribute
 | Own record (student self-view) | Query `USER#<s>`, SK `STUDENT#` |
 | Get student profile | Query `STUDENT#<c>` SK `META` |
 | List students by status (admin) | GSI2 Query `STUDENT#STATUS#<status>` |
-| List users by role (admin / educator) | GSI2 Query `ROLE#<role>` (educator restricted to guardian/student) |
+| List users by role (admin / educator) | GSI2 Query `USER#ROLE#<role>` (educator restricted to guardian/student) |
 | Check first-admin bootstrap / last-admin | GSI2 Query `USER#ROLE#admin` (count active) |
 | Submissions of a student (one form) | Query `STUDENT#<c>`, SK begins_with `SUBMISSION#<formId>#`, desc |
 | Submissions of a student (all forms) | Query `STUDENT#<c>`, SK begins_with `SUBMISSION#`, desc |
@@ -216,7 +216,7 @@ Uniqueness reservations (`EMAIL#`) use **conditional writes** inside the transac
 - A student's core record lives in one partition (`STUDENT#<studentId>`): guardians, educators, consent, submissions, recommendations, observations, reports. Assessments (`ASSESS#<studentId>`) and predictions (`PRED#<studentId>`) live in dedicated partitions so their `SK` can be a pure timestamp id without mixing entity kinds in one SK range; reads stay single-partition and ordered by timestamp.
 - Export partitions (`SUBMISSION#<formId>`, `ASSESS#vark`, `OBS#<category>`, `PRED#<model>`) live on **GSI1** so the nightly `feature-export` Lambda scans one hot GSI partition per form/profile instead of a full table scan.
 - No item approaches 400 KB: submissions store answers as a small JSON map; VARK form keeps ~15 Likert items.
-- High-frequency counters (e.g., "total submissions for retraining trigger") should be maintained as atomic `Add` on dedicated counter items dedicated counter items if needed — not scanned.
+- High-frequency counters (e.g., "total submissions for retraining trigger") should be maintained as atomic `Add` on dedicated counter items if needed — not scanned.
 
 ---
 

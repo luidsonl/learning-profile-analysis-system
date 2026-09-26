@@ -68,18 +68,18 @@ graph LR
 
 | Spec (`id`) | Status | Last reviewed | Depends on |
 |-------------|--------|---------------|------------|
-| [architecture.md](./architecture.md) (`architecture`) | stable | 2026-08-30 | — |
-| [dynamodb-schema.md](./dynamodb-schema.md) (`dynamodb-schema`) | stable | 2026-08-29 | `architecture` |
+| [architecture.md](./architecture.md) (`architecture`) | stable | 2026-09-26 | — |
+| [dynamodb-schema.md](./dynamodb-schema.md) (`dynamodb-schema`) | stable | 2026-09-26 | `architecture` |
 | [auth.md](./auth.md) (`auth`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema` |
-| [backend.md](./backend.md) (`backend`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `auth` |
+| [backend.md](./backend.md) (`backend`) | stable | 2026-09-26 | `architecture`, `dynamodb-schema`, `auth` |
 | [api.yaml](./api.yaml) (`api`) | stable | 2026-09-05 | `backend` |
-| [frontend.md](./frontend.md) (`frontend`) | proposed | 2026-09-10 | `architecture`, `auth`, `backend` |
-| [design-system.md](./design-system.md) (`design-system`) | proposed | 2026-09-10 | `architecture`, `frontend` |
-| [ml-pipeline.md](./ml-pipeline.md) (`ml-pipeline`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `backend` |
+| [frontend.md](./frontend.md) (`frontend`) | stable | 2026-09-26 | `architecture`, `auth`, `backend` |
+| [design-system.md](./design-system.md) (`design-system`) | evolving | 2026-09-26 | `architecture`, `frontend` |
+| [ml-pipeline.md](./ml-pipeline.md) (`ml-pipeline`) | stable | 2026-09-26 | `architecture`, `dynamodb-schema`, `backend` |
 | [lgpd.md](./lgpd.md) (`lgpd`) | stable | 2026-08-30 | `architecture`, `dynamodb-schema`, `auth`, `ml-pipeline` |
-| [security.md](./security.md) (`security`) | stable | 2026-08-30 | `architecture`, `auth`, `ml-pipeline`, `lgpd` |
+| [security.md](./security.md) (`security`) | stable | 2026-09-26 | `architecture`, `auth`, `ml-pipeline`, `lgpd` |
 | [student-data-features.md](./student-data-features.md) (`student-data-features`) | proposed | 2026-08-29 | `architecture`, `dynamodb-schema`, `ml-pipeline`, `lgpd` |
-| [progress.md](./progress.md) (`progress`) | evolving | 2026-08-30 | — (report) |
+| [progress.md](./progress.md) (`progress`) | evolving | 2026-09-26 | — (report) |
 
 ## Status Legend
 
@@ -95,7 +95,7 @@ graph LR
 These rules keep the set coherent for both human readers and AI agents. Treat them like lint for docs.
 
 1. **Single source of truth (SSOT / DRY).** Every cross-cutting fact lives in exactly **one** spec: resource names & flows → `architecture`; entities/GSIs/transactions → `dynamodb-schema`; roles/statuses/scope → `auth`; endpoints → `backend` (contract details → `api.yaml`); consent/retention → `lgpd`; dataset/model policy → `ml-pipeline`. Other specs **link, never duplicate**. If a fact appears in two specs it has no owner — pick one home and reference it.
-1. **Language.** Every spec, contract (`api.yaml`), code comment, commit message and doc is written in **English**. `pt-BR` appears **only** in end-user-facing UI copy and domain data (e.g. form question texts served by the forms engine) — never in specs, the OpenAPI contract, comments, or documentation files.
+1. **Language.** Every spec, contract (`api.yaml`), code comment, commit message and doc is written in **English**. `pt-BR` appears **only** in end-user-facing UI copy and domain data (e.g. form question texts served by the forms engine) and in the **root `README.md`**, which is the human-facing pt-BR overview of the project — never in specs, the OpenAPI contract, comments, or documentation files.
 2. **Frontmatter is the contract.** Every spec opens with a YAML block: `id` (matches filename), `title`, `type` (`spec`|`report`), `status`, `since`, `lastReviewed`, and the edges `dependsOn` / `requiredBy`. Edges must be **inverse-consistent**: `X.dependsOn` contains Y ⇔ `Y.requiredBy` contains X. The graph above is derived from these fields — a new spec must be added to this index *and* the Mermaid graph at the same time it is created.
 3. **Link first, explain after.** Cross-spec references use relative links (`./auth.md`). When a spec needs another's content, reference it and summarize only the essential context — never restate the source.
 4. **Read order is encoded, not implied.** `dependsOn` means "read these before this, they're prerequisites." Reviewers and agents follow the graph bottom-up; a change to a spec implicitly risks its `requiredBy` dependents.

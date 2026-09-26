@@ -4,7 +4,7 @@ title: Architecture
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-09-12
+lastReviewed: 2026-09-26
 dependsOn: []
 requiredBy:
   - dynamodb-schema
@@ -26,7 +26,7 @@ The Learning Profile Analysis System is a serverless platform that personalizes 
 
 Four personas are served: **educator**, **guardian** (parent/legal responsible), **student** (usually a minor, but can be an adult; self-registers and owns a full self-view of a single student entity), and **admin**. Access control is role- and scope-based: guardians see only the students **assigned** to them; educators see only the students they follow; students see only their **own single entity** (profile, submissions, predictions, observations, reports); administrators manage users and the institution's data. Educator/guardian accounts are **approval-gated** (they register `pending` and must be approved before signing in) and the **first educator to register bootstraps as `admin`**. **Students self-register** their account (`role: student`, starts `pending`) and are granted a single student entity when an **educator links** their account to a `STUDENT#` entity they follow (the link approves the account and attributes the entity). A student's entity can also have a **guardian assigned** — the two relations (guardian-managed and self-owned) are independent and cumulative — see [Authentication](./auth.md).
 
-The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for the SPA, and **DynamoDB single-table** design. The SPA is **not currently implemented** — the previous React+Vite frontend was removed; it is planned to be rebuilt in Angular under fresh specs ([frontend](./frontend.md) + [design-system](./design-system.md), both `proposed`). It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
+The architecture mirrors the reference project [0shared](https://github.com/luidsonl/0shared): **Terraform** for stateful infrastructure, **AWS SAM** for stateless API-triggered Lambdas, **CloudFront + S3** for the SPA, and **DynamoDB single-table** design. The SPA is implemented in **Angular** (the earlier React+Vite app was removed and rebuilt) under [frontend](./frontend.md) (`stable`), with tokens and a11y baseline in [design-system](./design-system.md) (`evolving`). It adds a **fully decoupled ML subsystem**: machine learning is trained **offline only** (Python pipeline in `ml/`), the artifact is **bundled into** a Python inference Lambda deployed with SAM, and predictions are generated automatically after form submissions via asynchronous invoke (**no SQS in the ML path**). The system itself never trains models.
 
 The backend API is served under the `/api` path prefix so a single CloudFront distribution serves both the static SPA (`/*`) and the API (`/api/*`) from one domain, without CORS.
 
@@ -59,18 +59,21 @@ The backend API is served under the `/api` path prefix so a single CloudFront di
       │ single-  │                              │ reports,     │
       │ table    │                              │ documents    │
       └──────────┘                              └──────────────┘
-            ▲                                            ▲
-            │ (async Lambdas — Terraform)                │ (model artifacts,
-      ┌─────┴──────────────┐                     ┌───────┴─────┐
-      │ feature-export     │                     │ S3 (data)   │
-      │ report-generator   │                     │ snapshots + │
-      └────────────────────┘                     │ models      │
-                                                 └───────┬─────┘
-                                                         │ (offline train)
-                                                  ┌─────────────┐
-                                                  │ ML pipeline │
-                                                  │ (Python)    │
-                                                  └─────────────┘
+             ▲
+             │ (async Lambdas — Terraform)
+       ┌─────┴──────────────┐                     ┌──────────────┐
+       │ feature-export     │───(nightly snapshot)►│ S3 (data)    │
+       │ report-generator   │                     │ snapshots    │
+       └────────────────────┘                     └──────────────┘
+
+  ┌─────────────┐   make package (offline, on the dev machine)
+  │ ml/ pipeline│───────────────────────────────────────────────┐
+  │ (Python)    │  model.joblib + meta.json bundled in the      │
+  └─────────────┘  inference Lambda's deployment package       ▼
+                                                ┌────────────────────────┐
+                                                │ Inference Lambda       │
+                                                │ (Python 3.12, in SAM)  │
+                                                └────────────────────────┘
 ```
 
 **Form filling flow (generic engine — submission and classification are decoupled):**
@@ -135,33 +138,43 @@ Training always happens **outside** the deployed system (local machine). The dep
 ├── terraform/
 │   ├── aws-bootstrap/     # S3 bucket for Terraform state (one-time)
 │   ├── aws-app/           # DynamoDB + S3 buckets (files/data) + SQS + async Lambdas
+│   │   ├── resources/modules/   # database, files, data, report-queue, feature-export
 │   │   └── src/           # feature-export.mjs, report-generator.mjs
-│   └── aws-frontend/      # S3 static bucket + CloudFront + OAC + deploy (unused while the SPA is absent)
-├── frontend/              # (future) SPA — planned Angular rebuild, not implemented yet (see frontend.md / design-system.md)
+│   └── aws-frontend/      # S3 static bucket + CloudFront + OAC + CloudFront Functions
+├── frontend/              # Angular SPA (standalone components, signals, Material)
+│   ├── angular.json, proxy.conf.json
+│   └── src/app/           # core/ · layout/ · shared/ui/ · features/
 ├── sam-app/               # API Gateway + API-triggered Lambdas (stateless compute)
 │   ├── template.yaml      # SAM template (health, auth, students, guardianship,
-│   │                      #   observations, forms, assessment,
-│   │                      #   recommendations, reports, audit, inference)
+│   │                      #   consent, forms, observations, recommendations,
+│   │                      #   reports, audit, admin, inference)
 │   ├── samconfig.toml     # SAM config (stack name, parameter overrides)
 │   ├── resources.env      # Central resource names (source of truth)
 │   ├── Makefile           # deploy, redeploy-api, unit/e2e tests, clean (full dev DB wipe)
 │   ├── src/api/           # Lambda code — Node.js handlers, forms engine, lib
-│   └── src/inference/      # Lambda code — Python + bundled models (models/<formId>/model.joblib)
-│       ├── health.mjs, auth.mjs, students.mjs, guardianship.mjs,
-│       ├── observations.mjs, forms.mjs (submissions, assessments,
-│       │                  predictions),
-│       ├── recommendations.mjs, reports.mjs, audit.mjs
-│       ├── middleware/    # requireAuth + requireRole (guardian | educator | student | admin)
-│       └── lib/           # Shared utilities (DynamoDB client, VARK scoring, form engine, etc.)
+│   │   ├── handlers/      #   health.mjs, auth.mjs, students.mjs, guardianship.mjs,
+│   │   │                  #   consent.mjs, forms.mjs, observations.mjs,
+│   │   │                  #   recommendations.mjs, reports.mjs, audit.mjs, admin.mjs
+│   │   ├── forms/         #   engine.mjs, schema.mjs, classify.mjs,
+│   │   │                  #   definitions/ (anamnesis, vark, socioemotional,
+│   │   │                  #   behavior-checklist), processors/
+│   │   ├── middleware/    #   requireAuth + requireRole (guardian | educator | student | admin)
+│   │   └── lib/           #   Shared utilities (DynamoDB client, auth, scope, session, age…)
+│   └── src/inference/     # Lambda code — Python + bundled models
+│       ├── handler.py     #   routes by formId, scores, writes PRED#
+│       └── models/<formId>/model.joblib + meta.json
 ├── ml/                    # Offline Python ML pipeline (decoupled)
-│   ├── data/              # Public dataset (Mendeley 10.17632/bwrr6zypcj.1) + feature snapshots
-│   ├── features/          # Feature engineering (assessment/observation → feature vectors)
+│   ├── features/          # Feature engineering (dataset → feature vectors)
 │   ├── train/             # scikit-learn training + k-fold CV
-│   ├── evaluate/          # Metrics (accuracy, F1, Hamming loss) + reports
-│   └── serve/             # Package model for Lambda (artifact bundle + sanity checks)
+│   ├── evaluate/          # Metrics (accuracy, macro-F1, per-class) + reports
+│   ├── serve/             # Package model for Lambda (artifact bundle + sanity checks)
+│   └── tests/             # inference smoke tests (extreme vectors pin the label map)
+├── datasets/vark/         # Public dataset (Mendeley 10.17632/bwrr6zypcj.1) + citation.txt
 ├── specs/                 # architecture, backend, auth, dynamodb-schema, ml-pipeline,
-│                          #   student-data, lgpd, security (README = graph hub)
-├── agents.md
+│                          #   frontend, design-system, lgpd, security,
+│                          #   student-data-features, progress (README = graph hub),
+│                          #   api.yaml (OpenAPI contract)
+├── AGENTS.md
 └── Makefile
 ```
 
@@ -189,7 +202,7 @@ SAM manages **stateless, ephemeral compute** (API-triggered Lambdas) plus API Ga
 | `template.yaml` | All API handlers (Node.js 22 ESM), inference Lambda (Python 3.12, bundled model, invoked asynchronously by the Forms handler), REST API Gateway |
 `sam-app/src/api/handlers/` | Business logic
 
-The API is exercised via the deployed stack (`make e2e-test` in `sam-app/`); no local Lambda/DynamoDB emulation is wired up.
+The API is exercised via the deployed stack (`make e2e-test` in `sam-app/`); no local Lambda/DynamoDB emulation is wired up. The Angular SPA (`make frontend-serve`) proxies `/api` to the deployed API Gateway in dev — the same topology as production, so there is no CORS anywhere.
 
 ---
 
@@ -206,7 +219,7 @@ Naming follows the 0shared derivation chain: `terraform/aws-app/terraform.tfvars
 | Data S3 bucket (ML) | `{namespace}-{project_name}{env_dash}{data_bucket_suffix}` | `learning-profile-data` |
 | Frontend S3 bucket | `{namespace}-{project_name}{env_dash}{front_bucket_suffix}` | `learning-profile-front` |
 | Report SQS queue | `{project_name}{env_under}{queue_suffix}` | `learning-profile_reports` |
-| SAM stack | hardcoded in `samconfig.toml` | `app-learning-profile-backend` |
+| SAM stack | hardcoded in `sam-app/samconfig.toml` / `sam-app/Makefile` (`STACK_NAME`) | `learning-profile-api` |
 
 ---
 
@@ -234,7 +247,7 @@ Data collection is built on a generic, hybrid forms engine:
   | `behavior-checklist` | Educator | Observed behaviors / performance feedback |
 
 - **A profile is traced from a filled form:** each form submission is interpreted by a profile module into dimensions and labels (e.g., the `vark` form produces the VARK profile — V/A/R/K totals + multimodal label per Fleming's method, stored as an assessment `ASSESS#`). The MVP implements the VARK profile; future profiles (giftedness, difficulty, socioemotional) follow the same pattern: a form + a scoring/classification step.
-- **Admin editing:** form content is editable via the admin panel; edits create a new form **version** (never a destructive update), so past submissions stay interpretable.
+- **Versioning:** definitions carry a `formVersion` and are versioned **in code** (per release). A change to a definition is a new version, never a destructive in-place edit, so past submissions stay interpretable. There is no in-app form editor: content changes ship with a release.
 
 Forms are the system's data-collection mechanism; machine learning is an **offline, decoupled layer** that classifies profiles from form-derived features. See [Profiles & Machine Learning](#profiles--machine-learning-decoupled) and the standalone [ML Pipeline](./ml-pipeline.md) spec.
 
@@ -278,7 +291,7 @@ Terminal 3:  (sam-app/)  make e2e-inference             # shorthand for FILTER=i
 
 Scenario filtering (`FILTER=<id>` or a name substring) runs the contiguous prefix `01 → <matched scenario>` of the suite, since scenarios run in order and share `ctx` state — see [backend.md](./backend.md) → Local Development. The suite assumes a clean table (first educator becomes admin); a preflight check fails fast when a leftover admin blocks that bootstrap.
 
-The API is exercised via the deployed stack; the future SPA (Angular) will proxy `/api` in dev and use relative paths in prod — no environment-specific config in app code.
+The API is exercised via the deployed stack; the Angular SPA proxies `/api` in dev and uses relative paths in prod — no environment-specific config in app code.
 
 ---
 

@@ -2,9 +2,9 @@
 id: frontend
 title: Frontend (Angular SPA)
 type: spec
-status: proposed
+status: stable
 since: 2026-09-10
-lastReviewed: 2026-09-13
+lastReviewed: 2026-09-26
 dependsOn:
   - architecture
   - auth
@@ -21,9 +21,9 @@ requiredBy:
 
 The frontend is the interface for all four personas: **guardian**, **educator**, **student**, and **admin**. It renders the same feature set the API exposes and enforces the same role and scope rules at the UI level — the API remains the source of truth for authorization (see the [RBAC Matrix](./backend.md#rbac-matrix)); the SPA only hides what a persona cannot access.
 
-The SPA is **not yet implemented**. This spec captures the agreed shape of the planned rebuild (the previous React+Vite frontend was removed; the rebuild is Angular with fresh specs, see [progress](./progress.md)). Its scope:
+The SPA is **implemented in Angular** and deployed behind CloudFront. This spec is the SSOT for its shape: the previous React+Vite app was removed and rebuilt in Angular against this spec (see [progress](./progress.md)). Its scope:
 
-- Browser application in Angular, standalone components, lazy-loaded feature modules.
+- Browser application in Angular, **standalone components** with lazy-loaded routes (`loadComponent` per feature).
 - Static SPA served from S3 + CloudFront; no server-side rendering.
 - Design tokens and component primitives come from the [design system](./design-system.md) spec.
 - One domain serves the SPA (`/*`) and the API (`/api/*`) through CloudFront — see [architecture](./architecture.md) → *Architecture Diagram* and *Deployment Order*.
@@ -43,12 +43,12 @@ Deployment artifacts live in `terraform/aws-frontend` (S3 static bucket + CloudF
 
 | Concern | Choice | Rationale |
 |---------|--------|-----------|
-| Framework | Angular (current LTS line at scaffold time) | Owner decision; stable router, DI, signals |
+| Framework | Angular 21 (standalone components, signals) | Owner decision; stable router, DI, signals |
 | UI primitives | Angular Material + CDK (Material 3 theming) | Accessible primitives out of the box; CDK for overlay/a11y patterns — see [design system](./design-system.md) |
 | Styling | Angular Material 3 theming + SCSS; custom CSS custom-properties only for gaps | Native Material styling wins by default; custom tokens fill gaps only — see [design system](./design-system.md) |
 | State | Built-in signals + `resource`/`httpResource` | Lean; no third-party state library |
 | HTTP client | Angular `HttpClient` + typed services | Wraps the OpenAPI contract |
-| DTO types | Generated from `specs/api.yaml` | OpenAPI 3.0.3 is the SSOT for shapes (see [backend](./backend.md)) |
+| DTO types | Hand-written in `core/api/types.ts`, mirroring `specs/api.yaml` | OpenAPI 3.0.3 is the SSOT for shapes; the SPA mirrors it (see [backend](./backend.md)) |
 | Unit tests | Vitest, API mocked | Deterministic, no AWS dependency; see *Testing* |
 
 ## Application Structure
@@ -59,50 +59,59 @@ frontend/
 ├── proxy.conf.json         # dev proxy: /api → deployed API Gateway
 └── src/
     ├── main.ts             # bootstrap, provideRouter, provideAnimations
-    ├── styles/             # core/style tier: tokens.scss, themes/, global.scss (see design-system)
-    ├── paths.ts            # typescript path aliases (@core, @shared/ui, @features)
+    ├── styles/             # tokens.scss, fonts.scss, global.scss (see design-system)
     └── app/
-        ├── core/           # singleton providers: interceptors, auth service, errors
-        │   ├── auth/       # login/register calls, session storage, guards
-        │   ├── api/        # generated DTOs + typed feature clients
-        │   └── errors/     # API error envelope → pt-BR user messages
-        ├── shared/ui/      # app-wide Material extensions (Button, Field, Card, DataTable, EmptyState, …)
-        │                   #   promoted here only when ≥ 2 features reuse the component
+        ├── app.routes.ts   # the routing table (all routes, lazy loadComponent)
+        ├── core/           # singleton providers: auth, guards, interceptor,
+        │   │               # errors, and one typed API client per domain
+        │   ├── auth/       # auth.service, auth.guard (authGuard, adminOrEducatorGuard,
+        │   │               #   skipStudentSelectorGuard), auth.interceptor
+        │   ├── api/        # types.ts (DTOs mirroring specs/api.yaml)
+        │   ├── errors/     # API error envelope → typed error + pt-BR user messages
+        │   ├── students/ admin/ forms/ reports/ observations/
+        │   ├── recommendations/ users/ vark/
+        │   └── predictions/prediction-polling.service (signal + RxJS timer backoff)
         ├── layout/         # app shell: header, responsive nav, role-aware menu, footer
-        └── features/       # one dir per feature: routes, services, state, and its own ui/ colocated
-            ├── auth/       # login, register (+ ui/)
-            ├── home/       # role-aware landing/dashboard (+ ui/)
-            ├── students/   # list, detail — profile, submissions, predictions, recommendations,
-            │   │           #   observations, consent, audit (+ ui/ holds PredictionCard, ProfileCard…)
-            ├── forms/      # dynamic form renderer FormRenderer + submissions list (+ ui/)
-            ├── reports/    # report list, generate, download (+ ui/)
-            └── admin/      # user management (approve/deny, tokens, RBAC) (+ ui/)
+        └── features/       # one dir per feature: route component(s) + its .html/.scss/.spec.ts
+            ├── auth/         # login, register
+            ├── home/         # role-aware landing
+            ├── students-list/    # /estudantes — in-scope students
+            ├── student-create/   # /estudantes/novo — educator/admin
+            ├── student-workspace/# /estudantes/:id — the ficha (tabbed)
+            ├── assessment/      # /avaliacoes* — 3-screen workspace + FormAssessment
+            ├── profile/         # /perfil — own self-view (MeuPerfil)
+            ├── observations/ recommendations/ reports/   # /observacoes, /recomendacoes, /relatorios
+            └── admin/           # /admin — approvals + user management
 ```
 
-Component organization follows the **tier + colocation rule** (no Atomic Design): a component lives in its feature's `ui/` unless ≥ 2 features reuse it, then it is promoted to `shared/ui/`; dependencies point inward (`feature/ui` → `shared/ui` → `core/styles`). Details in [design system](./design-system.md) → *Implementation Structure*.
+Component organization follows the **tier + colocation rule** (no Atomic Design): a component lives in its feature directory unless ≥ 2 features reuse it, then it is promoted to `shared/ui/` (today: `PredictionScores`, `StudentForm`); dependencies point inward (`feature` → `shared/ui` → `core/styles`). Details in [design system](./design-system.md) → *Implementation Structure*.
 
 ## Routing & Navigation
 
-Routes map 1:1 to the API surface. Guards mirror backend preconditions:
+Routes map 1:1 to the API surface, but the **URL segments are pt-BR** (end-user navigation, not developer surface). Guards mirror backend preconditions:
 
 | Route | Personas | Purpose | Guard notes |
 |-------|----------|---------|-------------|
 | `/login`, `/register` | public | Sign in / self-register (incl. `role: student`) | Redirect to home when already authenticated |
 | `/` | authenticated | Role-aware landing | `authGuard` |
-| `/me` | student | Own self-view: profile, submissions, predictions, observations, reports | `studentRoleGuard`; renders **restricted self-service area** while `pending`/unlinked (`studentId == null`) |
-| `/students` | guardian, educator, admin | List in-scope students | `guardianEducatorAdminGuard` |
-| `/students/:id` | scoped | Student detail shell + tabs (profile, submissions/predictions, recommendations, observations, consent, audit) | `scopedStudentGuard`; admin adds audit tab |
-| `/students/:id/forms/:formId` | scoped | Fill a form (dynamic renderer) | subject may open any curated form about themselves |
+| `/perfil` | student | Own self-view: profile, submissions, predictions, observations, reports | `authGuard`; renders the **restricted self-service area** while `pending`/unlinked (`studentId == null`) |
+| `/estudantes` | guardian, educator, admin | List in-scope students | `authGuard` |
+| `/estudantes/novo` | educator, admin | Create a student | `authGuard` |
+| `/estudantes/:studentId` | scoped | **Student ficha** — tabbed: Dados (edit + LGPD removal), Perfil de aprendizagem, Observações, Recomendações, Consentimento, Acessos; plus an "avaliações" action button into the assessment workspace | `authGuard`; tabs and write actions are role-gated in the UI |
 | `/avaliacoes` | scoped | Step 1 — pick the student (see *Assessment Workspace*) | `authGuard` + `skipStudentSelectorGuard` (student ⇒ redirect to own profile) |
 | `/avaliacoes/:studentId` | scoped | Step 2 — pick the form | `authGuard`; deep link from the student list skips step 1 |
 | `/avaliacoes/:studentId/:formId` | scoped | Step 3 — submissions/results + *Enviar nova avaliação* | `authGuard` |
-| `/admin/users` | admin, educator | User management (approve/deny/promote/delete/reset) | `adminOrEducatorGuard`; role/status conditional UI; role selector only for staff (guardian/student roles are fixed — no selector) |
+| `/observacoes`, `/recomendacoes`, `/relatorios` | scoped | Cross-student lists for the observations, recommendations and reports the persona can see | `authGuard`; write actions educator/admin only |
+| `/admin` | admin, educator | User management (approvals + users) | `authGuard` + `adminOrEducatorGuard`; role/status conditional UI; role selector only for staff (guardian/student roles are fixed — no selector) |
+| `**` | — | Redirect to `/` | — |
+
+There is **no audit tab** in the ficha: the audit trail is an API-only surface (`GET /api/audit/students/:id`), surfaced to admins outside the SPA.
 
 **Status-aware login**: educator/guardian accounts that are `denied` or not yet `active` receive the mapped error and are routed accordingly; a `pending` student still signs in and lands on `/me` in restricted self-service mode (see [auth](./auth.md) → *Account status & approval flow*).
 
 ## Authentication Flow (SPA side)
 
-1. **Login/register** call `POST /api/auth/login` / `POST /api/auth/register` (role support for `student` self-registration with `birthDate`).
+1. **Login/register** call `POST /api/auth/login` / `POST /api/auth/register` (role support for `student` self-registration; `birthDate` is **optional** — the account declares no age, the ficha does).
 2. **Session token** is returned by the API; the SPA keeps it in memory (Angular service) and mirrors it to `sessionStorage` (survives refresh, cleared on tab close — no long-lived persistence). `logout` revokes via the API and clears local storage. **Session policy is deliberately lenient (risk accepted)**: there is **no idle auto-logout**; session lifetime is governed by the server-side `SESSION#` TTL (7 days sliding, see [auth](./auth.md) → *Session Flow*) alone. Re-login is the only required action after a token-expired `401`.
 3. **Interceptor** (`core/`) attaches `Authorization: Bearer <token>` and maps the uniform error envelope `{ error: { code, message } }` to typed errors and **pt-BR user messages** (see [backend](./backend.md) → *Conventions*).
 4. **401 handling**: destroy local session and route to `/login` (approval/demotion takes effect immediately because `requireAuth` re-reads the user from the DB — see [auth](./auth.md) → *Middleware*).
@@ -110,14 +119,14 @@ Routes map 1:1 to the API surface. Guards mirror backend preconditions:
 
 ## API Client & Types
 
-- DTO interfaces are **generated from `specs/api.yaml`** (OpenAPI 3.0.3) at build time and committed; `core/api/` exposes one typed, feature-scoped client per domain (auth, students, guardianship, consent, forms, observations, assessments, predictions, recommendations, reports, admin, audit).
+- DTO interfaces live in `core/api/types.ts` and **mirror** `specs/api.yaml` (OpenAPI 3.0.3), which stays the SSOT for shapes — there is no codegen step in the build, so a contract change is a deliberate edit in both places (see [backend](./backend.md)). `core/` exposes one typed, feature-scoped client per domain (auth, students, users, forms, observations, predictions, recommendations, reports, admin).
 - Every client returns typed results and passes raw error objects to `core/errors/` for mapping — the SPA never invents domain rules.
 - There is **no business logic in the database or the SPA**: submission flow, consent gating, and prediction semantics are driven by the API response shape, not re-implemented in the client (see [architecture](./architecture.md) → *Forms Engine*).
 
 ## Async & State Patterns
 
 - **Signals** hold session, current student context, and feature list state.
-- **Predictions are asynchronous**: a `vark` submission is stored immediately; the inference Lambda scores it and writes the `PRED#` item asynchronously ([backend](./backend.md) → *Assessment & Prediction*). The SPA **polls** with a signal + RxJS `timer` backoff: `1s → 2s → 5s`, hard stop at **15 s total**; each poll calls `GET /students/:id/predictions?form=vark`. Polling stops when: the prediction for the submitted `requestId` lands, the route changes, the user logs out, or the tab becomes hidden (`document.hidden`). On timeout without a prediction, the SPA enters a **terminal "processing" state** ("análise em processamento") with a **manual retry** action — retry restarts the poll only, it never resubmits the form (`requestId` preserved; see [backend](./backend.md) → *Forms*).
+- **Predictions are asynchronous**: a `vark` submission is stored immediately; the inference Lambda scores it and writes the `PRED#` item asynchronously ([backend](./backend.md) → *Assessment & Prediction*). The SPA **polls** with a signal + RxJS `timer` backoff — `1s → 2s → 5s → 5s` (≈ 13 s total, `POLL_DELAYS_MS` in `core/predictions/prediction-polling.service.ts`); each poll calls `GET /students/:id/predictions?form=<formId>`. Polling stops when: the prediction for the submitted `requestId` lands, the route changes, or the terminal state is reached. On exhaustion without a prediction, the SPA enters a **terminal "processing" state** ("análise em processamento") with a **manual retry** action — retry restarts the poll only, it never resubmits the form (`requestId` preserved; see [backend](./backend.md) → *Forms*). A submission opened later is polled too: the history screen auto-polls the newest pending row, so a prediction that landed after the user navigated away still appears.
 - **`requestId` idempotency**: the SPA generates a `requestId` per submission attempt; a retry reuses the same value so the API deduplicates (see [backend](./backend.md) → *Forms*).
 - **Optimistic UI only where safe** (e.g. local tab state); anything that mutates students' data waits for the API response and refreshes from the server.
 
@@ -185,7 +194,7 @@ Derived from the RBAC matrix — the SPA shows only these actions, each wired to
 - No secrets or credentials in the bundle; tokens live in memory/session storage only.
 - Least-privilege navigation (guards) is a UX optimization — the API enforces real authorization.
 - No third-party analytics/tracking (LGPD constraint, see [lgpd](./lgpd.md)); CSP and security headers are applied at the CloudFront level (see [security](./security.md)).
-- Dependency hygiene: `npm audit` runs for frontend deps when the SPA is reintroduced (see [security](./security.md)).
+- Dependency hygiene: `npm audit` runs for frontend deps (see [security](./security.md)).
 
 ## Testing
 

@@ -2,9 +2,9 @@
 id: design-system
 title: Design System
 type: spec
-status: proposed
+status: evolving
 since: 2026-09-10
-lastReviewed: 2026-09-10
+lastReviewed: 2026-09-26
 dependsOn:
   - architecture
   - frontend
@@ -147,24 +147,25 @@ Compliance is verified by: token contrast checks in CI, automated a11y scans on 
 
 ## Implementation Structure
 
+> **Implementation status (`evolving`)**: the SPA ships Angular Material 3 + the core style tier (`src/styles/{tokens,fonts,global}.scss`) and the first promoted components (`shared/ui/prediction-scores`, `shared/ui/student-form`). The component catalog, theme variants (dark/dyslexia-friendly) and the token scale below are the **target** surface — landed incrementally as screens need them, not built upfront. See [progress](./progress.md).
+
 Component organization follows **layers by intent, colocated by feature** — not Atomic Design (no atom/molecule/… taxonomy; a component's tier is set by **real reuse**, not size):
 
 ```
-frontend/src/styles/                      # core/style tier — tokens, themes, global
+frontend/src/styles/                      # core/style tier — tokens, fonts, global
 │   ├── tokens.scss                       # custom design tokens (gaps Material does not cover)
-│   ├── themes/                           # light, dark, dyslexia-friendly token sets
+│   ├── fonts.scss                        # typography face/scale wiring
 │   └── global.scss                       # resets, base typography, focus styles
 frontend/src/app/core/                    # singleton services/providers (auth store, interceptors)
-frontend/src/app/shared/ui/               # app-wide Material extensions (Button, Field, Card,
-│                                         #   DataTable, EmptyState, …) — promoted here ONLY when
-│                                         #   ≥ 2 features reuse them
-frontend/src/app/features/<feature>/      # one dir per feature: routes, services, state
-│   └── ui/                               # feature-local composites (PredictionCard,
-│                                         #   ProfileCard, FormRenderer, …) colocated with the
-│                                         #   feature that owns them
+frontend/src/app/shared/ui/               # app-wide Material extensions — promoted here ONLY when
+│                                         #   ≥ 2 features reuse them (today: prediction-scores,
+│                                         #   student-form)
+frontend/src/app/features/<feature>/      # one dir per feature: route component(s), its services,
+│                                         #   its .html/.scss and its .spec.ts — colocated
+│                                         #   flat (no ui/ subdir today)
 ```
 
-**Dependency rule**: dependencies always point inward — `feature/…/ui` → `shared/ui` → `core/styles`. Features never import from other features; when a component is reused by a second feature it moves up to `shared/ui`. The [form renderer](./frontend.md) → *Forms Renderer* lives in `features/forms/ui/` because it is a product pattern, not a primitive.
+**Dependency rule**: dependencies always point inward — `feature/…` → `shared/ui` → `core/styles`. Features never import from other features; when a component is reused by a second feature it moves up to `shared/ui`. The [form renderer](./frontend.md) → *Forms Renderer* (`features/assessment/form-assessment`) lives inside its owning feature because it is a product pattern, not a primitive.
 
 - Material theme is configured once (Material 3 provider); **Material's native styling is the default** — custom component styles exist only for custom composites (tier 2/3), via tokens. Material component overrides are avoided unless a WCAG AA gap demands one.
 - Custom token files are the source of truth for the gaps Material does not cover; changing a custom token re-themes the affected composites.

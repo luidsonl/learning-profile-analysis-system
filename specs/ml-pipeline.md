@@ -4,7 +4,7 @@ title: ML Pipeline
 type: spec
 status: stable
 since: 2026-08-27
-lastReviewed: 2026-08-30
+lastReviewed: 2026-09-26
 dependsOn:
   - architecture
   - dynamodb-schema
@@ -142,7 +142,7 @@ Retraining is **never scheduled inside AWS** — it is a deliberate human step o
 
 The pipeline is designed so new classifications are additive. Only models that change need retraining — adding a model never retrains the others (existing packaged artifacts are reused at package time):
 
-1. **New form → new profile:** add a curated form (see Architecture — Forms Engine); submissions are stored by the generic engine; add its `formId` to `INFERENCE_FORMS` in `resources.env`.
+1. **New form → new profile:** add a curated form (see Architecture — Forms Engine); submissions are stored by the generic engine; add its `formId` to the **`INFERENCE_FORMS`** environment variable of the Forms function in `sam-app/template.yaml` (comma-separated, default `vark`) — that list gates the async invoke. `sam-app/resources.env` carries the model name (`INFERENCE_MODEL`), not this list.
 2. **New model:** register it in `ml/features/prepare.py` (`MODELS` — dataset layout, feature order, label map) and train offline (`make train MODEL=<id>`, on exported snapshots once the export phase exists). Existing models are left untouched.
 3. **Deploy:** `make package-all` + redeploy the inference Lambda — predictions for that form's submissions start flowing automatically through the same async invoke (routed by `formId`); no new endpoint is required.
 4. No changes to the running system's data model are required — the submission contract already carries the data.
@@ -188,7 +188,7 @@ Beyond the primary dataset (Armand, Eboue 2021), these public datasets are candi
 | Open University Learning Analytics Dataset (OULAD) | Kuzilek, Zdrahal & Fuglik, 2017 | Large VLE interaction + demographics + results — behavioral classification at scale |
 | Education Dialogue Dataset | Google Research, arXiv:2405.14655 | Teacher-student dialogues with stated learning preferences — NLU/LLM-based personalization research |
 
-Each candidate should be vetted (license, age range, feature alignment) in `ml/data/README.md` before being used for training.
+Each candidate must be vetted (license, age range, feature alignment) before use — the committed primary dataset's provenance lives in `datasets/vark/citation.txt`, and the dataset itself at `datasets/vark/data.csv`.
 
 ---
 
