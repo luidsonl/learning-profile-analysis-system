@@ -403,7 +403,7 @@ Fluxo completo no ambiente de desenvolvimento, com **dados fictícios** (nenhum 
 
 | Cadastro de nova conta | Página inicial do admin |
 |:---:|:---:|
-| <img src="docs/img/02-cadastro-nova-conta.png" alt="Formulário de cadastro de nova conta" width="330"> | <img src="docs/img/02-pagina-inicial-admin.png" alt="Página inicial do admin" width="330"> |
+| <img src="docs/img/19-cadastro-nova-conta-selecao-tipo-conta.png" alt="Formulário de cadastro de nova conta" width="330"> | <img src="docs/img/02-pagina-inicial-admin.png" alt="Página inicial do admin" width="330"> |
 
 **Gestão de usuários**
 
@@ -441,7 +441,7 @@ Fluxo completo no ambiente de desenvolvimento, com **dados fictícios** (nenhum 
 
 | Resultado (perfil + predição) | Integração back → front |
 |:---:|:---:|
-| <img src="docs/img/16-resultados-test-vark.png" alt="Resultado do VARK com predição do modelo" width="330"> | <img src="docs/img/17-integracao-back-front.png" alt="Integração entre backend e frontend" width="330"> |
+| <img src="docs/img/16-resultados-test-vark.png" alt="Resultado do VARK com predição do modelo" width="330"> | <img src="docs/img/17-integracao-back-front-devtools-requisicoes-api.png" alt="Integração entre backend e frontend" width="330"> |
 
 ---
 
