@@ -2,7 +2,7 @@
 
 Plataforma **serverless** que personaliza o ensino para estudantes superdotados e para estudantes com necessidades específicas. Coleta dados por **formulários** (histórico escolar, preferências de aprendizagem, comportamentos observados, indicadores socioemocionais), roda **machine learning** sobre essas respostas e devolve **estratégias pedagógicas** e relatórios — com quatro personas: **educador**, **responsável** (guardian), **estudante** e **admin**.
 
-O principle central é: **um perfil é rastreado a partir de um formulário preenchido.** O formulário VARK, por exemplo, gera o perfil de aprendizagem V/A/R/K (método de Fleming) e, em seguida, um modelo de ML classifica o perfil automaticamente.
+O princípio central é: **um perfil é rastreado a partir de um formulário preenchido.** O formulário VARK, por exemplo, gera o perfil de aprendizagem V/A/R/K (método de Fleming) e, em seguida, um modelo de ML classifica o perfil automaticamente.
 
 > Documento em **pt-BR** (visão geral para humanos). A documentação de arquitetura em inglês, que é a fonte da verdade do projeto, vive em [`specs/`](./specs/README.md) — comece por ela.
 
@@ -29,6 +29,7 @@ O principle central é: **um perfil é rastreado a partir de um formulário pree
   - [LGPD](#lgpd)
 - [Machine Learning (100% offline)](#machine-learning-100-offline)
 - [Frontend (Angular)](#frontend-angular)
+  - [Capturas de tela](#capturas-de-tela)
 - [Testes](#testes)
 - [Comandos](#comandos)
 - [Segurança e repositório público](#segurança-e-repositório-público)
@@ -389,6 +390,58 @@ SPA em **Angular 21** com **Angular Material** (theming M3), **Signals** (sem bi
 - **Observações e recomendações são da equipe**: os formulários de escrita e as ações de status/exclusão só aparecem para educador/admin; responsável e estudante veem as listas em modo leitura.
 - **Hardening do envio**: o botão é `type="button"` com `(click)` (o `ngSubmit` sem `preventDefault` recarregava a página e abortava o POST) — não existe navegação nativa possível no fluxo de envio.
 - **Dev sem CORS**: `make frontend-serve` roda o dev server com proxy de `/api` para a API já implantada — mesma topologia de produção.
+
+### Capturas de tela
+
+Fluxo completo no ambiente de desenvolvimento, com **dados fictícios** (nenhum dado real de estudante é publicado aqui — ver [Segurança e repositório público](#segurança-e-repositório-público)).
+
+**Acesso e cadastro**
+
+| Primeiro educador vira admin | Login |
+|:---:|:---:|
+| <img src="docs/img/00-cadastro-admin-educador.png" alt="Cadastro do primeiro educador, que se torna admin" width="330"> | <img src="docs/img/01-tela-login.png" alt="Tela de login" width="330"> |
+
+| Cadastro de nova conta | Página inicial do admin |
+|:---:|:---:|
+| <img src="docs/img/02-cadastro-nova-conta.png" alt="Formulário de cadastro de nova conta" width="330"> | <img src="docs/img/02-pagina-inicial-admin.png" alt="Página inicial do admin" width="330"> |
+
+**Gestão de usuários**
+
+| Aprovação pendente | Aprovação de usuários |
+|:---:|:---:|
+| <img src="docs/img/03-aprocavao-pendente.png" alt="Fila de contas aguardando aprovação" width="330"> | <img src="docs/img/04-aprovacao-usuarios.png" alt="Aprovação de contas pendentes" width="330"> |
+
+| Gerenciamento de usuários (admin) | Visão do educador |
+|:---:|:---:|
+| <img src="docs/img/05-gerenciamento-usuarios.png" alt="Gerenciamento de usuários pelo admin" width="330"> | <img src="docs/img/06-gerenciamento-usuarios-visao-educador.png" alt="Gerenciamento de usuários na visão do educador" width="330"> |
+
+**Estudantes**
+
+| Cadastro de estudante (educador) | Listagem de estudantes |
+|:---:|:---:|
+| <img src="docs/img/07-cadastro-estudante-visao-educador.png" alt="Cadastro de estudante na visão do educador" width="330"> | <img src="docs/img/08-listagem-estudantes.png" alt="Listagem dos estudantes no escopo" width="330"> |
+
+| Ficha do estudante | Gerenciamento de acesso |
+|:---:|:---:|
+| <img src="docs/img/09-ficha-estudante.png" alt="Ficha do estudante em abas" width="330"> | <img src="docs/img/10-gerenciamento-acesso-estudante.png" alt="Gerenciamento de acesso do estudante" width="330"> |
+
+| Consentimento (LGPD) |
+|:---:|
+| <img src="docs/img/11-consentimento-lgpd.png" alt="Aba de consentimento LGPD da ficha" width="330"> |
+
+**Formulário VARK e predição**
+
+| Seleção de formulário | Seleção do VARK |
+|:---:|:---:|
+| <img src="docs/img/12-selecao-formulario.png" alt="Seleção de formulário" width="330"> | <img src="docs/img/13-selecao-formulario-vark.png" alt="Seleção do formulário VARK" width="330"> |
+
+| Preenchimento | Envio |
+|:---:|:---:|
+| <img src="docs/img/14-preenchimento-formulario.png" alt="Preenchimento do formulário" width="330"> | <img src="docs/img/15-envio-teste-vark.png" alt="Envio do formulário VARK" width="330"> |
+
+| Resultado (perfil + predição) | Integração back → front |
+|:---:|:---:|
+| <img src="docs/img/16-resultados-test-vark.png" alt="Resultado do VARK com predição do modelo" width="330"> | <img src="docs/img/17-integracao-back-front.png" alt="Integração entre backend e frontend" width="330"> |
 
 ---
 
