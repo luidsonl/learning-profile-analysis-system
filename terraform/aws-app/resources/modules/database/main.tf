@@ -4,10 +4,6 @@ resource "aws_dynamodb_table" "this" {
   hash_key     = "PK"
   range_key    = "SK"
 
-  lifecycle {
-    prevent_destroy = true
-  }
-
   server_side_encryption {
     enabled = true
   }

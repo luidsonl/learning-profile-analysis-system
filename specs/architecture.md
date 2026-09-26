@@ -178,7 +178,7 @@ Terraform manages all **stateful, long-lived infrastructure**:
 | `terraform/aws-bootstrap/` | S3 bucket for Terraform state |
 | `terraform/aws-app/` | DynamoDB table, S3 files bucket (reports/documents), S3 data bucket (ML artifacts/Parquet snapshots), SQS report queue + DLQ, async Lambdas (feature-export, report-generator), EventBridge schedule (nightly VARK/observation export), event source mappings |
 
-Rationale matches 0shared: stateful resources must not be recreated, `prevent_destroy` protects them, and non-API-triggered Lambdas are centralized with the infrastructure they process.
+Rationale matches 0shared: stateful resources must not be recreated, non-API-triggered Lambdas are centralized with the infrastructure they process, and `prevent_destroy` is reserved for the Terraform state bucket (`aws-bootstrap`) — the `aws-app` data/table/files resources stay destroyable so `make destroy-all` can complete; their data is treated as disposable (test data, derived exports) and is recreated by the next `make apply`.
 
 ### AWS SAM — Application Layer
 
